@@ -10,10 +10,10 @@ export function normalize(text) {
     .replace(/\s+/g, ' ');
 }
 
-// Palavras usadas na busca de pessoas: cada palavra do nome e da profissão
+// Palavras usadas nas buscas (pessoas, unidades): cada palavra dos textos, sem repetir
 export function searchKeywords(...texts) {
-  const words = texts.flatMap((t) => normalize(t).split(' ')).filter((w) => w.length >= 2);
-  return [...new Set(words)].slice(0, 60);
+  const words = texts.flatMap((t) => normalize(t).split(/[^a-z0-9]+/)).filter((w) => w.length >= 2);
+  return [...new Set(words)].slice(0, 30);
 }
 
 export function isValidEmail(email) {

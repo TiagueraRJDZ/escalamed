@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { auth } from '../firebase.js';
+import { auth, navigate } from '../firebase.js';
 import { currentUser, ensureUserProfile, nextUrl } from '../auth.js';
 import { icon, GOOGLE_LOGO } from '../icons.js';
 import { isValidEmail, isValidName, isStrongPassword, PASSWORD_RULES } from '../validators.js';
@@ -17,6 +17,7 @@ import {
   setLoading,
   setFieldError,
   clearFormErrors,
+  clearErrorsWhileTyping,
   showFormAlert,
   firebaseErrorMessage,
   toast,
@@ -26,12 +27,12 @@ import {
 const existingUser = await currentUser();
 if (existingUser) {
   await ensureUserProfile(existingUser);
-  location.replace(nextUrl());
+  navigate(nextUrl(), { replace: true });
 }
 
 async function finishLogin(user, fallbackName) {
   await ensureUserProfile(user, fallbackName);
-  location.replace(nextUrl());
+  navigate(nextUrl(), { replace: true });
 }
 
 // ---------- Carrossel de benefícios ----------
@@ -281,6 +282,8 @@ setupPasswordRules();
 setupLogin();
 setupSignup();
 setupForgot();
+
+['login-form', 'signup-form', 'forgot-form'].forEach((id) => clearErrorsWhileTyping(document.getElementById(id)));
 
 document.querySelectorAll('[data-google]').forEach((button) => {
   button.insertAdjacentHTML('afterbegin', GOOGLE_LOGO);

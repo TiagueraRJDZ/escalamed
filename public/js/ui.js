@@ -54,6 +54,19 @@ export function setFieldError(input, message) {
   }
 }
 
+// Apaga o erro de um campo assim que a pessoa começa a corrigi-lo
+export function clearErrorsWhileTyping(form) {
+  const handler = (event) => {
+    const el = event.target;
+    // Em campos de texto, "change" também dispara ao perder o foco; só "input" conta
+    const isChoice = el.tagName === 'SELECT' || ['checkbox', 'radio'].includes(el.type);
+    if (event.type === 'change' && !isChoice) return;
+    if (el.getAttribute?.('aria-invalid') === 'true') setFieldError(el, '');
+  };
+  form.addEventListener('input', handler);
+  form.addEventListener('change', handler);
+}
+
 export function clearFormErrors(form) {
   form.querySelectorAll('[aria-invalid]').forEach((el) => el.setAttribute('aria-invalid', 'false'));
   form.querySelectorAll('.field-error').forEach((el) => (el.textContent = ''));
@@ -69,6 +82,71 @@ export function showFormAlert(form, message, type = 'error') {
   el.className = `alert alert-${type} form-alert`;
   el.textContent = message;
   el.hidden = false;
+}
+
+// Menu suspenso acessível: abre/fecha no botão, fecha com Esc ou clique fora,
+// setas para navegar entre os itens.
+export function setupMenu(button, menu) {
+  const items = () => [...menu.querySelectorAll('[role=menuitem]')];
+  const setOpen = (open, { focusButton = false } = {}) => {
+    menu.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    if (open) items()[0]?.focus();
+    else if (focusButton) button.focus();
+  };
+
+  button.addEventListener('click', () => setOpen(menu.hidden));
+  document.addEventListener('click', (event) => {
+    if (!menu.hidden && !button.contains(event.target) && !menu.contains(event.target)) setOpen(false);
+  });
+  menu.addEventListener('keydown', (event) => {
+    const list = items();
+    const index = list.indexOf(document.activeElement);
+    if (event.key === 'Escape') setOpen(false, { focusButton: true });
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      list[(index + 1) % list.length].focus();
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      list[(index - 1 + list.length) % list.length].focus();
+    }
+  });
+  return { close: () => setOpen(false) };
+}
+
+// Janela de confirmação. Uso: if (await confirmDialog({ ... })) { ... }
+export function confirmDialog({ title, message, confirmText = 'Confirmar', cancelText = 'Cancelar', danger = false }) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'modal';
+    dialog.setAttribute('aria-labelledby', 'confirm-title');
+    dialog.innerHTML = `
+      <div class="dialog-header" style="border:0"><h2 id="confirm-title">${escapeHtml(title)}</h2></div>
+      <div class="dialog-body"><p class="muted">${escapeHtml(message)}</p></div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" value="cancel">${escapeHtml(cancelText)}</button>
+        <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" value="confirm">${escapeHtml(confirmText)}</button>
+      </div>`;
+    document.body.append(dialog);
+
+    let confirmed = false;
+    dialog.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (button) {
+        confirmed = button.value === 'confirm';
+        dialog.close();
+      } else if (event.target === dialog) {
+        dialog.close();
+      }
+    });
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      resolve(confirmed);
+    });
+    dialog.showModal();
+    dialog.querySelector('[value=cancel]').focus();
+  });
 }
 
 // Traduz os erros do Firebase para mensagens em português.

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar grupo | EscalaMed</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/schedules.css" />
+  <link rel="stylesheet" href="/css/wizard.css" />
+</head>
+<body class="is-booting">
+  <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
+
+  <main id="page" class="page wizard-page">
+    <a class="btn btn-ghost wizard-back" href="/schedules"><span data-icon="arrowLeft"></span>Voltar para escalas</a>
+
+    <div class="card wizard">
+      <header class="wizard-header">
+        <div>
+          <h1 id="wizard-title">Criar novo grupo</h1>
+          <p class="muted" id="wizard-subtitle">Monte a escala da sua equipe em poucos passos.</p>
+        </div>
+        <ol class="stepper" aria-label="Etapas">
+          <li class="step" data-step="info"><span class="step-number">1</span><span class="step-label">Informações</span></li>
+          <li class="step" data-step="shifts"><span class="step-number">2</span><span class="step-label">Turnos</span></li>
+        </ol>
+      </header>
+
+      <!-- Etapa 1: informações -->
+      <form id="step-info" class="wizard-step" novalidate hidden>
+        <div class="wizard-body">
+          <div class="alert form-alert" role="alert" hidden></div>
+          <div class="form-grid">
+            <div class="field span-2">
+              <label class="label" for="group-name" id="group-name-label">Nome do grupo</label>
+              <input class="input" id="group-name" name="name" type="text" maxlength="60" placeholder="Ex.: UTI Adulto" required />
+              <span class="field-error"></span>
+            </div>
+
+            <div class="field span-2" id="unit-field">
+              <label class="label" for="unit-search" id="unit-label">Unidade de saúde</label>
+              <div class="combobox" id="unit-combobox">
+                <div class="input-icon">
+                  <span data-icon="search"></span>
+                  <input class="input" id="unit-search" type="text" role="combobox" autocomplete="off"
+                    placeholder="Busque pelo nome da unidade ou cidade"
+                    aria-autocomplete="list" aria-expanded="false" aria-controls="unit-options" />
+                </div>
+                <ul class="combobox-list" id="unit-options" role="listbox" aria-labelledby="unit-label" hidden></ul>
+              </div>
+              <div class="selected-unit" id="selected-unit" hidden></div>
+              <span class="field-error"></span>
+            </div>
+
+            <div class="field span-2">
+              <label class="label" for="group-category" id="category-label">Categoria profissional</label>
+              <select class="select" id="group-category" name="categoryId">
+                <option value="">Selecione</option>
+              </select>
+              <span class="field-error"></span>
+            </div>
+
+            <fieldset class="field span-2 color-fieldset">
+              <legend class="label">Cor do grupo</legend>
+              <div class="swatches" id="swatches"></div>
+            </fieldset>
+
+            <div class="field span-2">
+              <span class="label">Prévia</span>
+              <div class="group-preview" id="group-preview" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <a class="btn btn-secondary" href="/schedules">Cancelar</a>
+          <button type="submit" class="btn btn-primary">Próximo<span data-icon="chevronRight"></span></button>
+        </div>
+      </form>
+
+      <!-- Etapa 2: turnos -->
+      <section id="step-shifts" class="wizard-step" aria-labelledby="shifts-title" hidden>
+        <div class="wizard-body">
+          <h2 id="shifts-title" style="font-size:var(--texto-lg)">Turnos</h2>
+          <p class="muted" style="margin:var(--esp-1) 0 var(--esp-4)">
+            Cadastre os turnos que se repetem na escala. Você pode alterá-los depois.
+          </p>
+
+          <div class="presets" id="presets"><span>Sugestões:</span></div>
+          <ul class="shift-list" id="shift-list" aria-live="polite"></ul>
+          <button type="button" class="btn btn-secondary" id="add-shift"><span data-icon="plus"></span>Adicionar turno</button>
+        </div>
+        <div class="wizard-footer">
+          <button type="button" class="btn btn-secondary" id="back-to-info"><span data-icon="arrowLeft"></span>Voltar</button>
+          <button type="button" class="btn btn-primary" id="finish">Concluir<span data-icon="check"></span></button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modal: criar/editar turno -->
+  <dialog class="modal" id="modal-shift" aria-labelledby="modal-shift-title">
+    <form id="shift-form" novalidate>
+      <div class="dialog-header">
+        <h2 id="modal-shift-title">Novo turno</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <div class="alert form-alert" role="alert" hidden></div>
+        <div class="field">
+          <label class="label" for="shift-title">Título</label>
+          <input class="input" id="shift-title" name="title" type="text" maxlength="40" placeholder="Ex.: Diurno" required />
+          <span class="field-error"></span>
+        </div>
+        <div class="time-grid">
+          <div class="field">
+            <label class="label" for="shift-start">Hora de início</label>
+            <input class="input" id="shift-start" name="start" type="time" required />
+            <span class="field-error"></span>
+          </div>
+          <div class="field">
+            <label class="label" for="shift-end">Hora de fim</label>
+            <input class="input" id="shift-end" name="end" type="time" required />
+            <span class="field-error"></span>
+          </div>
+        </div>
+        <p class="shift-hint" id="shift-hint" aria-live="polite"></p>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar turno</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: cadastrar unidade de saúde -->
+  <dialog class="modal" id="modal-unit" aria-labelledby="modal-unit-title">
+    <form id="unit-form" novalidate>
+      <div class="dialog-header">
+        <h2 id="modal-unit-title">Cadastrar unidade de saúde</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <div class="alert form-alert" role="alert" hidden></div>
+        <div class="field">
+          <label class="label" for="unit-name">Nome da unidade</label>
+          <input class="input" id="unit-name" name="name" type="text" maxlength="120" placeholder="Ex.: Hospital Municipal Central" required />
+          <span class="field-error"></span>
+        </div>
+        <div class="time-grid">
+          <div class="field">
+            <label class="label" for="unit-city">Cidade</label>
+            <input class="input" id="unit-city" name="city" type="text" maxlength="80" required />
+            <span class="field-error"></span>
+          </div>
+          <div class="field">
+            <label class="label" for="unit-state">UF</label>
+            <select class="select" id="unit-state" name="state" required>
+              <option value="">Selecione</option>
+            </select>
+            <span class="field-error"></span>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Cadastrar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/pages/group-new.js"></script>
+</body>
+</html>

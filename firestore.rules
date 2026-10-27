@@ -74,9 +74,10 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn()
         && incoming().keys().hasOnly(['name', 'nameLower', 'city', 'cityLower', 'state',
-                                      'createdBy', 'createdAt'])
+                                      'keywords', 'createdBy', 'createdAt'])
         && str(incoming().name, 3, 120)
         && str(incoming().nameLower, 3, 120)
+        && incoming().keywords is list && incoming().keywords.size() <= 30
         && str(incoming().city, 2, 80)
         && str(incoming().cityLower, 2, 80)
         && incoming().state is string && incoming().state.matches('^[A-Z]{2}$')

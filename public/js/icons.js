@@ -41,6 +41,13 @@ export function icon(name, className = '') {
   return `<svg${cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
 
+// Troca cada <span data-icon="nome"></span> do HTML pelo ícone correspondente
+export function renderIcons(root = document) {
+  root.querySelectorAll('span[data-icon]').forEach((el) => {
+    el.outerHTML = icon(el.dataset.icon);
+  });
+}
+
 // Logo colorido do Google (botão "Continuar com Google")
 export const GOOGLE_LOGO = `<svg viewBox="0 0 24 24" aria-hidden="true">
   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/>

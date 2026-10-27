@@ -84,6 +84,8 @@ async function main() {
       ...rest,
       nameLower: normalize(unit.name),
       cityLower: normalize(unit.city),
+      // palavras do nome e da cidade, para buscar por qualquer uma delas
+      keywords: [...new Set(normalize(`${unit.name} ${unit.city}`).split(/[^a-z0-9]+/).filter((w) => w.length >= 2))],
       createdBy: 'seed',
       createdAt: now,
     });

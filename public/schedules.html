@@ -10,19 +10,59 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/schedules.css" />
 </head>
 <body class="is-booting">
   <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
 
-  <main id="page" class="page" data-active="schedules">
-    <div class="card">
-      <div class="empty-state" data-icon="calendar">
-        <h1 style="font-size:var(--texto-xl)">Escalas</h1>
-        <p>Seus grupos e escalas aparecem aqui.</p>
+  <main id="page" class="page schedules-page">
+    <!-- Lista de grupos -->
+    <section class="card groups-card" aria-labelledby="groups-title">
+      <div class="groups-header">
+        <h1 id="groups-title">Lista de grupos</h1>
+        <div class="groups-toolbar">
+          <div class="input-icon">
+            <span data-icon="search"></span>
+            <label class="sr-only" for="group-search">Procurar grupo</label>
+            <input class="input" id="group-search" type="search" placeholder="Procurar grupo" autocomplete="off" />
+          </div>
+          <div class="menu-anchor">
+            <button type="button" class="btn-icon btn-boxed" id="new-button" aria-label="Criar grupo ou escala"
+              aria-haspopup="menu" aria-expanded="false" aria-controls="new-menu" title="Criar grupo ou escala">
+              <span data-icon="plus"></span>
+            </button>
+            <div class="menu new-menu" id="new-menu" role="menu" aria-label="Criar" hidden>
+              <a class="menu-item" role="menuitem" href="/group-new?type=team">
+                <span data-icon="users"></span>
+                <span>Criar novo grupo<small>Para gestores: monte a escala da sua equipe</small></span>
+              </a>
+              <a class="menu-item" role="menuitem" href="/group-new?type=personal">
+                <span data-icon="user"></span>
+                <span>Criar escala individual<small>Para plantonistas: organize seus próprios plantões</small></span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
+      <ul class="group-list" id="group-list" aria-busy="true"></ul>
+    </section>
+
+    <!-- Calendário e plantões disponíveis -->
+    <div class="schedules-side">
+      <section class="card calendar-card" id="calendar" aria-label="Calendário"></section>
+      <section aria-labelledby="available-title">
+        <h2 class="side-title" id="available-title">Disponíveis (<span id="available-count">0</span>)</h2>
+        <div class="card">
+          <div class="empty-state">
+            <span data-icon="hourglass"></span>
+            <h3>Nenhum plantão disponível</h3>
+            <p>Plantões vagos ou oferecidos para troca nos seus grupos aparecem aqui.</p>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
-  <script type="module" src="/js/pages/placeholder.js"></script>
+  <script type="module" src="/js/pages/schedules.js"></script>
 </body>
 </html>

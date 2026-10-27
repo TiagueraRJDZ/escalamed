@@ -17,10 +17,16 @@ Plataforma web de gestão de escalas e plantões para equipes de saúde (hospita
 escalamed/
 ├─ public/              tudo o que vai para o site
 │  ├─ index.html        entrar / criar conta
-│  ├─ css/              base.css (cores e componentes) e estilos de layout
+│  ├─ schedules.html    Escalas: lista de grupos, calendário e disponíveis
+│  ├─ group-new.html    wizard de criação de grupo ou escala individual
+│  ├─ *.html            demais telas (algumas ainda provisórias)
+│  ├─ css/              base.css (cores e componentes), layout.css e um arquivo por tela
 │  ├─ js/
 │  │  ├─ config.js      configuração do Firebase e links
-│  │  ├─ firebase.js    conexão com o Firebase (Auth e Firestore)
+│  │  ├─ firebase.js    conexão com o Firebase e troca de página (navigate)
+│  │  ├─ layout.js      menu lateral, barra superior, gavetas e modais
+│  │  ├─ auth.js        sessão do usuário e proteção das páginas
+│  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
 │  │  └─ pages/         código de cada tela
 │  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)
 │  └─ img/              logo e imagens

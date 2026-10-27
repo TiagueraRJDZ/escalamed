@@ -3,7 +3,7 @@
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
 import { requireAuth, signOutUser } from './auth.js';
 import { icon } from './icons.js';
-import { escapeHtml, initials, toast } from './ui.js';
+import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules' },
@@ -187,34 +187,8 @@ function setupSidebar(app) {
 }
 
 function setupUserMenu(app) {
-  const button = app.querySelector('#avatar-button');
   const menu = app.querySelector('#user-menu');
-  const items = () => [...menu.querySelectorAll('[role=menuitem]')];
-
-  const setOpen = (open, { focusButton = false } = {}) => {
-    menu.hidden = !open;
-    button.setAttribute('aria-expanded', String(open));
-    if (open) items()[0].focus();
-    else if (focusButton) button.focus();
-  };
-
-  button.addEventListener('click', () => setOpen(menu.hidden));
-  document.addEventListener('click', (event) => {
-    if (!menu.hidden && !event.target.closest('.menu-anchor')) setOpen(false);
-  });
-  menu.addEventListener('keydown', (event) => {
-    const list = items();
-    const index = list.indexOf(document.activeElement);
-    if (event.key === 'Escape') setOpen(false, { focusButton: true });
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      list[(index + 1) % list.length].focus();
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      list[(index - 1 + list.length) % list.length].focus();
-    }
-  });
+  setupMenu(app.querySelector('#avatar-button'), menu);
   menu.querySelector('#logout').addEventListener('click', signOutUser);
 }
 

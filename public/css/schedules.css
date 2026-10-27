@@ -1,0 +1,159 @@
+/* Tela de Escalas: lista de grupos, calendário e plantões disponíveis */
+
+.schedules-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--esp-5);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .schedules-page { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+
+/* ---------- Lista de grupos ---------- */
+.groups-card { min-height: 420px; }
+
+.groups-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  padding: var(--esp-5) var(--esp-5) var(--esp-4);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.groups-header h1 { font-size: var(--texto-xl); }
+
+.groups-toolbar {
+  display: flex;
+  gap: var(--esp-2);
+}
+
+.groups-toolbar .input-icon { flex: 1; }
+.groups-toolbar .btn-icon { width: 46px; height: 46px; }
+
+.new-menu { min-width: 300px; }
+
+.group-list {
+  margin: 0;
+  padding: var(--esp-2);
+  list-style: none;
+}
+
+.group-item {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border-radius: var(--raio);
+  color: var(--cor-texto);
+  transition: background var(--transicao);
+}
+.group-item:hover { background: var(--cor-superficie-2); text-decoration: none; }
+.group-item > svg { width: 18px; height: 18px; color: var(--cor-texto-3); flex-shrink: 0; }
+
+.group-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+}
+
+.group-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.group-info strong,
+.group-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-info span { font-size: var(--texto-sm); color: var(--cor-texto-3); }
+
+.group-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-1); }
+.badge-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
+
+.group-skeleton {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+}
+.group-skeleton .skeleton:first-child { width: 44px; height: 44px; border-radius: 12px; }
+.group-skeleton div { flex: 1; display: grid; gap: var(--esp-2); }
+
+.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--esp-2); margin-top: var(--esp-2); }
+
+/* Celular: selos vão para baixo do nome, para o nome não ser cortado */
+@media (max-width: 599px) {
+  .group-item {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 18px;
+    column-gap: var(--esp-3);
+    row-gap: var(--esp-1);
+  }
+  .group-avatar { grid-row: span 2; }
+  .group-badges { grid-column: 2; grid-row: 2; justify-content: flex-start; }
+  .group-badges:empty { display: none; }
+  .group-item > svg { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
+}
+
+/* ---------- Coluna direita ---------- */
+.schedules-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-5);
+}
+
+.side-title { font-size: var(--texto-lg); margin-bottom: var(--esp-3); }
+
+/* ---------- Calendário ---------- */
+.calendar-card { padding: var(--esp-4); }
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--esp-3);
+}
+
+.cal-title { font-size: var(--texto-lg); }
+.cal-title span { color: var(--cor-texto-3); font-weight: 600; }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.cal-weekday {
+  padding: var(--esp-2) 0;
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-2);
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--raio);
+  background: none;
+  font-size: var(--texto-md);
+  font-weight: 500;
+  color: var(--cor-texto);
+  cursor: pointer;
+}
+.cal-day:hover { background: var(--cor-superficie-2); }
+.cal-day.is-past { color: var(--cor-texto-3); font-weight: 400; }
+.cal-day[aria-current='date'] { border-color: var(--cor-primaria); font-weight: 700; }
+.cal-day[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }

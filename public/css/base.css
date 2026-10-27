@@ -125,6 +125,12 @@ a:hover {
   display: none !important;
 }
 
+/* Títulos que recebem foco por código (acessibilidade) não mostram contorno */
+[tabindex='-1']:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Texto só para leitores de tela */
 .sr-only {
   position: absolute;
@@ -355,7 +361,7 @@ a:hover {
   text-align: center;
   color: var(--cor-texto-3);
 }
-.empty-state svg { width: 48px; height: 48px; color: var(--cor-texto-2); }
+.empty-state > svg { width: 48px; height: 48px; color: var(--cor-texto-2); }
 .empty-state h3 { color: var(--cor-texto); }
 .empty-state p { max-width: 32ch; font-size: var(--texto-sm); }
 

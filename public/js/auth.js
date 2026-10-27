@@ -6,7 +6,7 @@ import {
   writeBatch,
   serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { auth, db } from './firebase.js';
+import { auth, db, navigate } from './firebase.js';
 import { normalize, searchKeywords } from './validators.js';
 
 const HOME = '/schedules';
@@ -26,7 +26,7 @@ export async function requireAuth() {
   const user = await currentUser();
   if (!user) {
     const next = encodeURIComponent(location.pathname + location.search);
-    location.replace(`/?next=${next}`);
+    navigate(`/?next=${next}`, { replace: true });
     return new Promise(() => {}); // a página para aqui enquanto redireciona
   }
   return user;
@@ -70,5 +70,5 @@ export async function ensureUserProfile(user, fallbackName = '') {
 
 export async function signOutUser() {
   await signOut(auth);
-  location.replace('/');
+  navigate('/', { replace: true });
 }
