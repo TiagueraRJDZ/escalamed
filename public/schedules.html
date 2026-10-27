@@ -9,20 +9,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
 </head>
-<body>
-  <!-- Provisório: o layout completo entra no commit 1.0.3 -->
-  <main style="display:grid;place-items:center;min-height:100vh;padding:1rem">
-    <div class="card" style="padding:2rem;display:grid;gap:1rem;text-align:center">
-      <h1 id="hello">Carregando…</h1>
-      <button type="button" class="btn btn-secondary" id="logout">Sair</button>
+<body class="is-booting">
+  <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
+
+  <main id="page" class="page" data-active="schedules">
+    <div class="card">
+      <div class="empty-state" data-icon="calendar">
+        <h1 style="font-size:var(--texto-xl)">Escalas</h1>
+        <p>Seus grupos e escalas aparecem aqui.</p>
+      </div>
     </div>
   </main>
-  <script type="module">
-    import { requireAuth, signOutUser } from '/js/auth.js';
-    const user = await requireAuth();
-    document.getElementById('hello').textContent = `Olá, ${user.displayName ?? user.email}`;
-    document.getElementById('logout').addEventListener('click', signOutUser);
-  </script>
+
+  <script type="module" src="/js/pages/placeholder.js"></script>
 </body>
 </html>

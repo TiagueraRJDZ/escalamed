@@ -1,0 +1,410 @@
+/* =========================================================
+   Layout do app: menu lateral, barra superior, gavetas e modais
+   ========================================================= */
+
+:root {
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 68px;
+}
+
+/* Enquanto confere o login, mostra só um carregando */
+body.is-booting #page { visibility: hidden; }
+.boot-spinner {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+body:not(.is-booting) .boot-spinner { display: none; }
+
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+  transition: grid-template-columns 200ms ease;
+}
+
+.app.is-collapsed { grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr); }
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---------- Menu lateral ---------- */
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: var(--esp-4) var(--esp-3);
+  background: var(--cor-superficie);
+  border-right: 1px solid var(--cor-borda);
+  overflow: hidden auto;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  height: 44px;
+  padding: 0 var(--esp-2);
+  margin-bottom: var(--esp-5);
+  color: var(--cor-texto);
+  font-size: var(--texto-xl);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sidebar-brand:hover { text-decoration: none; }
+.sidebar-brand img { width: 36px; height: 36px; flex-shrink: 0; }
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--esp-3);
+  border: 0;
+  border-radius: var(--raio);
+  background: none;
+  color: var(--cor-texto-2);
+  font-size: var(--texto-md);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transicao), color var(--transicao);
+}
+.nav-item:hover { background: var(--cor-superficie-2); color: var(--cor-texto); text-decoration: none; }
+.nav-item svg { width: 22px; height: 22px; flex-shrink: 0; }
+.nav-item[aria-current='page'] {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  font-weight: 600;
+}
+
+/* Selo "NOVO!" no canto do item */
+.nav-item .badge-new {
+  position: absolute;
+  top: -6px;
+  right: var(--esp-2);
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+}
+
+.sidebar-footer { margin-top: auto; padding-top: var(--esp-4); }
+.sidebar-toggle svg { transition: transform 200ms ease; }
+
+/* Menu recolhido: só os ícones */
+.app.is-collapsed .sidebar-brand span,
+.app.is-collapsed .nav-label { display: none; }
+.app.is-collapsed .nav-item { justify-content: center; padding: 0; }
+.app.is-collapsed .sidebar-brand { justify-content: center; padding: 0; }
+.app.is-collapsed .nav-item .badge-new {
+  top: 6px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  font-size: 0;
+}
+.app.is-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+/* ---------- Barra superior ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  height: var(--topbar-h);
+  padding: 0 var(--esp-5);
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.topbar-menu { display: none; }
+
+.topbar-search {
+  flex: 1;
+  max-width: 420px;
+}
+.topbar-search .input {
+  min-height: 42px;
+  background: var(--cor-superficie-2);
+  border-color: transparent;
+}
+.topbar-search .input:focus { background: var(--cor-superficie); }
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+  margin-left: auto;
+}
+
+/* Bolinha de "tem notificação nova" */
+.has-dot { position: relative; }
+.has-dot::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--cor-superficie);
+  border-radius: 50%;
+  background: var(--cor-perigo);
+}
+
+.gcal-icon { color: var(--cor-primaria); }
+
+/* ---------- Avatar e menu suspenso ---------- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria-hover);
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.avatar-button {
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.menu-anchor { position: relative; }
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--esp-2));
+  right: 0;
+  z-index: 30;
+  min-width: 240px;
+  padding: var(--esp-2);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-lg);
+}
+
+.menu-header {
+  padding: var(--esp-2) var(--esp-3) var(--esp-3);
+  margin-bottom: var(--esp-2);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.menu-header strong { display: block; }
+.menu-header span { font-size: var(--texto-sm); color: var(--cor-texto-3); word-break: break-all; }
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  width: 100%;
+  padding: var(--esp-2) var(--esp-3);
+  border: 0;
+  border-radius: var(--raio);
+  background: none;
+  color: var(--cor-texto);
+  font-size: var(--texto-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover,
+.menu-item:focus-visible { background: var(--cor-superficie-2); text-decoration: none; }
+.menu-item svg { width: 18px; height: 18px; color: var(--cor-texto-2); }
+.menu-item small { display: block; color: var(--cor-texto-3); font-size: var(--texto-xs); }
+.menu-item.is-danger,
+.menu-item.is-danger svg { color: var(--cor-perigo); }
+
+/* ---------- Conteúdo da página ---------- */
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  padding: var(--esp-5);
+}
+
+/* ---------- Gaveta lateral e modal (elemento <dialog>) ---------- */
+dialog {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: var(--cor-superficie);
+}
+dialog::backdrop { background: rgb(15 23 42 / 0.45); }
+
+.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(440px, 100vw);
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  box-shadow: var(--sombra-lg);
+}
+.drawer[open] {
+  display: flex;
+  flex-direction: column;
+  animation: entrar-direita 220ms ease;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: var(--esp-4) var(--esp-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.dialog-header h2 { font-size: var(--texto-lg); }
+
+.dialog-body {
+  flex: 1;
+  padding: var(--esp-5);
+  overflow-y: auto;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  padding: var(--esp-4) var(--esp-5);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.modal {
+  width: min(480px, calc(100vw - 2rem));
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-lg);
+}
+.modal[open] { animation: aparecer 180ms ease; }
+.modal .dialog-body { padding-top: var(--esp-4); }
+.modal .dialog-footer { border-top: 0; padding-top: 0; }
+
+/* Ilustração no topo de um modal (ex.: Google Agenda) */
+.modal-hero {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--esp-4);
+  border-radius: 18px;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+.modal-hero svg { width: 32px; height: 32px; }
+.modal-center { text-align: center; }
+.modal-center .dialog-footer { justify-content: center; }
+
+@keyframes entrar-direita {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes aparecer {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* Filtros em "pílula" (ex.: notificações) */
+.chips { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+.chip {
+  padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-2);
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.chip[aria-pressed='true'] {
+  background: var(--cor-primaria-suave);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-primaria-hover);
+}
+
+.section-title {
+  margin: var(--esp-5) 0 var(--esp-2);
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  color: var(--cor-texto-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Celular e tablet ---------- */
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 899px) {
+  .app,
+  .app.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+
+  /* Menu vira gaveta pela esquerda */
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: min(288px, 85vw);
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    box-shadow: var(--sombra-lg);
+  }
+  .app.is-menu-open .sidebar { transform: none; }
+  .app.is-menu-open .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  /* No celular o menu sempre aparece completo */
+  .app.is-collapsed .sidebar-brand span,
+  .app.is-collapsed .nav-label { display: inline; }
+  .app.is-collapsed .nav-item { justify-content: flex-start; padding: 0 var(--esp-3); }
+  .app.is-collapsed .sidebar-brand { justify-content: flex-start; padding: 0 var(--esp-2); }
+  .app.is-collapsed .nav-item .badge-new {
+    top: -6px;
+    right: var(--esp-2);
+    width: auto;
+    height: auto;
+    padding: 1px 6px;
+    font-size: 0.6875rem;
+  }
+  .sidebar-footer { display: none; }
+
+  .topbar { padding: 0 var(--esp-3); gap: var(--esp-2); }
+  .topbar-menu { display: inline-grid; }
+  .page { padding: var(--esp-4); }
+}
+
+@media (max-width: 520px) {
+  .gcal-button { display: none; }
+}
