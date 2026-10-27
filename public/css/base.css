@@ -226,9 +226,11 @@ a:hover {
   animation: girar 0.8s linear infinite;
 }
 .btn-secondary.is-loading::after,
-.btn-ghost.is-loading::after {
+.btn-ghost.is-loading::after,
+.btn-google.is-loading::after {
   border-color: var(--cor-texto-2) transparent var(--cor-texto-2) transparent;
 }
+.btn.is-loading > svg { visibility: hidden; }
 
 /* ---------- Formulários ---------- */
 .field {

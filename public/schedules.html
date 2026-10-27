@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escalas | EscalaMed</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/base.css" />
+</head>
+<body>
+  <!-- Provisório: o layout completo entra no commit 1.0.3 -->
+  <main style="display:grid;place-items:center;min-height:100vh;padding:1rem">
+    <div class="card" style="padding:2rem;display:grid;gap:1rem;text-align:center">
+      <h1 id="hello">Carregando…</h1>
+      <button type="button" class="btn btn-secondary" id="logout">Sair</button>
+    </div>
+  </main>
+  <script type="module">
+    import { requireAuth, signOutUser } from '/js/auth.js';
+    const user = await requireAuth();
+    document.getElementById('hello').textContent = `Olá, ${user.displayName ?? user.email}`;
+    document.getElementById('logout').addEventListener('click', signOutUser);
+  </script>
+</body>
+</html>

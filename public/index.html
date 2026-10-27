@@ -3,48 +3,144 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EscalaMed</title>
+  <title>Entrar | EscalaMed</title>
   <meta name="description" content="EscalaMed: gestão de escalas e plantões para equipes de saúde." />
   <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/base.css" />
-  <style>
-    .boot {
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: var(--esp-4);
-    }
-    .boot .card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--esp-3);
-      padding: var(--esp-6);
-      max-width: 420px;
-      text-align: center;
-    }
-    .boot img { width: 64px; height: 64px; }
-  </style>
+  <link rel="stylesheet" href="/css/auth.css" />
 </head>
 <body>
-  <main class="boot">
-    <div class="card">
-      <img src="/img/logo.svg" alt="" />
-      <h1>EscalaMed</h1>
-      <p class="muted">Gestão de escalas e plantões para equipes de saúde.</p>
-      <span class="badge badge-primary" id="status">Conectando ao Firebase…</span>
-    </div>
-  </main>
+  <div class="auth">
+    <!-- Carrossel de benefícios (só em telas largas) -->
+    <aside class="auth-showcase" aria-label="Benefícios do EscalaMed">
+      <a class="auth-brand" href="/"><img src="/img/logo.svg" alt="" />EscalaMed</a>
 
-  <script type="module">
-    import { app } from '/js/firebase.js';
-    import { useEmulators } from '/js/config.js';
+      <div class="carousel" id="carousel">
+        <div class="carousel-track" id="carousel-track"></div>
+        <div class="carousel-dots" id="carousel-dots" role="group" aria-label="Escolher benefício"></div>
+      </div>
 
-    const status = document.getElementById('status');
-    status.textContent = `Firebase conectado: ${app.options.projectId}${useEmulators ? ' (emulador)' : ''}`;
-  </script>
+      <p class="auth-showcase-footer">Escalas, trocas e plantões da sua equipe de saúde em um só lugar.</p>
+    </aside>
+
+    <main class="auth-panel">
+      <div class="auth-box">
+        <a class="auth-brand" href="/"><img src="/img/logo.svg" alt="" />EscalaMed</a>
+
+        <!-- Início: escolher como entrar -->
+        <section class="auth-view" id="view-start" aria-labelledby="start-title">
+          <header>
+            <h1 id="start-title">Boas-vindas ao EscalaMed</h1>
+            <p class="muted">Organize as escalas e os plantões da sua equipe de saúde.</p>
+          </header>
+          <a class="btn btn-primary btn-block" href="#entrar">Já possuo uma conta</a>
+          <a class="btn btn-secondary btn-block" href="#cadastro">Criar nova conta</a>
+          <div class="divider">ou</div>
+          <button type="button" class="btn btn-google btn-block" data-google>Continuar com Google</button>
+          <p class="auth-legal">Ao continuar, você concorda com os Termos de Uso e a Política de Privacidade do EscalaMed.</p>
+        </section>
+
+        <!-- Entrar -->
+        <section class="auth-view" id="view-login" aria-labelledby="login-title" hidden>
+          <a class="btn btn-ghost auth-back" href="#" data-back>Voltar</a>
+          <header>
+            <h1 id="login-title">Entrar</h1>
+            <p class="muted">Use o e-mail e a senha da sua conta.</p>
+          </header>
+          <form id="login-form" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="login-email">E-mail</label>
+              <input class="input" id="login-email" name="email" type="email" autocomplete="email" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="login-password">Senha</label>
+              <div class="password-wrap">
+                <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" required />
+              </div>
+              <span class="field-error"></span>
+            </div>
+            <div class="auth-row"><a href="#recuperar">Esqueci minha senha</a></div>
+            <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+          </form>
+          <div class="divider">ou</div>
+          <button type="button" class="btn btn-google btn-block" data-google>Continuar com Google</button>
+          <p class="auth-switch">Ainda não tem conta? <a href="#cadastro">Criar nova conta</a></p>
+        </section>
+
+        <!-- Criar conta -->
+        <section class="auth-view" id="view-signup" aria-labelledby="signup-title" hidden>
+          <a class="btn btn-ghost auth-back" href="#" data-back>Voltar</a>
+          <header>
+            <h1 id="signup-title">Criar conta</h1>
+            <p class="muted">É grátis e leva menos de um minuto.</p>
+          </header>
+          <form id="signup-form" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="signup-name">Nome completo</label>
+              <input class="input" id="signup-name" name="name" type="text" autocomplete="name" maxlength="80" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="signup-email">E-mail</label>
+              <input class="input" id="signup-email" name="email" type="email" autocomplete="email" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="signup-password">Senha</label>
+              <div class="password-wrap">
+                <input class="input" id="signup-password" name="password" type="password" autocomplete="new-password" required />
+              </div>
+              <ul class="password-rules" id="password-rules" aria-label="Requisitos da senha"></ul>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="signup-confirm">Confirmar senha</label>
+              <div class="password-wrap">
+                <input class="input" id="signup-confirm" name="confirm" type="password" autocomplete="new-password" required />
+              </div>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" name="terms" id="signup-terms" />
+                <span>Li e concordo com os Termos de Uso e a Política de Privacidade.</span>
+              </label>
+              <span class="field-error"></span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+          </form>
+          <div class="divider">ou</div>
+          <button type="button" class="btn btn-google btn-block" data-google>Continuar com Google</button>
+          <p class="auth-switch">Já tem conta? <a href="#entrar">Entrar</a></p>
+        </section>
+
+        <!-- Recuperar senha -->
+        <section class="auth-view" id="view-forgot" aria-labelledby="forgot-title" hidden>
+          <a class="btn btn-ghost auth-back" href="#entrar">Voltar</a>
+          <header>
+            <h1 id="forgot-title">Recuperar senha</h1>
+            <p class="muted">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p>
+          </header>
+          <form id="forgot-form" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="forgot-email">E-mail</label>
+              <input class="input" id="forgot-email" name="email" type="email" autocomplete="email" required />
+              <span class="field-error"></span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Enviar link</button>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/js/pages/login.js"></script>
 </body>
 </html>
