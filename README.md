@@ -6,7 +6,7 @@ Plataforma web de gestão de escalas e plantões para equipes de saúde (hospita
 
 - **HTML, CSS e JavaScript puros**, sem etapa de build. Cada tela é um arquivo `.html` e o JavaScript usa módulos ES.
 - **Firebase, plano gratuito (Spark)**:
-  - **Authentication**: e-mail/senha e Google.
+  - **Authentication**: e-mail e senha.
   - **Firestore**: banco de dados. A segurança fica nas regras (`firestore.rules`).
   - **Hosting**: publicação do site.
 - O SDK do Firebase é carregado pelo CDN oficial (`gstatic.com`), versão fixa em [public/js/firebase.js](public/js/firebase.js).
@@ -16,7 +16,7 @@ Plataforma web de gestão de escalas e plantões para equipes de saúde (hospita
 ```
 escalamed/
 ├─ public/              tudo o que vai para o site
-│  ├─ index.html        entrar / criar conta
+│  ├─ index.html        entrar, criar conta e recuperar senha
 │  ├─ schedules.html    Escalas: lista de grupos, calendário e disponíveis
 │  ├─ group-new.html    wizard de criação de grupo ou escala individual
 │  ├─ *.html            demais telas (algumas ainda provisórias)
@@ -86,7 +86,7 @@ O Live Server já está configurado para servir a pasta `public` (arquivo `.vsco
 ## Configurar o projeto Firebase real
 
 1. Crie um projeto no [console do Firebase](https://console.firebase.google.com) (plano gratuito).
-2. Em **Authentication > Método de login**, ative **E-mail/senha** e **Google**.
+2. Em **Authentication > Método de login**, ative **E-mail/senha**.
 3. Em **Firestore Database**, crie o banco (região `southamerica-east1`, São Paulo).
 4. Em **Configurações do projeto > Seus apps**, registre um app da **Web** e copie o `firebaseConfig` para [public/js/config.js](public/js/config.js).
 5. Troque o ID do projeto em `.firebaserc`.

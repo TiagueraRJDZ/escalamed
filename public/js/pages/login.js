@@ -1,17 +1,14 @@
-// Tela de entrada: entrar, criar conta, Google e recuperar senha.
+// Tela de entrada: entrar, criar conta e recuperar senha.
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
   sendPasswordResetEmail,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { auth, navigate } from '../firebase.js';
 import { currentUser, ensureUserProfile, nextUrl } from '../auth.js';
-import { icon, GOOGLE_LOGO } from '../icons.js';
+import { icon, renderIcons } from '../icons.js';
 import { isValidEmail, isValidName, isStrongPassword, PASSWORD_RULES } from '../validators.js';
 import {
   setLoading,
@@ -20,7 +17,6 @@ import {
   clearErrorsWhileTyping,
   showFormAlert,
   firebaseErrorMessage,
-  toast,
 } from '../ui.js';
 
 // ---------- Já está logado? Vai direto para o app ----------
@@ -113,10 +109,11 @@ function setupCarousel() {
 }
 
 // ---------- Troca de tela pelo endereço (#entrar, #cadastro, #recuperar) ----------
-const VIEWS = { '': 'view-start', '#entrar': 'view-login', '#cadastro': 'view-signup', '#recuperar': 'view-forgot' };
+// Sem endereço (ou desconhecido), mostra a tela de entrar.
+const VIEWS = { '#entrar': 'view-login', '#cadastro': 'view-signup', '#recuperar': 'view-forgot' };
 
 function showView({ focus = true } = {}) {
-  const target = VIEWS[location.hash] ?? 'view-start';
+  const target = VIEWS[location.hash] ?? 'view-login';
   document.querySelectorAll('.auth-view').forEach((view) => {
     view.hidden = view.id !== target;
   });
@@ -158,26 +155,6 @@ function setupPasswordRules() {
   };
   input.addEventListener('input', render);
   render();
-}
-
-// ---------- Google ----------
-async function signInWithGoogle(button) {
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  setLoading(button, true);
-  try {
-    const { user } = await signInWithPopup(auth, provider);
-    await finishLogin(user);
-  } catch (error) {
-    if (error.code === 'auth/popup-blocked') {
-      // Navegador bloqueou a janela: entra pela própria página
-      await signInWithRedirect(auth, provider);
-      return;
-    }
-    const message = firebaseErrorMessage(error);
-    if (message) toast(message, 'error');
-    setLoading(button, false);
-  }
 }
 
 // ---------- Formulários ----------
@@ -226,7 +203,6 @@ function setupSignup() {
     if (!isValidEmail(email)) errors.push([form.email, 'Informe um e-mail válido.']);
     if (!isStrongPassword(password)) errors.push([form.password, 'A senha não atende aos requisitos acima.']);
     if (form.confirm.value !== password) errors.push([form.confirm, 'As senhas não conferem.']);
-    if (!form.terms.checked) errors.push([form.terms, 'Para continuar, aceite os termos.']);
     if (errors.length) {
       errors.forEach(([input, message]) => setFieldError(input, message));
       errors[0][0].focus();
@@ -276,6 +252,7 @@ function setupForgot() {
 }
 
 // ---------- Início ----------
+renderIcons();
 setupCarousel();
 setupPasswordToggles();
 setupPasswordRules();
@@ -284,21 +261,6 @@ setupSignup();
 setupForgot();
 
 ['login-form', 'signup-form', 'forgot-form'].forEach((id) => clearErrorsWhileTyping(document.getElementById(id)));
-
-document.querySelectorAll('[data-google]').forEach((button) => {
-  button.insertAdjacentHTML('afterbegin', GOOGLE_LOGO);
-  button.addEventListener('click', () => signInWithGoogle(button));
-});
-
-document.querySelectorAll('[data-back]').forEach((link) =>
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    history.pushState(null, '', location.pathname + location.search);
-    showView();
-  }),
-);
-
-document.querySelectorAll('.auth-back').forEach((link) => link.insertAdjacentHTML('afterbegin', icon('arrowLeft')));
 
 window.addEventListener('hashchange', () => showView());
 showView({ focus: false });

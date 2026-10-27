@@ -38,7 +38,7 @@ export function nextUrl() {
   return next && next.startsWith('/') && !next.startsWith('//') ? next : HOME;
 }
 
-// Cria o perfil no Firestore no primeiro acesso (cadastro por e-mail ou Google)
+// Cria o perfil no Firestore no primeiro acesso (cadastro ou primeiro login)
 export async function ensureUserProfile(user, fallbackName = '') {
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);

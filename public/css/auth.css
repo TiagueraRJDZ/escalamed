@@ -1,5 +1,13 @@
 /* Tela de entrada: carrossel à esquerda e formulários à direita */
 
+/* Azuis próprios da tela de entrada */
+:root {
+  --auth-azul-painel: #0e3bab;
+  --auth-azul-claro: #1a46b3;
+  --auth-azul: #1243d6;
+  --auth-azul-hover: #0d37b5;
+}
+
 .auth {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -11,17 +19,34 @@
   .auth { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 }
 
+/* Logos no topo do painel: Hapvida | EscalaMed */
+.auth-brands {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-5);
+}
+
+.auth-partner {
+  height: 40px;
+  width: auto;
+}
+
+.auth-brands-divider {
+  width: 1px;
+  height: 40px;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.auth-showcase .auth-brand { font-size: var(--texto-lg); }
+
 /* ---------- Carrossel ---------- */
 .auth-showcase {
   display: none;
   position: relative;
   overflow: hidden;
-  padding: var(--esp-6);
+  padding: var(--esp-5);
   color: #fff;
-  background:
-    radial-gradient(circle at 15% 20%, rgb(255 255 255 / 0.14), transparent 40%),
-    radial-gradient(circle at 85% 85%, rgb(255 255 255 / 0.1), transparent 45%),
-    linear-gradient(150deg, #1d4ed8, #1e3a8a);
+  background: linear-gradient(150deg, var(--auth-azul-claro) 0%, var(--auth-azul-painel) 55%);
 }
 
 @media (min-width: 960px) {
@@ -39,7 +64,10 @@
   font-size: var(--texto-xl);
   font-weight: 700;
   color: inherit;
+  text-decoration: none;
 }
+
+.auth-brand:hover { text-decoration: none; }
 
 .auth-brand img { width: 40px; height: 40px; }
 
@@ -49,14 +77,25 @@
 }
 
 .carousel {
-  max-width: 460px;
+  max-width: 508px;
   margin: 0 auto;
   width: 100%;
 }
 
+/* Ilustração fixa acima dos slides (diminui em telas baixas) */
+.carousel-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 38vh;
+  object-fit: contain;
+  object-position: left bottom;
+  margin-bottom: var(--esp-1);
+}
+
 .carousel-track {
   position: relative;
-  min-height: 260px;
+  min-height: 220px;
 }
 
 .slide {
@@ -116,7 +155,7 @@
 
 .auth-showcase-footer {
   font-size: var(--texto-sm);
-  color: rgb(255 255 255 / 0.7);
+  color: rgb(255 255 255 / 0.85);
 }
 
 /* ---------- Formulários ---------- */
@@ -133,6 +172,7 @@
 }
 
 .auth-box .auth-brand {
+  justify-content: center;
   color: var(--cor-texto);
   margin-bottom: var(--esp-6);
 }
@@ -147,56 +187,48 @@
   gap: var(--esp-4);
 }
 
-.auth-view header {
+.auth-header {
   display: flex;
   flex-direction: column;
   gap: var(--esp-2);
   margin-bottom: var(--esp-2);
+  text-align: center;
 }
 
-.auth-back {
-  align-self: flex-start;
-  margin-left: calc(var(--esp-3) * -1);
-}
+.auth-header h1 { color: var(--auth-azul); }
 
 .auth-view form {
   display: flex;
   flex-direction: column;
 }
 
-.auth-view form .btn-primary { margin-top: var(--esp-5); }
+/* Campos e botão principal mais altos, no estilo da tela de entrada */
+.auth-view .input { min-height: 52px; }
+.auth-view .input-icon > svg { left: var(--esp-4); }
+.auth-view .input-icon > .input { padding-left: 2.85rem; }
 
-.auth-row {
+.auth-view .btn-primary {
+  background: var(--auth-azul);
+}
+
+.auth-view .btn-primary:hover:not(:disabled) { background: var(--auth-azul-hover); }
+
+.auth-view form .btn-primary {
+  min-height: 52px;
+  margin-top: var(--esp-4);
+  font-size: var(--texto-md);
+}
+
+/* Links abaixo do formulário: "Criar conta" à esquerda e "Esqueci a senha" à direita */
+.auth-links {
   display: flex;
-  justify-content: flex-end;
-  margin-top: var(--esp-2);
+  justify-content: space-between;
+  gap: var(--esp-3);
   font-size: var(--texto-sm);
-}
-
-.auth-switch {
-  text-align: center;
-  font-size: var(--texto-sm);
-  color: var(--cor-texto-2);
-}
-
-.link-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--cor-primaria);
   font-weight: 600;
-  cursor: pointer;
 }
 
-.link-button:hover { text-decoration: underline; }
-
-.btn-google {
-  background: var(--cor-superficie);
-  border-color: var(--cor-borda-forte);
-  color: var(--cor-texto);
-}
-
-.btn-google:hover:not(:disabled) { background: var(--cor-superficie-2); }
+.auth-links a { color: var(--auth-azul); }
 
 .auth-legal {
   font-size: var(--texto-xs);
@@ -210,8 +242,8 @@
 .password-wrap .btn-icon {
   position: absolute;
   right: 1px;
-  top: 1px;
-  height: 42px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* Lista de requisitos da senha */
@@ -233,19 +265,3 @@
 
 .password-rules svg { width: 14px; height: 14px; }
 .password-rules li.is-ok { color: var(--cor-sucesso); }
-
-.checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--esp-2);
-  margin-top: var(--esp-4);
-  font-size: var(--texto-sm);
-  color: var(--cor-texto-2);
-}
-
-.checkbox input {
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  accent-color: var(--cor-primaria);
-}
