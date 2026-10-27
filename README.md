@@ -22,8 +22,10 @@ escalamed/
 │  │  ├─ config.js      configuração do Firebase e links
 │  │  ├─ firebase.js    conexão com o Firebase (Auth e Firestore)
 │  │  └─ pages/         código de cada tela
-│  ├─ data/             listas fixas (categorias, cores…)
+│  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)
 │  └─ img/              logo e imagens
+├─ scripts/             utilitários de desenvolvimento (dados de teste)
+├─ firestore.rules      regras de segurança do banco
 ├─ firebase.json        configuração do Hosting e dos emuladores
 ├─ .firebaserc          projeto Firebase em uso
 └─ README.md
@@ -47,6 +49,23 @@ firebase emulators:start
 - Painel dos emuladores (usuários e dados de teste): http://localhost:4000
 
 Em `localhost`, o app usa automaticamente os emuladores, então nada é gravado no projeto real.
+
+Para preencher os emuladores com dados de teste (unidades de saúde e dois usuários), rode em outro terminal:
+
+```bash
+node scripts/seed-emulator.mjs
+```
+
+| Usuário | Senha |
+|---|---|
+| gestor@teste.com | Teste@123 |
+| plantonista@teste.com | Teste@123 |
+
+Os emuladores apagam tudo ao fechar. Para manter os dados entre execuções:
+
+```bash
+firebase emulators:start --import=./emulator-data --export-on-exit
+```
 
 > Abrir o `index.html` direto pelo explorador de arquivos não funciona: os módulos JavaScript precisam de um servidor.
 

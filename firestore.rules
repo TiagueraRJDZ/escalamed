@@ -1,0 +1,182 @@
+rules_version = '2';
+
+// Regras de segurança do EscalaMed.
+// Sem servidor próprio (plano gratuito), são estas regras que impedem um usuário
+// de ler ou gravar o que não deve. Toda coleção não listada aqui fica bloqueada.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Funções auxiliares ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Texto com tamanho entre min e max
+    function str(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function optStr(v, max) {
+      return v == null || (v is string && v.size() <= max);
+    }
+
+    // Só os campos listados mudaram
+    function changedOnly(keys) {
+      return incoming().diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ---------- Usuários (perfil público) ----------
+    match /users/{uid} {
+      function validUser(d) {
+        return d.keys().hasOnly(['name', 'nameLower', 'photoURL', 'username', 'categoryId',
+                                 'searchKeywords', 'createdAt', 'updatedAt'])
+          && str(d.name, 2, 80)
+          && str(d.nameLower, 2, 80)
+          && optStr(d.photoURL, 2048)
+          && optStr(d.username, 30)
+          && optStr(d.categoryId, 60)
+          && d.searchKeywords is list && d.searchKeywords.size() <= 60;
+      }
+
+      allow read: if signedIn();
+      allow create: if isSelf(uid)
+        && validUser(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSelf(uid)
+        && validUser(incoming())
+        && incoming().createdAt == resource.data.createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isSelf(uid);
+
+      // Dados pessoais: só o próprio usuário lê e grava
+      match /private/{docId} {
+        allow read, delete: if isSelf(uid);
+        allow create, update: if isSelf(uid)
+          && docId == 'data'
+          && incoming().keys().hasOnly(['email', 'phone', 'cpf', 'state', 'updatedAt'])
+          && optStr(incoming().email, 254)
+          && incoming().updatedAt == request.time;
+      }
+    }
+
+    // ---------- Unidades de saúde ----------
+    // Qualquer usuário logado pode cadastrar uma unidade que ainda não existe.
+    match /healthUnits/{unitId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && incoming().keys().hasOnly(['name', 'nameLower', 'city', 'cityLower', 'state',
+                                      'createdBy', 'createdAt'])
+        && str(incoming().name, 3, 120)
+        && str(incoming().nameLower, 3, 120)
+        && str(incoming().city, 2, 80)
+        && str(incoming().cityLower, 2, 80)
+        && incoming().state is string && incoming().state.matches('^[A-Z]{2}$')
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // ---------- Grupos ----------
+    match /groups/{groupId} {
+      function groupPath() {
+        return /databases/$(database)/documents/groups/$(groupId);
+      }
+
+      function groupData() {
+        return get(groupPath()).data;
+      }
+
+      function isMemberOf(g) {
+        return signedIn() && request.auth.uid in g.memberIds;
+      }
+
+      function isManagerOf(g) {
+        return signedIn() && request.auth.uid in g.managerIds;
+      }
+
+      function validGroup(d) {
+        return d.keys().hasOnly(['name', 'type', 'color', 'unit', 'categoryId', 'timezone',
+                                 'ownerId', 'managerIds', 'memberIds', 'setupStep',
+                                 'createdAt', 'updatedAt'])
+          && str(d.name, 3, 60)
+          && d.type in ['team', 'personal']
+          && d.color is string && d.color.matches('^#[0-9A-Fa-f]{6}$')
+          && (d.unit == null
+              || (d.unit is map
+                  && d.unit.keys().hasOnly(['id', 'name', 'city', 'state'])
+                  && str(d.unit.id, 1, 128)
+                  && str(d.unit.name, 3, 120)))
+          && optStr(d.categoryId, 60)
+          && str(d.timezone, 3, 60)
+          && d.setupStep in ['shifts', 'members', 'done'];
+      }
+
+      allow read: if isMemberOf(resource.data);
+
+      // Quem cria vira dono, gestor e único membro
+      allow create: if signedIn()
+        && validGroup(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().managerIds == [request.auth.uid]
+        && incoming().memberIds == [request.auth.uid]
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      // Gestor edita os dados do grupo (membros e papéis ficam para a fase 2)
+      allow update: if isManagerOf(resource.data)
+        && validGroup(incoming())
+        && changedOnly(['name', 'color', 'unit', 'categoryId', 'timezone', 'setupStep', 'updatedAt'])
+        && incoming().updatedAt == request.time;
+
+      allow delete: if signedIn() && request.auth.uid == resource.data.ownerId;
+
+      // ----- Membros -----
+      match /members/{memberId} {
+        allow read: if isMemberOf(groupData());
+
+        // Só na criação do grupo (gravação em lote): o dono entra como gestor
+        allow create: if isSelf(memberId)
+          && !exists(groupPath())
+          && getAfter(groupPath()).data.ownerId == memberId
+          && incoming().keys().hasOnly(['role', 'name', 'photoURL', 'joinedAt'])
+          && incoming().role == 'manager'
+          && str(incoming().name, 2, 80)
+          && optStr(incoming().photoURL, 2048)
+          && incoming().joinedAt == request.time;
+
+        allow update, delete: if false;
+      }
+
+      // ----- Turnos -----
+      // startMinute e endMinute: minutos desde 00:00 (0 a 1439).
+      // Fim menor que o início = termina no dia seguinte; iguais = 24 horas.
+      match /shifts/{shiftId} {
+        function validShift(d) {
+          return d.keys().hasOnly(['title', 'startMinute', 'endMinute', 'createdAt', 'updatedAt'])
+            && str(d.title, 1, 40)
+            && d.startMinute is int && d.startMinute >= 0 && d.startMinute <= 1439
+            && d.endMinute is int && d.endMinute >= 0 && d.endMinute <= 1439
+            && d.updatedAt == request.time;
+        }
+
+        allow read: if isMemberOf(groupData());
+        allow create: if isManagerOf(groupData())
+          && validShift(incoming())
+          && incoming().createdAt == request.time;
+        allow update: if isManagerOf(groupData())
+          && validShift(incoming())
+          && incoming().createdAt == resource.data.createdAt;
+        allow delete: if isManagerOf(groupData());
+      }
+    }
+  }
+}
