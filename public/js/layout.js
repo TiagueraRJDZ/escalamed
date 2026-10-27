@@ -1,5 +1,5 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
-// menu da conta, gavetas (Privacidade, Ajuda, Notificações) e modal do Google Agenda.
+// menu da conta, gavetas (Privacidade, Notificações) e modal do Google Agenda.
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
 import { requireAuth, signOutUser } from './auth.js';
 import { icon } from './icons.js';
@@ -7,10 +7,7 @@ import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
-  { id: 'checkin', label: 'Painel de check-in/out', icon: 'checkCircle', href: '/checkin.html', badge: 'NOVO!' },
-  { id: 'ads', label: 'Anúncios', icon: 'megaphone', href: '/ads.html' },
   { id: 'privacy', label: 'Privacidade', icon: 'lock', drawer: 'drawer-privacy' },
-  { id: 'help', label: 'Ajuda', icon: 'help', drawer: 'drawer-help' },
   { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html' },
 ];
 
@@ -50,6 +47,8 @@ function avatarHtml(user) {
     : `<span class="avatar">${escapeHtml(initials(name))}</span>`;
 }
 
+const toggleLabel = (collapsed) => (collapsed ? 'Expandir menu' : 'Recolher menu');
+
 function shellHtml(user, active, collapsed) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
@@ -61,12 +60,12 @@ function shellHtml(user, active, collapsed) {
       <nav aria-label="Navegação principal">
         <ul class="nav">${NAV.map((item) => navItem(item, active)).join('')}</ul>
       </nav>
-      <div class="sidebar-footer">
-        <button type="button" class="nav-item sidebar-toggle" id="sidebar-toggle" aria-expanded="${!collapsed}" aria-controls="sidebar">
-          ${icon('chevronLeft')}<span class="nav-label">${collapsed ? 'Mostrar mais' : 'Mostrar menos'}</span>
-        </button>
-      </div>
     </aside>
+    <!-- Botão redondo na borda do menu: recolhe e expande -->
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="sidebar"
+      aria-expanded="${!collapsed}" aria-label="${toggleLabel(collapsed)}" title="${toggleLabel(collapsed)}">
+      ${icon('chevronLeft')}
+    </button>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <div class="app-main">
@@ -120,17 +119,6 @@ function dialogsHtml() {
       </div>
     </dialog>
 
-    <dialog class="drawer" id="drawer-help" aria-labelledby="drawer-help-title">
-      <div class="dialog-header"><h2 id="drawer-help-title">Ajuda</h2>${closeButton}</div>
-      <div class="dialog-body">
-        <div class="empty-state">
-          ${icon('help')}
-          <h3>Fale com a gente</h3>
-          <p>Em breve você poderá enviar dúvidas, sugestões e pedidos de suporte por aqui.</p>
-        </div>
-      </div>
-    </dialog>
-
     <dialog class="drawer" id="drawer-notifications" aria-labelledby="drawer-notifications-title">
       <div class="dialog-header"><h2 id="drawer-notifications-title">Notificações</h2>${closeButton}</div>
       <div class="dialog-body">
@@ -170,7 +158,8 @@ function setupSidebar(app) {
     const collapsed = app.classList.toggle('is-collapsed');
     saveCollapsed(collapsed);
     toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggle.querySelector('.nav-label').textContent = collapsed ? 'Mostrar mais' : 'Mostrar menos';
+    toggle.setAttribute('aria-label', toggleLabel(collapsed));
+    toggle.title = toggleLabel(collapsed);
   });
 
   // Celular: menu abre como gaveta pela esquerda

@@ -122,8 +122,32 @@ body:not(.is-booting) .boot-spinner { display: none; }
   padding: 1px 6px;
 }
 
-.sidebar-footer { margin-top: auto; padding-top: var(--esp-4); }
-.sidebar-toggle svg { transition: transform 200ms ease; }
+/* Botão redondo na borda do menu, centralizado na altura da tela */
+.sidebar-toggle {
+  position: fixed;
+  top: calc(50% - 14px);
+  left: calc(var(--sidebar-w) - 14px);
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-2);
+  box-shadow: var(--sombra-sm);
+  cursor: pointer;
+  transition: left 200ms ease, color var(--transicao), background var(--transicao), border-color var(--transicao);
+}
+.sidebar-toggle:hover {
+  color: var(--cor-primaria);
+  border-color: var(--cor-primaria-borda);
+  background: var(--cor-primaria-suave);
+}
+.sidebar-toggle svg { width: 16px; height: 16px; transition: transform 200ms ease; }
+.app.is-collapsed .sidebar-toggle { left: calc(var(--sidebar-w-collapsed) - 14px); }
 
 /* Menu recolhido: só os ícones */
 .app.is-collapsed .sidebar-partner,
@@ -418,7 +442,7 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
     padding: 1px 6px;
     font-size: 0.6875rem;
   }
-  .sidebar-footer { display: none; }
+  .sidebar-toggle { display: none; }
 
   .topbar { padding: 0 var(--esp-3); gap: var(--esp-2); }
   .topbar-menu { display: inline-grid; }
