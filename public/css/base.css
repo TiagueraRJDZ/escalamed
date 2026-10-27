@@ -3,6 +3,23 @@
    Cores, tipografia e componentes reutilizados em todas as telas.
    ========================================================= */
 
+/* ---------- Fonte da marca Hapvida (Pitanga, versão variável: pesos de 100 a 800 e itálico no mesmo arquivo) ---------- */
+@font-face {
+  font-family: 'Pitanga';
+  src: url('/fonts/PitangaVariable.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pitanga';
+  src: url('/fonts/PitangaVariable.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* ---------- Cores e medidas (troque aqui para mudar o visual) ---------- */
 :root {
   /* Marca */
@@ -33,7 +50,7 @@
   --cor-destaque: #e0b04b; /* selo "NOVO!" */
 
   /* Tipografia */
-  --fonte: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte: 'Pitanga', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --texto-xs: 0.75rem;
   --texto-sm: 0.875rem;
   --texto-md: 1rem;

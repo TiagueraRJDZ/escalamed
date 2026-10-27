@@ -53,7 +53,11 @@ function avatarHtml(user) {
 function shellHtml(user, active, collapsed) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
-      <a class="sidebar-brand" href="/schedules.html"><img src="/img/logo.svg" alt="" /><span>EscalaMed</span></a>
+      <a class="sidebar-brand" href="/schedules.html" aria-label="Hapvida EscalaMed">
+        <img class="sidebar-partner" src="/img/hapvida-logo.svg" alt="" width="98" height="22" />
+        <span class="sidebar-brand-divider" aria-hidden="true"></span>
+        <img src="/img/logo.svg" alt="" /><span class="sidebar-brand-name">EscalaMed</span>
+      </a>
       <nav aria-label="Navegação principal">
         <ul class="nav">${NAV.map((item) => navItem(item, active)).join('')}</ul>
       </nav>

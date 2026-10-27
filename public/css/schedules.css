@@ -1,6 +1,7 @@
 /* Tela de Escalas: lista de grupos, calendário e plantões disponíveis */
 
 .schedules-page {
+  max-width: none; /* usa toda a largura da tela */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--esp-5);
@@ -8,21 +9,26 @@
 }
 
 @media (min-width: 1100px) {
-  .schedules-page { grid-template-columns: minmax(0, 1fr) 340px; }
+  .schedules-page { grid-template-columns: minmax(0, 1fr) clamp(360px, 30%, 460px); }
 }
 
 /* ---------- Lista de grupos ---------- */
 .groups-card { min-height: 420px; }
 
+/* Tela larga: a lista ocupa a altura da tela (menos a barra superior e as margens) */
+@media (min-width: 1100px) {
+  .groups-card { min-height: calc(100vh - var(--topbar-h) - var(--esp-5) * 2); }
+}
+
 .groups-header {
   display: flex;
   flex-direction: column;
   gap: var(--esp-3);
-  padding: var(--esp-5) var(--esp-5) var(--esp-4);
+  padding: var(--esp-6) var(--esp-6) var(--esp-5);
   border-bottom: 1px solid var(--cor-borda);
 }
 
-.groups-header h1 { font-size: var(--texto-xl); }
+.groups-header h1 { font-size: var(--texto-2xl); }
 
 .groups-toolbar {
   display: flex;
@@ -30,21 +36,24 @@
 }
 
 .groups-toolbar .input-icon { flex: 1; }
-.groups-toolbar .btn-icon { width: 46px; height: 46px; }
+.groups-toolbar .input { min-height: 50px; font-size: var(--texto-md); }
+.groups-toolbar .btn-icon { width: 50px; height: 50px; }
 
 .new-menu { min-width: 300px; }
 
 .group-list {
+  display: grid;
+  gap: var(--esp-1);
   margin: 0;
-  padding: var(--esp-2);
+  padding: var(--esp-3) var(--esp-4);
   list-style: none;
 }
 
 .group-item {
   display: flex;
   align-items: center;
-  gap: var(--esp-3);
-  padding: var(--esp-3);
+  gap: var(--esp-4);
+  padding: var(--esp-4);
   border-radius: var(--raio);
   color: var(--cor-texto);
   transition: background var(--transicao);
@@ -56,11 +65,11 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   color: #fff;
-  font-size: var(--texto-sm);
+  font-size: var(--texto-md);
   font-weight: 700;
 }
 
@@ -76,7 +85,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.group-info span { font-size: var(--texto-sm); color: var(--cor-texto-3); }
+.group-info { gap: 2px; }
+.group-info strong { font-size: var(--texto-lg); }
+.group-info span { font-size: var(--texto-md); color: var(--cor-texto-3); }
 
 .group-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-1); }
 .badge-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
@@ -87,7 +98,7 @@
   gap: var(--esp-3);
   padding: var(--esp-3);
 }
-.group-skeleton .skeleton:first-child { width: 44px; height: 44px; border-radius: 12px; }
+.group-skeleton .skeleton:first-child { width: 52px; height: 52px; border-radius: 14px; }
 .group-skeleton div { flex: 1; display: grid; gap: var(--esp-2); }
 
 .empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--esp-2); margin-top: var(--esp-2); }
@@ -96,7 +107,7 @@
 @media (max-width: 599px) {
   .group-item {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 18px;
+    grid-template-columns: 52px minmax(0, 1fr) 18px;
     column-gap: var(--esp-3);
     row-gap: var(--esp-1);
   }
@@ -113,10 +124,10 @@
   gap: var(--esp-5);
 }
 
-.side-title { font-size: var(--texto-lg); margin-bottom: var(--esp-3); }
+.side-title { font-size: var(--texto-xl); margin-bottom: var(--esp-3); }
 
 /* ---------- Calendário ---------- */
-.calendar-card { padding: var(--esp-4); }
+.calendar-card { padding: var(--esp-5); }
 
 .cal-header {
   display: flex;

@@ -9,6 +9,7 @@ Plataforma web de gestão de escalas e plantões para equipes de saúde (hospita
   - **Authentication**: e-mail e senha.
   - **Firestore**: banco de dados. A segurança fica nas regras (`firestore.rules`).
   - **Hosting**: publicação do site.
+- Fonte **Pitanga** (fonte da marca Hapvida), versão variável em `public/fonts/PitangaVariable.woff2`, declarada em `public/css/base.css`.
 - O SDK do Firebase é carregado pelo CDN oficial (`gstatic.com`), versão fixa em [public/js/firebase.js](public/js/firebase.js).
 
 ## Estrutura
@@ -28,6 +29,7 @@ escalamed/
 │  │  ├─ auth.js        sessão do usuário e proteção das páginas
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
 │  │  └─ pages/         código de cada tela
+│  ├─ fonts/            fonte Pitanga (woff2)
 │  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)
 │  └─ img/              logo e imagens
 ├─ scripts/             utilitários de desenvolvimento (dados de teste)
