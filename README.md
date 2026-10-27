@@ -75,6 +75,14 @@ firebase emulators:start --import=./emulator-data --export-on-exit
 
 > Abrir o `index.html` direto pelo explorador de arquivos não funciona: os módulos JavaScript precisam de um servidor.
 
+### Pelo Go Live (extensão Live Server do VS Code)
+
+1. Abra a **pasta do projeto** no VS Code (Arquivo > Abrir Pasta > `escalamed`). Sem a pasta aberta, o Go Live mostra "Open a folder or workspace".
+2. Ligue os emuladores num terminal: `firebase emulators:start`. Se quiser dados de teste, rode também `node scripts/seed-emulator.mjs`.
+3. Clique em **Go Live**, na barra inferior. O app abre em http://127.0.0.1:5500.
+
+O Live Server já está configurado para servir a pasta `public` (arquivo `.vscode/settings.json`). Se os emuladores estiverem desligados, o app mostra uma faixa amarela avisando.
+
 ## Configurar o projeto Firebase real
 
 1. Crie um projeto no [console do Firebase](https://console.firebase.google.com) (plano gratuito).

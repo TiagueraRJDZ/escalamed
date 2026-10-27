@@ -58,7 +58,7 @@ if (groupId) {
   const snapshot = await getDoc(doc(db, 'groups', groupId)).catch(() => null);
   if (!snapshot?.exists() || !snapshot.data().managerIds?.includes(user.uid)) {
     toast('Grupo não encontrado ou você não tem permissão para editá-lo.', 'error');
-    setTimeout(() => navigate('/schedules', { replace: true }), 1500);
+    setTimeout(() => navigate('/schedules.html', { replace: true }), 1500);
     await new Promise(() => {});
   }
   group = { id: snapshot.id, ...snapshot.data() };
@@ -107,7 +107,7 @@ function goTo(step, { focus = true } = {}) {
     else item.removeAttribute('aria-current');
   });
 
-  if (groupId) history.replaceState(null, '', `/group-new?id=${groupId}&step=${step}`);
+  if (groupId) history.replaceState(null, '', `/group-new.html?id=${groupId}&step=${step}`);
 
   if (step === 'shifts') {
     listenShifts();
@@ -637,7 +637,7 @@ $('finish').addEventListener('click', async (event) => {
   setLoading(button, true);
   try {
     await updateDoc(doc(db, 'groups', groupId), { setupStep: 'done', updatedAt: serverTimestamp() });
-    navigate('/schedules?created=1');
+    navigate('/schedules.html?created=1');
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
     setLoading(button, false);

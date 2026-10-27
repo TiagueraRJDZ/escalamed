@@ -391,6 +391,25 @@ a:hover {
   100% { background-position: 0 50%; }
 }
 
+/* ---------- Aviso de desenvolvimento (emuladores desligados) ---------- */
+.dev-warning {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  padding: var(--esp-2) var(--esp-4);
+  background: var(--cor-alerta-suave);
+  border-bottom: 1px solid #fcd34d;
+  color: var(--cor-alerta);
+  font-size: var(--texto-sm);
+  text-align: center;
+}
+.dev-warning code {
+  padding: 1px 6px;
+  border-radius: var(--raio-sm);
+  background: #fff;
+  font-size: var(--texto-xs);
+}
+
 /* ---------- Aviso rápido (toast) ---------- */
 .toast-area {
   position: fixed;

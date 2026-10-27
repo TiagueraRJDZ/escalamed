@@ -10,5 +10,6 @@ emulator-data/
 .DS_Store
 Thumbs.db
 desktop.ini
-.vscode/
+.vscode/*
+!.vscode/settings.json
 node_modules/

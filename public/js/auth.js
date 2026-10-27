@@ -9,7 +9,7 @@ import {
 import { auth, db, navigate } from './firebase.js';
 import { normalize, searchKeywords } from './validators.js';
 
-const HOME = '/schedules';
+const HOME = '/schedules.html';
 
 // Espera o Firebase dizer se há alguém logado (só a primeira resposta)
 export function currentUser() {

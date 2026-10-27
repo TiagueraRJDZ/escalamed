@@ -18,6 +18,17 @@ auth.languageCode = 'pt-BR';
 if (useEmulators) {
   connectAuthEmulator(auth, `http://${location.hostname}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(db, location.hostname, 8080);
+
+  // Aviso para quem abriu o app (ex.: pelo Go Live) com os emuladores desligados
+  fetch(`http://${location.hostname}:9099/`, { mode: 'no-cors' }).catch(() => {
+    const warning = document.createElement('div');
+    warning.className = 'dev-warning';
+    warning.setAttribute('role', 'alert');
+    warning.innerHTML =
+      'Emuladores do Firebase desligados: login e dados não vão funcionar. ' +
+      'No terminal, na pasta do projeto, rode <code>firebase emulators:start</code> e recarregue a página.';
+    document.body.prepend(warning);
+  });
 }
 
 // ---------- Troca de página sem deixar conexões abertas ----------

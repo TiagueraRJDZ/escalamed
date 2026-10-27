@@ -6,12 +6,12 @@ import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 
 const NAV = [
-  { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules' },
-  { id: 'checkin', label: 'Painel de check-in/out', icon: 'checkCircle', href: '/checkin', badge: 'NOVO!' },
-  { id: 'ads', label: 'Anúncios', icon: 'megaphone', href: '/ads' },
+  { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
+  { id: 'checkin', label: 'Painel de check-in/out', icon: 'checkCircle', href: '/checkin.html', badge: 'NOVO!' },
+  { id: 'ads', label: 'Anúncios', icon: 'megaphone', href: '/ads.html' },
   { id: 'privacy', label: 'Privacidade', icon: 'lock', drawer: 'drawer-privacy' },
   { id: 'help', label: 'Ajuda', icon: 'help', drawer: 'drawer-help' },
-  { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings' },
+  { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html' },
 ];
 
 const COLLAPSED_KEY = 'escalamed:menu-recolhido';
@@ -53,7 +53,7 @@ function avatarHtml(user) {
 function shellHtml(user, active, collapsed) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
-      <a class="sidebar-brand" href="/schedules"><img src="/img/logo.svg" alt="" /><span>EscalaMed</span></a>
+      <a class="sidebar-brand" href="/schedules.html"><img src="/img/logo.svg" alt="" /><span>EscalaMed</span></a>
       <nav aria-label="Navegação principal">
         <ul class="nav">${NAV.map((item) => navItem(item, active)).join('')}</ul>
       </nav>
@@ -93,7 +93,7 @@ function shellHtml(user, active, collapsed) {
                 <strong>${escapeHtml(user.displayName || 'Minha conta')}</strong>
                 <span>${escapeHtml(user.email || '')}</span>
               </div>
-              <a class="menu-item" role="menuitem" href="/profile">${icon('user')}Ver perfil</a>
+              <a class="menu-item" role="menuitem" href="/profile.html">${icon('user')}Ver perfil</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>

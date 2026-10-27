@@ -48,7 +48,7 @@ function groupSubtitle(group) {
 function groupItem(group) {
   const isManager = group.managerIds?.includes(user.uid);
   const pending = group.setupStep !== 'done';
-  const href = pending ? `/group-new?id=${group.id}` : `/group?id=${group.id}`;
+  const href = pending ? `/group-new.html?id=${group.id}` : `/group.html?id=${group.id}`;
   const badges = [
     pending ? '<span class="badge badge-warning">Configuração pendente</span>' : '',
     isManager && group.type === 'team' ? '<span class="badge badge-primary">Gestor</span>' : '',
@@ -73,8 +73,8 @@ function emptyState() {
     <h3>Você ainda não participa de nenhum grupo</h3>
     <p>Crie um grupo para montar a escala da sua equipe ou uma escala individual para organizar seus plantões.</p>
     <div class="empty-actions">
-      <a class="btn btn-primary" href="/group-new?type=team">${icon('plus')}Criar novo grupo</a>
-      <a class="btn btn-secondary" href="/group-new?type=personal">Criar escala individual</a>
+      <a class="btn btn-primary" href="/group-new.html?type=team">${icon('plus')}Criar novo grupo</a>
+      <a class="btn btn-secondary" href="/group-new.html?type=personal">Criar escala individual</a>
     </div>
   </li>`;
 }

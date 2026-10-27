@@ -5,7 +5,7 @@
   },
   "hosting": {
     "public": "public",
-    "cleanUrls": true,
+    "cleanUrls": false,
     "ignore": ["**/.*"]
   },
   "emulators": {
