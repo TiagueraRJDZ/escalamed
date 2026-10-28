@@ -21,10 +21,13 @@
         <h1 id="schedule-group">Carregando…</h1>
         <p class="muted" id="schedule-unit"></p>
       </div>
-      <div class="schedule-month-nav">
-        <a class="btn-icon" id="prev-month" aria-label="Mês anterior"><span data-icon="chevronLeft"></span></a>
-        <h2 id="schedule-month" aria-live="polite"></h2>
-        <a class="btn-icon" id="next-month" aria-label="Próximo mês"><span data-icon="chevronRight"></span></a>
+      <div class="schedule-head-month">
+        <div class="schedule-month-nav">
+          <a class="btn-icon" id="prev-month" aria-label="Mês anterior"><span data-icon="chevronLeft"></span></a>
+          <h2 id="schedule-month" aria-live="polite"></h2>
+          <a class="btn-icon" id="next-month" aria-label="Próximo mês"><span data-icon="chevronRight"></span></a>
+        </div>
+        <p class="muted text-sm" id="schedule-editor"></p>
       </div>
     </header>
 
@@ -39,12 +42,13 @@
     <div class="schedule-bar" role="toolbar" aria-label="Ações da escala">
       <div class="input-icon schedule-find">
         <span data-icon="search"></span>
-        <label class="sr-only" for="find-member">Encontrar membro na grade</label>
+        <label class="sr-only" for="find-member">Filtrar membros da grade</label>
         <input class="input" id="find-member" type="search" placeholder="Quem gostaria de encontrar?" autocomplete="off" />
       </div>
-      <span class="badge" id="schedule-status"></span>
+      <span class="status-dot" id="schedule-status"></span>
       <div class="schedule-actions">
         <button type="button" class="btn btn-secondary" id="print-button"><span data-icon="printer"></span>Imprimir</button>
+        <button type="button" class="btn btn-secondary" id="review-button"><span data-icon="eye"></span>Revisar</button>
         <button type="button" class="btn btn-secondary" id="replicate-button"><span data-icon="copy"></span>Replicar</button>
         <button type="button" class="btn btn-primary" id="publish-button"><span data-icon="check"></span>Publicar</button>
       </div>
@@ -80,7 +84,18 @@
         <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
       </div>
       <div class="dialog-body">
-        <p id="replicate-text"></p>
+        <p class="muted">Replique a escala da sua equipe para o mês seguinte. O mês de destino fica em rascunho.</p>
+        <div class="replicate-months">
+          <div class="field">
+            <label class="label" for="replicate-from">Replicar escala de</label>
+            <input class="input" id="replicate-from" type="text" readonly />
+          </div>
+          <span class="replicate-arrow" aria-hidden="true"><span data-icon="chevronRight"></span></span>
+          <div class="field">
+            <label class="label" for="replicate-to">Para</label>
+            <input class="input" id="replicate-to" type="text" readonly />
+          </div>
+        </div>
         <fieldset class="replicate-modes">
           <legend class="label">Como copiar</legend>
           <label class="radio-option">
@@ -98,6 +113,24 @@
         <button type="submit" class="btn btn-primary">Replicar</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Modal: revisar a escala (uma coluna por dia, cartões por turno) -->
+  <dialog class="modal modal-wide" id="modal-review" aria-labelledby="modal-review-title">
+    <div class="dialog-header">
+      <h2 id="modal-review-title">Revisar escala</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body review-body">
+      <div class="review-columns" id="review-columns"></div>
+    </div>
+    <div class="dialog-footer review-footer">
+      <div class="segmented" id="review-mode" role="group" aria-label="Escala">
+        <button type="button" data-mode="fixed" aria-pressed="false">Escala fixa</button>
+        <button type="button" data-mode="dynamic" aria-pressed="true">Escala dinâmica</button>
+      </div>
+      <button type="button" class="btn btn-primary" data-close>Fechar</button>
+    </div>
   </dialog>
 
   <script type="module" src="/js/pages/schedule-edit.js"></script>

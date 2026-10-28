@@ -151,17 +151,28 @@
       <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
     </div>
     <div class="dialog-body">
-      <div class="day-nav">
-        <button type="button" class="btn-icon" data-day-nav="-1" aria-label="Dia anterior"><span data-icon="chevronLeft"></span></button>
-        <strong id="day-label" aria-live="polite"></strong>
-        <button type="button" class="btn-icon" data-day-nav="1" aria-label="Próximo dia"><span data-icon="chevronRight"></span></button>
+      <div class="week-strip">
+        <button type="button" class="btn-icon" data-week-nav="-7" aria-label="Semana anterior"><span data-icon="chevronLeft"></span></button>
+        <div class="week-days" id="week-days" role="group" aria-label="Dias"></div>
+        <button type="button" class="btn-icon" data-week-nav="7" aria-label="Próxima semana"><span data-icon="chevronRight"></span></button>
       </div>
+      <p class="day-title" id="day-label" aria-live="polite"></p>
       <div class="segmented" id="day-mode" role="group" aria-label="Escala" hidden>
         <button type="button" data-mode="dynamic" aria-pressed="true">Dinâmica</button>
         <button type="button" data-mode="fixed" aria-pressed="false">Fixa</button>
       </div>
       <div id="day-shifts"></div>
     </div>
+  </dialog>
+
+  <!-- Gaveta: detalhes de um plantão (ao clicar em alguém nos plantões do dia) -->
+  <dialog class="drawer" id="drawer-shift" aria-labelledby="drawer-shift-title">
+    <div class="dialog-header">
+      <button type="button" class="btn-icon" data-close aria-label="Voltar para os plantões do dia"><span data-icon="arrowLeft"></span></button>
+      <h2 id="drawer-shift-title">Detalhes do plantão</h2>
+      <button type="button" class="btn-icon" id="close-shift-drawers" aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body" id="shift-detail"></div>
   </dialog>
 
   <script type="module" src="/js/pages/group.js"></script>

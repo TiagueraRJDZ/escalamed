@@ -23,6 +23,7 @@ import { formatClock } from '../shifts.js';
 import {
   monthKey,
   monthParts,
+  cellKey,
   cellsOf,
   userDays,
   dayShifts,
@@ -644,22 +645,55 @@ $('my-shifts').addEventListener('click', (event) => {
   if (item) openDay(shownMonth, Number(item.dataset.openDay));
 });
 
-// Gaveta "Plantões do dia"
-const dayState = { month: null, day: 1, mode: 'dynamic' };
+// Gaveta "Plantões do dia": faixa de 7 dias (meus dias com plantão em destaque),
+// Dinâmica/Fixa e um cartão por turno. Clicar numa pessoa abre os detalhes do plantão.
+const dayState = { month: null, day: 1, mode: 'dynamic', weekStart: null };
+const WEEK_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const dateKey = (date) => ({ month: monthKey(date.getFullYear(), date.getMonth()), day: date.getDate() });
+const addDays = (date, amount) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+const capitalizeFirst = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 async function openDay(month, day) {
-  Object.assign(dayState, { month, day });
+  // A faixa começa 3 dias antes do dia escolhido (ele fica no meio)
+  Object.assign(dayState, { month, day, weekStart: addDays(dateOf(month, day), -3) });
   if (!$('drawer-day').open) $('drawer-day').showModal();
   await renderDay();
 }
 
+async function renderWeek() {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(dayState.weekStart, i));
+  const monthsInWeek = [...new Set(days.map((d) => dateKey(d).month))];
+  const schedules = new Map(
+    await Promise.all(monthsInWeek.map(async (m) => [m, await monthData(m).catch(() => null)])),
+  );
+  $('week-days').innerHTML = days
+    .map((date) => {
+      const { month, day } = dateKey(date);
+      const mine = schedules.get(month)?.assignments
+        ? userDays(schedules.get(month).assignments, user.uid).has(day)
+        : false;
+      const selected = month === dayState.month && day === dayState.day;
+      return `<button type="button" class="week-day${mine ? ' has-shift' : ''}" data-week-day="${month}|${day}"
+        aria-pressed="${selected}" aria-label="${escapeHtml(capitalizeFirst(longDate.format(date)))}${mine ? ', com plantão' : ''}">
+        <span>${WEEK_SHORT[date.getDay()]}</span><strong>${day}</strong></button>`;
+    })
+    .join('');
+}
+
+const daySkeleton = () =>
+  Array.from({ length: 3 }, () => `<div class="day-shift" aria-hidden="true">
+      <span class="skeleton" style="height:16px;width:55%"></span>
+      <span class="skeleton" style="height:28px;width:70%;margin-top:var(--esp-2)"></span></div>`).join('');
+
 async function renderDay() {
   const { month, day } = dayState;
-  const label = longDate.format(dateOf(month, day));
-  $('day-label').textContent = label.charAt(0).toUpperCase() + label.slice(1); // "Terça-feira, 06/10/2026"
-  $('day-shifts').innerHTML = '<p class="muted">Carregando…</p>';
+  $('day-label').textContent = capitalizeFirst(longDate.format(dateOf(month, day))); // "Terça-feira, 06/10/2026"
+  $('day-shifts').innerHTML = daySkeleton();
+  $('day-shifts').setAttribute('aria-busy', 'true');
+  renderWeek();
   const schedule = await monthData(month).catch(() => null);
   if (dayState.month !== month || dayState.day !== day) return;
+  $('day-shifts').setAttribute('aria-busy', 'false');
 
   const hasFixed = schedule?.status === 'published' && schedule.fixed;
   $('day-mode').hidden = !hasFixed;
@@ -678,17 +712,19 @@ async function renderDay() {
   }
   const byId = new Map(members.map((m) => [m.id, m]));
   $('day-shifts').innerHTML = list
-    .map(({ shift, uids, vacancies }) => {
+    .map(({ shiftId, shift, uids, vacancies }) => {
       const people = uids
         .map((uid) => byId.get(uid) ?? { id: uid, name: 'Ex-membro' })
         .map(
-          (m) => `<li class="day-person${m.id === user.uid ? ' is-me' : ''}">${avatarHtml(m, 'avatar day-avatar')}
-            <span>${escapeHtml(m.name)}${m.id === user.uid ? ' <span class="muted">(você)</span>' : ''}</span></li>`,
+          (m) => `<li><button type="button" class="day-person${m.id === user.uid ? ' is-me' : ''}" data-person="${escapeHtml(m.id)}" data-shift="${escapeHtml(shiftId)}">
+            ${avatarHtml(m, 'avatar day-avatar')}
+            <span class="day-person-name">${escapeHtml(m.name)}${m.id === user.uid ? ' <span class="muted">(você)</span>' : ''}</span>
+            ${icon('chevronRight')}</button></li>`,
         )
         .join('');
       const open = vacancies ? `<span class="badge badge-warning">${vacancies} ${vacancies === 1 ? 'vaga' : 'vagas'}</span>` : '';
       return `<article class="day-shift">
-        <header><strong>${escapeHtml(shift.title)} · ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>${open}</header>
+        <header><strong>${escapeHtml(shift.title)} - ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>${open}</header>
         ${people ? `<ul>${people}</ul>` : '<p class="muted text-sm">Ninguém escalado.</p>'}
       </article>`;
     })
@@ -696,10 +732,19 @@ async function renderDay() {
 }
 
 $('drawer-day').addEventListener('click', (event) => {
-  const nav = event.target.closest('[data-day-nav]');
-  if (nav) {
-    const date = dateOf(dayState.month, dayState.day + Number(nav.dataset.dayNav));
-    Object.assign(dayState, { month: monthKey(date.getFullYear(), date.getMonth()), day: date.getDate() });
+  const weekNav = event.target.closest('[data-week-nav]');
+  if (weekNav) {
+    // Anda uma semana: a faixa e o dia escolhido
+    const step = Number(weekNav.dataset.weekNav);
+    dayState.weekStart = addDays(dayState.weekStart, step);
+    Object.assign(dayState, dateKey(addDays(dateOf(dayState.month, dayState.day), step)));
+    renderDay();
+    return;
+  }
+  const weekDay = event.target.closest('[data-week-day]');
+  if (weekDay) {
+    const [month, day] = weekDay.dataset.weekDay.split('|');
+    Object.assign(dayState, { month, day: Number(day) });
     renderDay();
     return;
   }
@@ -707,7 +752,66 @@ $('drawer-day').addEventListener('click', (event) => {
   if (mode) {
     dayState.mode = mode.dataset.mode;
     renderDay();
+    return;
   }
+  const person = event.target.closest('[data-person]');
+  if (person) openShiftDetail(person.dataset.person, person.dataset.shift);
+});
+
+// ---------- Detalhes do plantão ----------
+const detailDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+async function openShiftDetail(uid, shiftId) {
+  const { month, day, mode } = dayState;
+  const schedule = await monthData(month).catch(() => null);
+  const shift = scheduleShifts(schedule, liveShifts)[shiftId];
+  if (!shift) return;
+  const source = (mode === 'fixed' ? schedule?.fixed : schedule?.assignments) ?? {};
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const person = byId.get(uid) ?? { id: uid, name: 'Ex-membro' };
+  const others = (source[cellKey(day, shiftId)] ?? []).filter((id) => id !== uid).map((id) => byId.get(id) ?? { id, name: 'Ex-membro' });
+  const work = [professionLabel(person), councilLabel(person.council)].filter(Boolean);
+  const unit = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
+
+  $('shift-detail').innerHTML = `
+    <div class="detail-group">
+      <span class="group-avatar" style="background:${escapeHtml(group.color)}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
+      <div><strong>${escapeHtml(group.name)}</strong><span class="muted">${escapeHtml(unit)}</span></div>
+    </div>
+    <div class="detail-person">
+      ${avatarHtml(person, 'avatar detail-avatar')}
+      <div>
+        <strong>${escapeHtml(person.name)}${person.id === user.uid ? ' <span class="muted">(você)</span>' : ''}</strong>
+        ${work.map((line) => `<span class="muted">${escapeHtml(line)}</span>`).join('')}
+      </div>
+    </div>
+    <h3 class="section-title">Detalhes do plantão</h3>
+    <div class="detail-shift">
+      ${icon('calendar')}
+      <div>
+        <strong>${escapeHtml(capitalizeFirst(detailDate.format(dateOf(month, day))))}</strong>
+        <span>${formatClock(shift.startMinute)} - ${formatClock(shift.endMinute)} (${escapeHtml(shift.title)})</span>
+      </div>
+    </div>
+    <h3 class="section-title">Quem mais está no plantão?</h3>
+    ${
+      others.length
+        ? `<ul class="detail-others">${others
+            .map((m) => `<li>${avatarHtml(m, 'avatar day-avatar')}<div><strong>${escapeHtml(m.name)}</strong>
+              <span class="muted">${escapeHtml(professionLabel(m) || '')}</span></div></li>`)
+            .join('')}</ul>`
+        : '<p class="muted">Não há outro profissional neste plantão.</p>'
+    }`;
+  $('drawer-shift').showModal();
+}
+
+// Fechar (X) fecha as duas gavetas; a seta só volta para os plantões do dia
+$('close-shift-drawers').addEventListener('click', () => {
+  $('drawer-shift').close();
+  $('drawer-day').close();
+});
+$('drawer-shift').addEventListener('click', (event) => {
+  if (event.target === $('drawer-shift')) $('drawer-shift').close();
 });
 
 // ---------- Editar escala: meses do ano ----------

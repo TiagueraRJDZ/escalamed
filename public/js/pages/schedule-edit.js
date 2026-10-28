@@ -1,12 +1,13 @@
 // Editor da escala mensal (/schedule-edit.html?group=<id>&month=YYYY-MM).
 // Grade: colunas = dias; linhas = "Plantão vago" + cada membro, com uma sub-linha por turno.
 // Clicar numa célula aloca ou tira a pessoa; a linha de vagas guarda quantas vagas estão abertas.
+// Rodapé: filtrar membros, situação, Imprimir, Revisar (um dia por coluna), Replicar e Publicar.
 import { doc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate, isLeaving } from '../firebase.js';
-import { initLayout, avatarHtml } from '../layout.js';
+import { initLayout } from '../layout.js';
 import { renderIcons } from '../icons.js';
 import { can, roleOf } from '../permissions.js';
-import { formatClock } from '../shifts.js';
+import { formatClock, toTime } from '../shifts.js';
 import {
   MONTH_PATTERN,
   MAX_VACANCIES,
@@ -20,6 +21,7 @@ import {
   formatHours,
   findConflict,
   replicate,
+  dayShifts,
 } from '../schedule-math.js';
 import {
   loadShifts,
@@ -34,7 +36,7 @@ import { normalize } from '../validators.js';
 import { escapeHtml, initials, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 
 renderIcons();
-const { user } = await initLayout({ active: 'schedules' });
+const { user, profile } = await initLayout({ active: 'schedules' });
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -67,6 +69,7 @@ $('back-link').href = groupUrl;
 $('prev-month').href = monthUrl(addMonths(month, -1));
 $('next-month').href = monthUrl(addMonths(month, 1));
 $('schedule-month').textContent = monthName(month);
+$('schedule-editor').textContent = `Editando: ${profile.name}`;
 document.title = `Escala ${monthName(month)} | EscalaMed`;
 
 // ---------- Grade ----------
@@ -77,6 +80,16 @@ const gridMembers = () =>
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
 const shiftList = () => sortShifts(Object.entries(shifts).map(([id, s]) => ({ id, ...s })));
+
+// Busca do rodapé: cada palavra precisa aparecer no nome
+const shownMembers = () => {
+  const words = normalize($('find-member').value).split(' ').filter(Boolean);
+  return gridMembers().filter((m) => words.every((w) => normalize(m.name).includes(w)));
+};
+
+// Coluna Turno: sigla e horário ("M" / "07:00 até 13:00")
+const shiftCell = (shift) =>
+  `<td class="col-shift"><strong>${escapeHtml(shift.title)}</strong><small>${toTime(shift.startMinute)} até ${toTime(shift.endMinute)}</small></td>`;
 
 function headHtml(days) {
   const cols = Array.from({ length: days }, (_, i) => {
@@ -97,30 +110,62 @@ function vacancyRows(list, days) {
           data-vacancy="${key}" aria-label="Vagas em ${dayLabel(d + 1)}, turno ${escapeHtml(shift.title)}: ${count}">${count || ''}</button></td>`;
       }).join('');
       const name = i === 0 ? `<th scope="rowgroup" class="col-name block-label" rowspan="${list.length}">Plantão vago</th>` : '';
-      return `<tr class="row-vacancy${i === 0 ? ' block-start' : ''}">${name}<td class="col-shift">${escapeHtml(shift.title)}</td>${cells}</tr>`;
+      return `<tr class="row-vacancy${i === 0 ? ' block-start' : ''}">${name}${shiftCell(shift)}${cells}</tr>`;
     })
     .join('');
 }
 
+// ---------- Fotos nas bolinhas ----------
+// A foto do perfil pode ser um texto grande (data:...). Para não repeti-la em cada célula,
+// cada foto vira uma vez um endereço curto (blob:) e todas as células usam esse endereço.
+const photos = new Map(); // uid → { from: photoURL original, src: endereço curto }
+
+async function preparePhotos() {
+  let changed = false;
+  for (const member of members) {
+    const url = member.photoURL;
+    const known = photos.get(member.id);
+    if (known?.from === url) continue;
+    if (known?.src.startsWith('blob:')) URL.revokeObjectURL(known.src);
+    if (!url) {
+      photos.delete(member.id);
+    } else {
+      const src = url.startsWith('data:') ? URL.createObjectURL(await (await fetch(url)).blob()) : url;
+      photos.set(member.id, { from: url, src });
+    }
+    changed = true;
+  }
+  return changed;
+}
+
+// Bolinha da pessoa: foto (ou iniciais, sem foto)
+function dotHtml(member, className = 'cell-dot') {
+  const src = photos.get(member.id)?.src;
+  return src
+    ? `<span class="${className}"><img src="${escapeHtml(src)}" alt="" referrerpolicy="no-referrer" /></span>`
+    : `<span class="${className}">${escapeHtml(initials(member.name))}</span>`;
+}
+
 function memberRows(member, list, days) {
   const minutes = memberMinutes(schedule?.assignments, shifts, member.id);
-  const short = escapeHtml(initials(member.name));
+  const dot = dotHtml(member);
+  const safeName = escapeHtml(member.name);
   return list
     .map((shift, i) => {
       const cells = Array.from({ length: days }, (_, d) => {
         const key = cellKey(d + 1, shift.id);
         const on = schedule?.assignments?.[key]?.includes(member.id) ?? false;
         return `<td class="${isWeekend(d + 1) ? 'is-weekend' : ''}"><button type="button" class="cell${on ? ' is-on' : ''}"
-          data-key="${key}" data-uid="${member.id}" aria-pressed="${on}"
-          aria-label="${escapeHtml(member.name)}, ${dayLabel(d + 1)}, turno ${escapeHtml(shift.title)}">${on ? `<span class="cell-dot">${short}</span>` : ''}</button></td>`;
+          data-key="${key}" data-uid="${member.id}" aria-pressed="${on}"${on ? ` title="${safeName}"` : ''}
+          aria-label="${safeName}, ${dayLabel(d + 1)}, turno ${escapeHtml(shift.title)}">${on ? dot : ''}</button></td>`;
       }).join('');
-      const name =
+      const nameCell =
         i === 0
           ? `<th scope="rowgroup" class="col-name" rowspan="${list.length}">
-              <div class="member-cell">${avatarHtml(member, 'avatar member-cell-avatar')}
+              <div class="member-cell">${dotHtml(member, 'avatar member-cell-avatar')}
                 <span><strong>${escapeHtml(member.name)}</strong><small>${formatHours(minutes)}</small></span></div></th>`
           : '';
-      return `<tr class="${i === 0 ? 'block-start' : ''}" data-member="${member.id}">${name}<td class="col-shift">${escapeHtml(shift.title)}</td>${cells}</tr>`;
+      return `<tr class="${i === 0 ? 'block-start' : ''}" data-member="${member.id}">${nameCell}${shiftCell(shift)}${cells}</tr>`;
     })
     .join('');
 }
@@ -128,7 +173,7 @@ function memberRows(member, list, days) {
 function render() {
   if (!group) return;
   const list = shiftList();
-  const people = gridMembers();
+  const people = shownMembers();
   const empty = $('schedule-empty');
   if (!list.length) {
     empty.hidden = false;
@@ -143,9 +188,12 @@ function render() {
   const days = daysInMonth(month);
   const scroll = $('schedule-scroll');
   const position = [scroll.scrollLeft, scroll.scrollTop];
+  const nobody = $('find-member').value.trim() && !people.length
+    ? `<tr><td class="grid-note" colspan="${days + 2}">Ninguém encontrado com esse nome.</td></tr>`
+    : '';
   $('schedule-grid').innerHTML = `${headHtml(days)}<tbody>${vacancyRows(list, days)}${people
     .map((m) => memberRows(m, list, days))
-    .join('')}</tbody>`;
+    .join('')}${nobody}</tbody>`;
   [scroll.scrollLeft, scroll.scrollTop] = position;
   renderStatus();
 }
@@ -154,7 +202,7 @@ function renderStatus() {
   const published = schedule?.status === 'published';
   const status = $('schedule-status');
   status.textContent = !schedule ? 'Sem escala' : published ? 'Escala publicada' : 'Escala em rascunho';
-  status.className = `badge ${!schedule ? 'badge-muted' : published ? 'badge-primary' : 'badge-warning'}`;
+  status.className = `status-dot ${!schedule ? 'is-none' : published ? 'is-published' : 'is-draft'}`;
   $('publish-button').lastChild.textContent = published ? 'Publicar alterações' : 'Publicar';
 }
 
@@ -230,16 +278,56 @@ $('vacancy-form').addEventListener('submit', async (event) => {
   }
 });
 
-// ---------- Encontrar membro ----------
-$('find-member').addEventListener('input', () => {
-  const term = normalize($('find-member').value);
-  document.querySelectorAll('tr.is-found').forEach((row) => row.classList.remove('is-found'));
-  if (!term) return;
-  const member = gridMembers().find((m) => normalize(m.name).includes(term));
-  if (!member) return;
-  const rows = document.querySelectorAll(`tr[data-member="${member.id}"]`);
-  rows.forEach((row) => row.classList.add('is-found'));
-  rows[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+// ---------- Filtrar membros ----------
+$('find-member').addEventListener('input', render);
+
+// ---------- Revisar: uma coluna por dia, com os turnos e quem está em cada um ----------
+const WEEKDAY_LONG = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+let reviewMode = 'dynamic';
+
+function renderReview() {
+  $('review-mode')
+    .querySelectorAll('[data-mode]')
+    .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === reviewMode)));
+  const fixed = reviewMode === 'fixed';
+  if (fixed && !(schedule?.status === 'published' && schedule.fixed)) {
+    $('review-columns').innerHTML = '<p class="muted review-note">A escala fixa aparece depois que a escala é publicada.</p>';
+    return;
+  }
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const reviewShifts = fixed ? { ...shifts, ...(schedule.shifts ?? {}) } : shifts;
+  $('review-columns').innerHTML = Array.from({ length: daysInMonth(month) }, (_, i) => {
+    const day = i + 1;
+    const cards = dayShifts(schedule, reviewShifts, day, { fixed })
+      .map(({ shift, uids, vacancies }) => {
+        const people = uids
+          .map((uid) => byId.get(uid) ?? { id: uid, name: 'Ex-membro' })
+          .map((m) => `<li title="${escapeHtml(m.name)}">${dotHtml(m, 'cell-dot review-avatar')}<span>${escapeHtml(m.name.split(' ')[0])}</span></li>`)
+          .join('');
+        const open = vacancies ? `<span class="badge badge-warning">${vacancies} ${vacancies === 1 ? 'vaga' : 'vagas'}</span>` : '';
+        return `<article class="review-shift">
+          <header><strong>${escapeHtml(shift.title)}</strong><small>${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</small>${open}</header>
+          ${people ? `<ul>${people}</ul>` : '<p class="muted">Ninguém</p>'}
+        </article>`;
+      })
+      .join('');
+    return `<section class="review-day${isWeekend(day) ? ' is-weekend' : ''}">
+      <h3><strong>${String(day).padStart(2, '0')}</strong><span>${WEEKDAY_LONG[weekdayOf(month, day)]}</span></h3>
+      ${cards}
+    </section>`;
+  }).join('');
+}
+
+$('review-button').addEventListener('click', () => {
+  reviewMode = 'dynamic';
+  renderReview();
+  $('modal-review').showModal();
+});
+$('review-mode').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-mode]');
+  if (!button) return;
+  reviewMode = button.dataset.mode;
+  renderReview();
 });
 
 // ---------- Imprimir ----------
@@ -276,7 +364,8 @@ $('replicate-button').addEventListener('click', () => {
     toast('Monte a escala deste mês antes de replicar.');
     return;
   }
-  $('replicate-text').innerHTML = `Replicar a escala de <strong>${monthName(month)}</strong> para <strong>${monthName(nextMonth)}</strong>. O mês de destino fica em rascunho.`;
+  $('replicate-from').value = monthName(month);
+  $('replicate-to').value = monthName(nextMonth);
   $('modal-replicate').showModal();
 });
 
@@ -341,7 +430,10 @@ onSnapshot(
   collection(db, 'groups', groupId, 'members'),
   (snapshot) => {
     members = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    render();
+    render(); // já mostra a grade (com iniciais) e troca pelas fotos quando ficarem prontas
+    preparePhotos()
+      .then((changed) => changed && render())
+      .catch(() => {}); // foto que não carrega: ficam as iniciais
   },
   () => {},
 );
@@ -352,6 +444,7 @@ watchSchedule(
   (data) => {
     schedule = data;
     render();
+    if ($('modal-review').open) renderReview();
   },
   (error) => !isLeaving() && toast(firebaseErrorMessage(error), 'error'),
 );

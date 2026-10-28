@@ -37,8 +37,8 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 | Login por e-mail (Firebase) ou nome de usuário (Worker na Cloudflare + D1), senha provisória pelo administrador da plataforma, troca de e-mail sem link | `worker/`, `auth-api.js`, `new-password.html` | Pronto e publicado |
 | Cargos com limites, convites, alterar perfil, transferir gestão, remover, sair | `group.html` (aba Membros), `invite.html`, `permissions.js`, `members.js`, regras | Pronto, com testes |
 | Configurações da conta (dados, profissão, foto, senha, exclusão) | `settings.html` | Pronto |
-| Escala mensal (etapa 4): lista de meses por ano, grade com horas, vagas, bloqueio de horário sobreposto (inclusive entre dias), publicar (escala fixa + turnos congelados), replicar (dia da semana ou número do dia), imprimir | `groups/{g}/schedules/{YYYY-MM}`, `schedule-edit.html`, `schedule-math.js`, `schedule-data.js`, regras | Pronto, com testes. Falta: Revisar (modal por dia), notificações ao publicar e histórico `edit` |
-| Calendário do grupo e "Plantões do dia" (etapa 5): dias com plantão, meus plantões do mês, gaveta com Dinâmica/Fixa | `group.html` (aba Calendário) | Pronto. Falta: "Disponíveis" na tela Escalas (depende das movimentações) |
+| Escala mensal (etapa 4): lista de meses por ano, grade com horas, vagas, bloqueio de horário sobreposto (inclusive entre dias), publicar (escala fixa + turnos congelados), replicar (dia da semana ou número do dia), imprimir | `groups/{g}/schedules/{YYYY-MM}`, `schedule-edit.html`, `schedule-math.js`, `schedule-data.js`, regras | Pronto, com testes: inclui Revisar (um dia por coluna, Fixa/Dinâmica), busca que filtra membros e quem está editando. Falta: notificações ao publicar e histórico `edit` |
+| Calendário do grupo e "Plantões do dia" (etapa 5): dias com plantão, meus plantões do mês, gaveta com faixa de 7 dias e Dinâmica/Fixa, detalhes do plantão ("Quem mais está no plantão?") | `group.html` (aba Calendário) | Pronto. Falta: "Disponíveis" na tela Escalas (depende das movimentações) |
 | Dias com plantão no calendário da tela Escalas | `schedules.js` | Pronto |
 
 ---

@@ -230,35 +230,50 @@
 .my-shift-date { text-transform: capitalize; color: var(--cor-texto-2); font-size: var(--texto-sm); }
 
 /* Gaveta "Plantões do dia" */
-.day-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-bottom: var(--esp-3); }
-.day-nav strong { text-align: center; }
-
-.segmented {
-  display: inline-flex;
-  margin-bottom: var(--esp-3);
-  padding: 3px;
-  border-radius: var(--raio-total);
-  background: var(--cor-superficie-2);
-}
-.segmented[hidden] { display: none; }
-.segmented button {
-  padding: var(--esp-1) var(--esp-4);
-  border: 0;
-  border-radius: var(--raio-total);
+/* Faixa de 7 dias: meus dias com plantão preenchidos, o escolhido com borda */
+.week-strip { display: flex; align-items: center; gap: var(--esp-1); margin-bottom: var(--esp-3); }
+.week-days { display: grid; flex: 1; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.week-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--esp-1) 0;
+  border: 2px solid transparent;
+  border-radius: var(--raio);
   background: none;
   font: inherit;
-  font-size: var(--texto-sm);
-  font-weight: 600;
-  color: var(--cor-texto-2);
+  color: var(--cor-texto);
   cursor: pointer;
 }
-.segmented button[aria-pressed='true'] { background: var(--cor-superficie); color: var(--cor-primaria); box-shadow: var(--sombra-sm); }
+.week-day span { font-size: var(--texto-xs); color: var(--cor-texto-3); }
+.week-day:hover { background: var(--cor-superficie-2); }
+.week-day.has-shift { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
+.week-day.has-shift span { color: rgb(255 255 255 / 0.8); }
+.week-day[aria-pressed='true'] { border-color: var(--cor-primaria-hover); box-shadow: 0 0 0 2px var(--cor-primaria-suave); }
+.day-title { margin-bottom: var(--esp-3); font-weight: 700; }
+
 
 .day-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-radius: var(--raio); }
 .day-shift + .day-shift { margin-top: var(--esp-2); }
 .day-shift header { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-bottom: var(--esp-2); }
 .day-shift ul { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
-.day-person { display: flex; align-items: center; gap: var(--esp-2); font-size: var(--texto-sm); }
+.day-person {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  width: 100%;
+  padding: var(--esp-1);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--texto-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.day-person:hover { background: var(--cor-primaria-suave); }
+.day-person-name { flex: 1; }
+.day-person > svg { width: 16px; height: 16px; color: var(--cor-texto-3); }
 .day-person.is-me { font-weight: 700; }
 .day-avatar { width: 28px; height: 28px; font-size: 0.625rem; }
 
@@ -278,3 +293,20 @@
 }
 .month-item:last-child { border-bottom: 0; }
 .month-item .badge { margin-left: var(--esp-2); }
+
+/* Gaveta "Detalhes do plantão" */
+#drawer-shift .dialog-header h2 { flex: 1; }
+.detail-group,
+.detail-person,
+.detail-shift { display: flex; align-items: center; gap: var(--esp-3); }
+.detail-group { padding: var(--esp-3); border-radius: var(--raio); background: var(--cor-superficie-2); }
+.detail-group > div,
+.detail-person > div,
+.detail-shift > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.detail-person { margin-top: var(--esp-4); }
+.detail-avatar { width: 56px; height: 56px; font-size: var(--texto-md); }
+.detail-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-left: 4px solid var(--cor-primaria); border-radius: var(--raio); }
+.detail-shift > svg { width: 22px; height: 22px; color: var(--cor-primaria); }
+.detail-others { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
+.detail-others li { display: flex; align-items: center; gap: var(--esp-2); }
+.detail-others li > div { display: flex; flex-direction: column; font-size: var(--texto-sm); }

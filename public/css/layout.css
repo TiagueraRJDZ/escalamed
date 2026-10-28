@@ -533,3 +533,25 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
 @media (max-width: 520px) {
   .gcal-button { display: none; }
 }
+
+/* Alternância de duas ou mais opções (ex.: Dinâmica | Fixa) */
+.segmented {
+  display: inline-flex;
+  margin-bottom: var(--esp-3);
+  padding: 3px;
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie-2);
+}
+.segmented[hidden] { display: none; }
+.segmented button {
+  padding: var(--esp-1) var(--esp-4);
+  border: 0;
+  border-radius: var(--raio-total);
+  background: none;
+  font: inherit;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--cor-texto-2);
+  cursor: pointer;
+}
+.segmented button[aria-pressed='true'] { background: var(--cor-superficie); color: var(--cor-primaria); box-shadow: var(--sombra-sm); }
