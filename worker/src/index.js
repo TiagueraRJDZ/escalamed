@@ -6,9 +6,9 @@
  *   - login por NOME DE USUÁRIO: acha a conta sem expor o e-mail, confere a
  *     senha no próprio Firebase e devolve um token personalizado para o app
  *     entrar (signInWithCustomToken);
- *   - SENHA PROVISÓRIA: o gestor (ou auxiliar) do grupo gera para um membro
- *     que esqueceu a senha. A conta fica marcada (trocarSenha) até a pessoa
- *     criar uma senha nova;
+ *   - SENHA PROVISÓRIA: só o administrador da plataforma gera, para quem
+ *     esqueceu a senha. A conta fica marcada (trocarSenha) até a pessoa criar
+ *     uma senha nova;
  *   - TROCA DE E-MAIL sem link de confirmação (o app confere a senha antes);
  *   - ADMINISTRAÇÃO da plataforma (Configurações > Usuários): listar as contas,
  *     senha provisória, inativar/reativar e excluir o acesso. Administradores são
@@ -20,7 +20,6 @@
  *   Com "Authorization: Bearer <token do Firebase>" de quem está logado:
  *   /trocar-usuario    { usuario }        vazio = remove
  *   /trocar-email      { novoEmail }      exige login recente (até 5 min)
- *   /senha-provisoria  { uid, grupo }     gestor/auxiliar para um membro do grupo
  *   /senha-definida    {}                 tira a marca depois que a pessoa troca a senha
  *   Só administradores:
  *   /admin/contas            {}               todas as contas (uid, e-mail, situação, último acesso)
@@ -40,7 +39,7 @@
  *   EMULADOR_AUTH / EMULADOR_FIRESTORE  endereços dos emuladores (padrão 127.0.0.1:9099 / :8080)
  * ===================================================================== */
 
-import { gerarSenhaProvisoria, emailValido, motivoUsuarioInvalido, motivoSemPermissaoSenha } from './senhas.js';
+import { gerarSenhaProvisoria, emailValido, motivoUsuarioInvalido } from './senhas.js';
 
 const LIMITE_POR_MINUTO = 10; // logins por nome de usuário, por endereço IP
 const LOGIN_RECENTE_S = 5 * 60; // troca de e-mail: login (ou senha conferida) há até 5 min
@@ -67,7 +66,6 @@ const ROTAS = {
   '/entrar-usuario': entrarComUsuario,
   '/trocar-usuario': trocarUsuario,
   '/trocar-email': trocarEmail,
-  '/senha-provisoria': senhaProvisoria,
   '/senha-definida': senhaDefinida,
   '/admin/contas': adminContas,
   '/admin/senha-provisoria': adminSenhaProvisoria,
@@ -149,7 +147,7 @@ async function conferirSenhaNoFirebase(env, email, senha, local) {
   if (resposta.ok) return;
   const motivo = (await resposta.json().catch(() => ({}))).error?.message || '';
   if (motivo.startsWith('TOO_MANY_ATTEMPTS')) {
-    throw new Falha(429, 'Acesso bloqueado por muitas tentativas com senha errada. Peça uma senha provisória ao gestor do seu grupo.');
+    throw new Falha(429, 'Acesso bloqueado por muitas tentativas com senha errada. Peça uma senha provisória ao administrador do EscalaMed.');
   }
   if (motivo.startsWith('USER_DISABLED')) throw new Falha(403, 'Esta conta foi desativada.');
   if (/INVALID|EMAIL_NOT_FOUND|MISSING_PASSWORD/.test(motivo)) throw new Falha(401, LOGIN_INVALIDO);
@@ -201,22 +199,6 @@ async function trocarEmail(contexto) {
   await contas(':update', { localId: uid, email });
   await registrar(env, uid, 'email', uid, ip);
   return { email };
-}
-
-// Gestor (ou auxiliar) gera uma senha provisória para um membro do grupo.
-// O grupo é lido no Firestore com o token de quem pediu: valem as regras.
-async function senhaProvisoria(contexto) {
-  const { env, corpo, ip, local } = contexto;
-  const { uid: autor, token } = await quemChamou(contexto);
-  const alvo = String(corpo.uid || '');
-  const grupoId = String(corpo.grupo || '');
-  if (!alvo || !grupoId) throw new Falha(400, 'Informe o membro e o grupo.');
-
-  const grupo = await lerGrupo(env, token, grupoId, local);
-  const motivo = motivoSemPermissaoSenha(grupo, autor, alvo);
-  if (motivo) throw new Falha(403, motivo);
-
-  return { senha: await aplicarSenhaProvisoria(env, local, alvo, autor, ip) };
 }
 
 // Troca a senha pela provisória. Devolve a senha (não fica guardada em lugar nenhum).
@@ -473,18 +455,6 @@ const listaDeTextos = (campo) => (campo?.arrayValue?.values || []).map((v) => v.
 async function lerAdmins(env, token, local) {
   const campos = await lerDocumento(env, token, 'config/admins', local);
   return listaDeTextos(campos?.uids);
-}
-
-async function lerGrupo(env, token, grupoId, local) {
-  const campos = await lerDocumento(env, token, `groups/${encodeURIComponent(grupoId)}`, local);
-  if (!campos) return null;
-  const lista = (nome) => listaDeTextos(campos[nome]);
-  return {
-    type: campos.type?.stringValue,
-    memberIds: lista('memberIds'),
-    managerIds: lista('managerIds'),
-    assistantIds: lista('assistantIds'),
-  };
 }
 
 /* ----- Contas do Firebase Authentication, com a chave de serviço ----- */

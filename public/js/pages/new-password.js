@@ -1,4 +1,4 @@
-// Troca obrigatória da senha provisória (gerada pelo gestor do grupo).
+// Troca obrigatória da senha provisória (gerada pelo administrador da plataforma).
 import { navigate } from '../firebase.js';
 import { requireAuth, nextUrl, signOutUser } from '../auth.js';
 import { changePassword, mustChangePassword } from '../auth-api.js';

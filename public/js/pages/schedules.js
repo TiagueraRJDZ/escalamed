@@ -12,7 +12,7 @@ import { createCalendar } from '../calendar.js';
 import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessage } from '../ui.js';
 import { normalize } from '../validators.js';
 import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
-import { myInvites, acceptInvite, cancelInvite } from '../members.js';
+import { myInvites, acceptInvite, cancelInvite, inviteKey } from '../members.js';
 
 renderIcons();
 const { user, profile } = await initLayout({ active: 'schedules' });
@@ -181,7 +181,7 @@ invitesEl.addEventListener('click', async (event) => {
       await acceptInvite(invite.groupId, invite, user, profile);
       toast(`Você entrou no grupo ${invite.groupName}.`, 'success');
     } else {
-      await cancelInvite(invite.groupId, invite.email);
+      await cancelInvite(invite.groupId, inviteKey(invite));
       toast('Convite recusado.');
     }
     pendingInvites = pendingInvites.filter((i) => i !== invite);
@@ -197,7 +197,7 @@ invitesEl.addEventListener('click', async (event) => {
   }
 });
 
-myInvites(user.email)
+myInvites(user)
   .then((list) => {
     pendingInvites = list;
     renderInvites();

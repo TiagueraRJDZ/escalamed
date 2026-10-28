@@ -16,8 +16,8 @@ import {
   can,
   assignableRoles,
 } from '../permissions.js';
-import { changeRole, removeMember, createInvite, cancelInvite, inviteLink, INVITE_DAYS } from '../members.js';
-import { temporaryPassword } from '../auth-api.js';
+import { changeRole, removeMember, createInvite, cancelInvite, inviteLink, inviteKey, INVITE_DAYS } from '../members.js';
+import { searchPeople } from '../people-search.js';
 import {
   escapeHtml,
   initials,
@@ -165,11 +165,16 @@ function memberCardHtml(member) {
 }
 
 function renderMembers() {
-  const term = normalize($('member-search').value);
+  // Cada palavra digitada precisa aparecer (no começo, meio ou fim) no nome, e-mail ou profissão
+  const words = normalize($('member-search').value).split(' ').filter(Boolean);
   const usage = roleUsage(group);
   const visible = members
     .filter((m) => group.memberIds.includes(m.id))
-    .filter((m) => !term || normalize(m.name).includes(term))
+    .filter((m) => {
+      if (!words.length) return true;
+      const text = normalize(`${m.name} ${m.email ?? ''} ${professionLabel(m)}`);
+      return words.every((w) => text.includes(w));
+    })
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   $('members-count').textContent = `(${group.memberIds.length})`;
@@ -225,12 +230,8 @@ function openRoleModal(uid) {
     })
     .join('');
 
-  // Senha provisória: o gestor para qualquer membro; o auxiliar só para quem não é gestor nem auxiliar
-  const canReset = myRole === 'manager' || !['manager', 'assistant'].includes(current);
-  const reset = canReset
-    ? `<button type="button" class="role-option role-option-extra" data-password>${icon('lock')}<span>Gerar senha provisória</span><small>Para quem esqueceu a senha</small></button>`
-    : '';
-  $('role-options').innerHTML = `${options}${reset}
+  // Senha provisória não fica aqui: só o administrador da plataforma gera (Configurações > Usuários)
+  $('role-options').innerHTML = `${options}
     <button type="button" class="role-option is-danger" data-remove>${icon('trash')}<span>Remover membro</span></button>`;
   $('role-options').dataset.uid = uid;
   $('modal-role').showModal();
@@ -242,24 +243,6 @@ $('role-options').addEventListener('click', async (event) => {
   const uid = $('role-options').dataset.uid;
   const member = members.find((m) => m.id === uid);
   $('modal-role').close();
-
-  if (button.hasAttribute('data-password')) {
-    const ok = await confirmDialog({
-      title: 'Gerar senha provisória?',
-      message: `A senha atual de ${member.name} deixa de funcionar e ela é desconectada. Ao entrar com a provisória, cria uma senha nova.`,
-      confirmText: 'Gerar senha',
-    });
-    if (!ok) return;
-    try {
-      const password = await temporaryPassword(uid, group.id);
-      $('temp-password-text').innerHTML = `Passe esta senha para <strong>${escapeHtml(member.name)}</strong> por um canal seguro. Ela não fica guardada: anote antes de fechar.`;
-      $('temp-password').value = password;
-      $('modal-temp-password').showModal();
-    } catch (error) {
-      toast(firebaseErrorMessage(error), 'error');
-    }
-    return;
-  }
 
   if (button.hasAttribute('data-remove')) {
     const ok = await confirmDialog({
@@ -298,12 +281,136 @@ $('role-options').addEventListener('click', async (event) => {
 });
 
 // ---------- Convites ----------
+// O campo aceita o nome de quem já usa o EscalaMed (sugestões da plataforma, convite
+// "por pessoa", sem revelar o e-mail dela) ou o e-mail de quem ainda não tem conta.
 const inviteForm = $('invite-form');
+const inviteInput = $('invite-email');
+const inviteList = $('invite-results');
 clearErrorsWhileTyping(inviteForm);
+
+let invitePerson = null; // pessoa escolhida na lista
+let inviteResults = [];
+let inviteActive = -1;
+let inviteTimer = null;
+let inviteSeq = 0;
+
+const personDetails = (p) =>
+  [professionLabel(p), councilLabel(p.council)].filter(Boolean).join(' · ') || (p.username ? `@${p.username}` : '');
+
+function setInviteListOpen(open) {
+  inviteList.hidden = !open;
+  inviteInput.setAttribute('aria-expanded', String(open));
+  if (!open) inviteInput.removeAttribute('aria-activedescendant');
+}
+
+// Situação da pessoa neste grupo: já é membro, já tem convite ou pode ser convidada
+function inviteStatus(p) {
+  if (group.memberIds.includes(p.uid)) return 'member';
+  if (invites.some((i) => i.uid === p.uid)) return 'invited';
+  return '';
+}
+
+function renderInviteResults(status = '') {
+  inviteList.innerHTML =
+    (status ? `<li class="search-status" role="presentation">${escapeHtml(status)}</li>` : '') +
+    inviteResults
+      .map((p, i) => {
+        const state = inviteStatus(p);
+        const note = state === 'member' ? 'Já está no grupo' : state === 'invited' ? 'Convite pendente (renova)' : personDetails(p);
+        return `<li class="search-option${state === 'member' ? ' is-disabled' : ''}" role="option" id="invite-opt-${i}"
+            data-index="${i}" aria-selected="${i === inviteActive}" aria-disabled="${state === 'member'}">
+          ${avatarHtml(p, 'avatar')}
+          <span><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(note)}</small></span>
+        </li>`;
+      })
+      .join('');
+  setInviteListOpen(true);
+  if (inviteActive >= 0) inviteInput.setAttribute('aria-activedescendant', `invite-opt-${inviteActive}`);
+}
+
+function choosePerson(index) {
+  const person = inviteResults[index];
+  if (!person || inviteStatus(person) === 'member') return;
+  invitePerson = person;
+  setInviteListOpen(false);
+  inviteInput.hidden = true;
+  $('invite-chosen').hidden = false;
+  $('invite-chosen').innerHTML = `${avatarHtml(person, 'avatar')}
+    <div class="member-info"><strong>${escapeHtml(person.name)}</strong><span>${escapeHtml(personDetails(person) || 'Usuário do EscalaMed')}</span></div>
+    <button type="button" class="btn-icon" id="invite-clear" aria-label="Trocar pessoa" title="Trocar pessoa">${icon('x')}</button>`;
+  clearFormErrors(inviteForm);
+}
+
+function clearPerson({ focus = true } = {}) {
+  invitePerson = null;
+  $('invite-chosen').hidden = true;
+  $('invite-chosen').innerHTML = '';
+  inviteInput.hidden = false;
+  if (focus) inviteInput.focus();
+}
+
+$('invite-chosen').addEventListener('click', (event) => {
+  if (event.target.closest('#invite-clear')) clearPerson();
+});
+
+inviteInput.addEventListener('input', () => {
+  clearTimeout(inviteTimer);
+  const text = inviteInput.value.trim();
+  inviteSeq++;
+  inviteResults = [];
+  inviteActive = -1;
+  // Com "@" é e-mail: sem sugestões
+  if (text.includes('@') || normalize(text).length < 2) {
+    setInviteListOpen(false);
+    return;
+  }
+  renderInviteResults('Buscando…');
+  const seq = inviteSeq;
+  inviteTimer = setTimeout(async () => {
+    try {
+      const found = await searchPeople(text, user.uid);
+      if (seq !== inviteSeq) return; // chegou uma busca mais nova
+      inviteResults = found;
+      renderInviteResults(found.length ? '' : 'Ninguém encontrado. Se a pessoa ainda não tem conta, informe o e-mail dela.');
+    } catch (error) {
+      if (seq === inviteSeq) renderInviteResults(firebaseErrorMessage(error) ?? '');
+    }
+  }, 300);
+});
+
+inviteInput.addEventListener('keydown', (event) => {
+  if (inviteList.hidden || !inviteResults.length) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const total = inviteResults.length;
+    inviteActive = (inviteActive + (event.key === 'ArrowDown' ? 1 : -1) + total) % total;
+    renderInviteResults();
+    $(`invite-opt-${inviteActive}`)?.scrollIntoView({ block: 'nearest' });
+  } else if (event.key === 'Enter' && inviteActive >= 0) {
+    event.preventDefault();
+    choosePerson(inviteActive);
+  } else if (event.key === 'Escape') {
+    event.preventDefault(); // não fecha o modal, só a lista
+    setInviteListOpen(false);
+  }
+});
+
+inviteInput.addEventListener('blur', () => setTimeout(() => setInviteListOpen(false), 150));
+
+// mousedown em vez de click: escolhe antes de o campo perder o foco
+inviteList.addEventListener('mousedown', (event) => {
+  const option = event.target.closest('.search-option');
+  if (!option) return;
+  event.preventDefault();
+  choosePerson(Number(option.dataset.index));
+});
 
 function openInviteModal() {
   inviteForm.reset();
   clearFormErrors(inviteForm);
+  clearPerson({ focus: false });
+  inviteResults = [];
+  setInviteListOpen(false);
   const usage = roleUsage(group);
   $('invite-role').innerHTML = INVITE_ROLES.map((role) => {
     const full = role !== 'staff' && !hasRoom(group, role);
@@ -311,7 +418,7 @@ function openInviteModal() {
     return `<option value="${role}" ${full ? 'disabled' : ''}>${ROLES[role]}${count}${full ? ' · limite atingido' : ''}</option>`;
   }).join('');
   $('modal-invite').showModal();
-  inviteForm.email.focus();
+  inviteInput.focus();
 }
 
 $('invite-button').addEventListener('click', openInviteModal);
@@ -319,24 +426,31 @@ $('invite-button').addEventListener('click', openInviteModal);
 inviteForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearFormErrors(inviteForm);
-  const email = inviteForm.email.value.trim().toLowerCase();
   const role = inviteForm.role.value;
-  if (!isValidEmail(email)) {
-    setFieldError(inviteForm.email, 'Informe um e-mail válido.');
-    return;
-  }
-  if (email === user.email?.toLowerCase()) {
-    setFieldError(inviteForm.email, 'Você já faz parte do grupo.');
-    return;
+
+  let target;
+  if (invitePerson) {
+    target = { uid: invitePerson.uid, name: invitePerson.name };
+  } else {
+    const email = inviteInput.value.trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      setFieldError(inviteInput, 'Escolha uma pessoa da lista ou informe um e-mail válido.');
+      return;
+    }
+    if (email === user.email?.toLowerCase()) {
+      setFieldError(inviteInput, 'Você já faz parte do grupo.');
+      return;
+    }
+    target = { email };
   }
 
   const button = inviteForm.querySelector('[type=submit]');
   setLoading(button, true);
   try {
-    const renewed = invites.some((i) => i.email === email);
-    await createInvite(group, email, role, { uid: user.uid, name: profile.name });
+    const renewed = invites.some((i) => inviteKey(i) === inviteKey(target));
+    await createInvite(group, target, role, { uid: user.uid, name: profile.name });
     $('modal-invite').close();
-    showInviteLink(email, renewed);
+    showInviteLink(target, renewed);
   } catch (error) {
     showFormAlert(inviteForm, firebaseErrorMessage(error));
   } finally {
@@ -344,12 +458,19 @@ inviteForm.addEventListener('submit', async (event) => {
   }
 });
 
-function showInviteLink(email, renewed = false) {
+// invite: { email } ou { uid, name }
+function showInviteLink(invite, renewed = false) {
   const link = inviteLink(group.id);
   $('modal-invite-link-title').textContent = renewed ? 'Convite renovado' : 'Convite criado';
-  $('invite-link-text').innerHTML = `Envie este link para <strong>${escapeHtml(email)}</strong>. Vale por ${INVITE_DAYS} dias e só funciona com esse e-mail.`;
+  if (invite.uid) {
+    $('invite-link-text').innerHTML = `<strong>${escapeHtml(invite.name)}</strong> vê o convite na tela Escalas ao entrar no EscalaMed. Se quiser, envie também este link (vale por ${INVITE_DAYS} dias e só funciona na conta dela).`;
+  } else {
+    $('invite-link-text').innerHTML = `Envie este link para <strong>${escapeHtml(invite.email)}</strong>. Vale por ${INVITE_DAYS} dias e só funciona com esse e-mail.`;
+  }
   $('invite-link').value = link;
-  const message = `Você foi convidado(a) para o grupo ${group.name} no EscalaMed. Entre com o e-mail ${email}: ${link}`;
+  const message = invite.uid
+    ? `Você foi convidado(a) para o grupo ${group.name} no EscalaMed: ${link}`
+    : `Você foi convidado(a) para o grupo ${group.name} no EscalaMed. Entre com o e-mail ${invite.email}: ${link}`;
   $('share-whatsapp').href = `https://wa.me/?text=${encodeURIComponent(message)}`;
   $('modal-invite-link').showModal();
 }
@@ -364,28 +485,30 @@ async function copyText(text, done = 'Link copiado.') {
 }
 
 $('copy-link').addEventListener('click', () => copyText($('invite-link').value));
-$('copy-temp-password').addEventListener('click', () => copyText($('temp-password').value, 'Senha copiada.'));
-$('modal-temp-password').addEventListener('close', () => ($('temp-password').value = ''));
+
+const inviteLabel = (invite) => invite.name ?? invite.email;
 
 function renderInvites() {
   const show = can(myRole, 'inviteMembers') && invites.length > 0;
   $('invites-section').hidden = !show;
   if (!show) return;
   $('invite-list').innerHTML = invites
-    .sort((a, b) => a.email.localeCompare(b.email))
+    .sort((a, b) => inviteLabel(a).localeCompare(inviteLabel(b), 'pt-BR'))
     .map((invite) => {
       const expired = invite.expiresAt?.toMillis() < Date.now();
       const status = expired
         ? '<span class="badge badge-warning">Vencido</span>'
         : `<span class="muted">vence em ${formatDate(invite.expiresAt)}</span>`;
+      const key = escapeHtml(inviteKey(invite));
+      const kind = invite.uid ? 'Usuário do EscalaMed · ' : '';
       return `<li class="invite-item">
         <div class="member-info">
-          <strong>${escapeHtml(invite.email)}</strong>
-          <span>${ROLES[invite.role]} · ${status}</span>
+          <strong>${escapeHtml(inviteLabel(invite))}</strong>
+          <span>${kind}${ROLES[invite.role]} · ${status}</span>
         </div>
         <div class="invite-actions">
-          <button type="button" class="btn btn-ghost" data-copy="${escapeHtml(invite.email)}">${icon('arrowRightLeft')}Link</button>
-          <button type="button" class="btn btn-ghost is-danger" data-cancel="${escapeHtml(invite.email)}">${icon('x')}Cancelar</button>
+          <button type="button" class="btn btn-ghost" data-copy="${key}">${icon('arrowRightLeft')}Link</button>
+          <button type="button" class="btn btn-ghost is-danger" data-cancel="${key}">${icon('x')}Cancelar</button>
         </div>
       </li>`;
     })
@@ -393,23 +516,25 @@ function renderInvites() {
 }
 
 $('invite-list').addEventListener('click', async (event) => {
-  const copy = event.target.closest('[data-copy]');
-  if (copy) {
-    showInviteLink(copy.dataset.copy);
+  const button = event.target.closest('[data-copy], [data-cancel]');
+  if (!button) return;
+  const key = button.dataset.copy ?? button.dataset.cancel;
+  const invite = invites.find((i) => inviteKey(i) === key);
+  if (!invite) return;
+  if (button.hasAttribute('data-copy')) {
+    showInviteLink(invite);
     return;
   }
-  const cancel = event.target.closest('[data-cancel]');
-  if (!cancel) return;
   const ok = await confirmDialog({
     title: 'Cancelar convite?',
-    message: `O link deixa de funcionar para ${cancel.dataset.cancel}.`,
+    message: `O convite de ${inviteLabel(invite)} deixa de valer.`,
     confirmText: 'Cancelar convite',
     cancelText: 'Voltar',
     danger: true,
   });
   if (!ok) return;
   try {
-    await cancelInvite(group.id, cancel.dataset.cancel);
+    await cancelInvite(group.id, key);
     toast('Convite cancelado.', 'success');
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');

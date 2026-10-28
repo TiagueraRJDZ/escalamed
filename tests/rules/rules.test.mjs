@@ -347,3 +347,70 @@ test('sem config/admins, ninguém apaga perfil alheio', async () => {
   await admin([w.set(`users/${staff.uid}`, { name: 'Plantonista', signupStep: 4 })]);
   assert.ok(!(await commit(manager.token, [w.delete(`users/${staff.uid}`)])));
 });
+
+// ---------- E-mail no cartão de membro (busca da aba Membros) ----------
+test('cartão: cada um grava só o próprio e-mail', async () => {
+  const path = `${G}/members/${staff.uid}`;
+  assert.ok(await commit(staff.token, [w.update(path, { email: staff.email })]));
+  assert.ok(!(await commit(staff.token, [w.update(path, { email: 'outro@teste.com' })])));
+  // Ninguém grava o e-mail no cartão de outra pessoa
+  assert.ok(!(await commit(manager.token, [w.update(path, { email: manager.email })])));
+});
+
+test('entrar por convite com o e-mail de outra pessoa no cartão é recusado', async () => {
+  await admin([w.set(`${G}/invites/${invited.email}`, invite(invited.email, 'staff'))]);
+  const entrar = (email) =>
+    commit(invited.token, [
+      w.update(G, { memberIds: [...baseGroup().memberIds, invited.uid], updatedAt: NOW }),
+      w.set(`${G}/members/${invited.uid}`, { ...card('staff', 'Convidado Silva'), email, joinedAt: NOW }),
+      w.delete(`${G}/invites/${invited.email}`),
+    ]);
+  assert.ok(!(await entrar('falso@teste.com')));
+  assert.ok(await entrar(invited.email));
+});
+
+// ---------- Convite por pessoa (busca da plataforma; id = uid, sem e-mail) ----------
+function personInvite(person, role = 'staff', extra = {}) {
+  const { email, ...rest } = invite('x@teste.com', role, extra);
+  return { ...rest, uid: person.uid, name: 'Convidado Silva' };
+}
+
+const createPersonInvite = (actor, person, role = 'staff') =>
+  commit(actor.token, [
+    w.set(`${G}/invites/${person.uid}`, { ...personInvite(person, role), invitedBy: actor.uid, createdAt: NOW }),
+  ]);
+
+test('convite por pessoa: gestor cria para quem tem perfil; não para membro nem sem perfil', async () => {
+  await admin([w.set(`users/${invited.uid}`, { name: 'Convidado Silva', signupStep: 4 })]);
+  assert.ok(!(await createPersonInvite(manager, outsider))); // sem perfil na plataforma
+  assert.ok(!(await createPersonInvite(manager, staff))); // já é membro
+  assert.ok(!(await createPersonInvite(staff, invited))); // plantonista não convida
+  assert.ok(await createPersonInvite(manager, invited));
+  // O id precisa ser o uid da pessoa
+  const wrongId = await commit(manager.token, [
+    w.set(`${G}/invites/${outsider.uid}`, { ...personInvite(invited), invitedBy: manager.uid, createdAt: NOW }),
+  ]);
+  assert.ok(!wrongId);
+});
+
+test('convite por pessoa: só ela vê, acha na lista e entra no cargo do convite', async () => {
+  await admin([w.set(`${G}/invites/${invited.uid}`, personInvite(invited, 'observer'))]);
+  assert.ok(await canRead(invited.token, `${G}/invites/${invited.uid}`));
+  assert.ok(!(await canRead(outsider.token, `${G}/invites/${invited.uid}`)));
+  assert.ok(await canQueryGroup(invited.token, 'invites', 'uid', invited.uid));
+  assert.ok(!(await canQueryGroup(outsider.token, 'invites', 'uid', invited.uid)));
+
+  const joinByPerson = (arrays, role) =>
+    commit(invited.token, [
+      w.update(G, { memberIds: [...baseGroup().memberIds, invited.uid], ...arrays, updatedAt: NOW }),
+      w.set(`${G}/members/${invited.uid}`, { ...card(role, 'Convidado Silva'), joinedAt: NOW }),
+      w.delete(`${G}/invites/${invited.uid}`),
+    ]);
+  assert.ok(!(await joinByPerson({}, 'staff')));
+  assert.ok(await joinByPerson({ observerIds: [observer.uid, invited.uid] }, 'observer'));
+});
+
+test('convite por pessoa de outra pessoa não deixa ninguém entrar', async () => {
+  await admin([w.set(`${G}/invites/${invited.uid}`, personInvite(invited))]);
+  assert.ok(!(await join(outsider, {}, 'staff')));
+});

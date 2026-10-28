@@ -5,7 +5,7 @@ import { db, navigate } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { ROLES } from '../permissions.js';
-import { acceptInvite, cancelInvite } from '../members.js';
+import { acceptInvite, cancelInvite, myInviteFor, inviteKey } from '../members.js';
 import { escapeHtml, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 import { signOutUser } from '../auth.js';
 
@@ -37,8 +37,8 @@ async function load() {
     return;
   }
 
-  const inviteSnap = await getDoc(doc(db, 'groups', groupId, 'invites', email)).catch(() => null);
-  const invite = inviteSnap?.exists() ? inviteSnap.data() : null;
+  // Convite para a pessoa (escolhida na busca) ou para o e-mail dela
+  const invite = await myInviteFor(groupId, user);
   if (!invite || invite.expiresAt.toMillis() < Date.now()) {
     showMessage(
       'mail',
@@ -89,7 +89,7 @@ async function load() {
     });
     if (!ok) return;
     try {
-      await cancelInvite(groupId, email);
+      await cancelInvite(groupId, inviteKey(invite));
       toast('Convite recusado.');
       navigate('/schedules.html', { replace: true });
     } catch (error) {

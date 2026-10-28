@@ -6,6 +6,7 @@ import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 import { mountCredits } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
+import { syncMemberCards } from './members.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
@@ -203,6 +204,27 @@ function setupDialogs() {
   });
 }
 
+// Cartões de membro sem e-mail (criados antes da busca por e-mail) ou com o e-mail
+// antigo: atualiza em todos os grupos. Roda uma vez por e-mail, em segundo plano.
+function syncCardEmail(user, profile) {
+  const key = `escalamed:email-cartoes:${user.uid}`;
+  const email = (user.email ?? '').toLowerCase();
+  try {
+    if (!email || localStorage.getItem(key) === email) return;
+  } catch {
+    return; // sem armazenamento: tenta de novo em outra visita
+  }
+  syncMemberCards(user.uid, profile)
+    .then(() => {
+      try {
+        localStorage.setItem(key, email);
+      } catch {
+        // sem armazenamento
+      }
+    })
+    .catch(() => {});
+}
+
 export async function initLayout({ active } = {}) {
   const { user, profile } = await requireAuth();
   const page = document.getElementById('page');
@@ -221,6 +243,7 @@ export async function initLayout({ active } = {}) {
   setupDialogs();
 
   setupPeopleSearch(app.querySelector('#global-search'), user.uid);
+  syncCardEmail(user, profile);
 
   mountCredits(app);
   document.body.classList.remove('is-booting');

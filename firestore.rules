@@ -216,9 +216,21 @@ service cloud.firestore {
         return ['memberIds', 'managerIds', 'assistantIds', 'analystIds', 'observerIds', 'updatedAt'];
       }
 
-      // ----- Convite da própria pessoa (id = e-mail em minúsculas) -----
+      // ----- Convite da própria pessoa: por e-mail (id = e-mail) ou por pessoa (id = uid) -----
       function invitePath() {
         return /databases/$(database)/documents/groups/$(groupId)/invites/$(myEmail());
+      }
+
+      function personInvitePath() {
+        return /databases/$(database)/documents/groups/$(groupId)/invites/$(me());
+      }
+
+      function hasMyInvite() {
+        return exists(personInvitePath()) || exists(invitePath());
+      }
+
+      function myInvite() {
+        return exists(personInvitePath()) ? get(personInvitePath()).data : get(invitePath()).data;
       }
 
       // O array do cargo do convite ganha a pessoa; os outros ficam iguais
@@ -272,8 +284,8 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.type == 'team'
         && !(me() in resource.data.memberIds)
-        && exists(invitePath())
-        && acceptsInvite(get(invitePath()).data)
+        && hasMyInvite()
+        && acceptsInvite(myInvite())
         && validGroup(incoming())
         && changedOnly(roleKeys())
         && incoming().updatedAt == request.time;
@@ -303,14 +315,20 @@ service cloud.firestore {
         }
 
         function validCard(d) {
-          return d.keys().hasOnly(['role', 'name', 'photoURL', 'categoryId', 'specialty', 'council',
+          return d.keys().hasOnly(['role', 'name', 'email', 'photoURL', 'categoryId', 'specialty', 'council',
                                    'joinedAt', 'addedBy'])
             && d.role in ['manager', 'assistant', 'analyst', 'observer', 'staff']
             && str(d.name, 2, 80)
+            && optStr(d.get('email', null), 254)
             && validPhoto(d.get('photoURL', null))
             && optCategory(d.get('categoryId', null))
             && optStr(d.get('specialty', null), 80)
             && validCouncil(d.get('council', null));
+        }
+
+        // E-mail do cartão (para a busca de membros): só o da própria conta
+        function ownEmail(d) {
+          return d.get('email', null) == null || d.email == request.auth.token.get('email', '').lower();
         }
 
         allow read: if isMemberOf(groupData());
@@ -320,6 +338,7 @@ service cloud.firestore {
           && !exists(groupPath())
           && getAfter(groupPath()).data.ownerId == memberId
           && validCard(incoming())
+          && ownEmail(incoming())
           && incoming().role == 'manager'
           && incoming().joinedAt == request.time;
 
@@ -329,6 +348,7 @@ service cloud.firestore {
           && !(memberId in groupData().memberIds)
           && memberId in groupAfter().memberIds
           && validCard(incoming())
+          && ownEmail(incoming())
           && incoming().role == roleIn(groupAfter(), memberId)
           && incoming().joinedAt == request.time;
 
@@ -337,11 +357,12 @@ service cloud.firestore {
           && changedOnly(['role'])
           && incoming().role == roleIn(groupAfter(), memberId);
 
-        // A própria pessoa atualiza o cartão (nome, foto, profissão)
+        // A própria pessoa atualiza o cartão (nome, e-mail, foto, profissão)
         allow update: if isSelf(memberId)
           && isMemberOf(groupData())
-          && changedOnly(['name', 'photoURL', 'categoryId', 'specialty', 'council'])
-          && validCard(incoming());
+          && changedOnly(['name', 'email', 'photoURL', 'categoryId', 'specialty', 'council'])
+          && validCard(incoming())
+          && ownEmail(incoming());
 
         // Remover membro, sair do grupo ou excluir o grupo: o cartão sai junto
         allow delete: if signedIn()
@@ -349,18 +370,16 @@ service cloud.firestore {
           && (!existsAfter(groupPath()) || !(memberId in groupAfter().memberIds));
       }
 
-      // ----- Convites (id = e-mail convidado, em minúsculas) -----
+      // ----- Convites -----
+      // Dois tipos, pelo id do documento:
+      //   - por e-mail: id = e-mail convidado, em minúsculas;
+      //   - por pessoa (escolhida na busca da plataforma): id = uid. O e-mail da
+      //     pessoa continua privado: quem convida não fica sabendo.
       // O convite guarda nome do grupo e da unidade porque quem é convidado
       // ainda não pode ler o grupo.
-      match /invites/{email} {
-        function validInvite(d) {
-          return d.keys().hasOnly(['email', 'role', 'groupName', 'unitName', 'invitedBy',
-                                   'invitedByName', 'createdAt', 'expiresAt'])
-            && d.email == email
-            && email == email.lower()
-            && email.size() <= 254
-            && email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
-            && d.role in ['staff', 'assistant', 'analyst', 'observer']
+      match /invites/{key} {
+        function inviteCommon(d) {
+          return d.role in ['staff', 'assistant', 'analyst', 'observer']
             && str(d.groupName, 3, 60)
             && optStr(d.unitName, 120)
             && d.invitedBy == me()
@@ -371,11 +390,34 @@ service cloud.firestore {
             && d.expiresAt <= request.time + duration.value(31, 'd');
         }
 
-        allow read: if signedIn() && (email == myEmail() || isAdminOf(groupData()));
+        function emailInvite(d) {
+          return d.keys().hasOnly(['email', 'role', 'groupName', 'unitName', 'invitedBy',
+                                   'invitedByName', 'createdAt', 'expiresAt'])
+            && d.email == key
+            && key == key.lower()
+            && key.size() <= 254
+            && key.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$');
+        }
+
+        function personInvite(d) {
+          return d.keys().hasOnly(['uid', 'name', 'role', 'groupName', 'unitName', 'invitedBy',
+                                   'invitedByName', 'createdAt', 'expiresAt'])
+            && d.uid == key
+            && str(d.name, 2, 80)
+            && exists(/databases/$(database)/documents/users/$(key))
+            && !(key in groupData().memberIds);
+        }
+
+        function isMine() {
+          return key == me() || key == myEmail();
+        }
+
+        allow read: if signedIn() && (isMine() || isAdminOf(groupData()));
         allow create, update: if isAdminOf(groupData())
           && groupData().type == 'team'
-          && validInvite(incoming());
-        allow delete: if signedIn() && (email == myEmail() || isAdminOf(groupData()));
+          && (emailInvite(incoming()) || personInvite(incoming()))
+          && inviteCommon(incoming());
+        allow delete: if signedIn() && (isMine() || isAdminOf(groupData()));
       }
 
       // ----- Turnos -----
@@ -408,8 +450,9 @@ service cloud.firestore {
     }
 
     // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail
-    match /{path=**}/invites/{email} {
-      allow read: if signedIn() && resource.data.email == myEmail();
+    match /{path=**}/invites/{key} {
+      allow read: if signedIn()
+        && (resource.data.get('uid', null) == me() || resource.data.get('email', null) == myEmail());
     }
   }
 }

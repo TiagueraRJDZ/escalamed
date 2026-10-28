@@ -1,6 +1,6 @@
 // Login e senhas: Firebase Authentication (e-mail e senha, ou conta Google). O serviço de contas
 // (Cloudflare Worker, pasta worker/) faz só o que o navegador não consegue sozinho:
-// login por nome de usuário, senha provisória gerada pelo gestor e troca de e-mail
+// login por nome de usuário, senha provisória gerada pelo administrador e troca de e-mail
 // sem link de confirmação.
 import {
   signInWithEmailAndPassword,
@@ -101,10 +101,6 @@ export async function changeEmail(newEmail, password) {
 // Vazio remove o nome de usuário. Devolve o nome gravado (em minúsculas) ou null.
 export const changeUsername = async (username) =>
   (await call('trocar-usuario', { usuario: username }, { signedIn: true })).usuario;
-
-// Gestor/auxiliar: senha provisória para um membro do grupo. Devolve a senha.
-export const temporaryPassword = async (uid, groupId) =>
-  (await call('senha-provisoria', { uid, grupo: groupId }, { signedIn: true })).senha;
 
 // ---------- Administrador da plataforma (Configurações > Usuários) ----------
 // O Worker confere em config/admins se quem chamou é administrador.

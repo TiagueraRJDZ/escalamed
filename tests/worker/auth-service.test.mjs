@@ -1,6 +1,6 @@
 // Teste completo do serviço de contas: roda o código do Worker no Node, com um D1
 // de mentira (SQLite do Node), o emulador de Authentication do Firebase e uma
-// leitura de grupo e de config/admins simulada (sem o emulador do Firestore, que usa Java).
+// leitura de config/admins simulada (sem o emulador do Firestore, que usa Java).
 // Uso:
 //   firebase emulators:exec --only auth --config firebase.test.json --project demo-escalamed-test "node --no-warnings --test tests/worker/auth-service.test.mjs"
 import { test, before } from 'node:test';
@@ -38,27 +38,14 @@ class D1Falso {
 const D1 = new D1Falso();
 const env = { PROJETO, ORIGENS: ORIGEM, DB: D1, EMULADOR: '1', EMULADOR_AUTH: AUTH, EMULADOR_FIRESTORE: 'firestore.falso' };
 
-// Grupo e administradores simulados: as leituras do Firestore feitas pelo Worker caem aqui
-let grupo = null;
+// Administradores simulados: a leitura de config/admins feita pelo Worker cai aqui
 let admins = [];
 const fetchReal = globalThis.fetch;
 globalThis.fetch = async (url, opcoes) => {
   if (String(url).startsWith('http://firestore.falso/')) {
-    const lista = (ids) => ({ arrayValue: { values: ids.map((id) => ({ stringValue: id })) } });
-    if (String(url).endsWith('/documents/config/admins')) {
-      return new Response(JSON.stringify({ fields: { uids: lista(admins) } }));
-    }
-    if (!grupo) return new Response('{}', { status: 404 });
-    return new Response(
-      JSON.stringify({
-        fields: {
-          type: { stringValue: 'team' },
-          memberIds: lista(grupo.memberIds),
-          managerIds: lista(grupo.managerIds),
-          assistantIds: lista(grupo.assistantIds),
-        },
-      }),
-    );
+    if (!String(url).endsWith('/documents/config/admins')) return new Response('{}', { status: 404 });
+    const uids = { arrayValue: { values: admins.map((id) => ({ stringValue: id })) } };
+    return new Response(JSON.stringify({ fields: { uids } }));
   }
   return fetchReal(url, opcoes);
 };
@@ -103,11 +90,6 @@ before(async () => {
   await fetchReal(`http://${AUTH}/emulator/v1/projects/${PROJETO}/accounts`, { method: 'DELETE' });
   gestor = await cadastrar('gestor@teste.com', SENHA);
   plantonista = await cadastrar('ana@teste.com', SENHA);
-  grupo = {
-    memberIds: [gestor.localId, plantonista.localId],
-    managerIds: [gestor.localId],
-    assistantIds: [],
-  };
 });
 
 test('origem fora da lista é recusada', async () => {
@@ -146,12 +128,18 @@ test('rota de logado sem token é recusada', async () => {
   assert.equal((await chamar('/trocar-usuario', { usuario: 'x.y.z' })).status, 401);
 });
 
-test('senha provisória: só gestor/auxiliar; marca e exige a troca', async () => {
-  // Plantonista não gera
-  const negada = await chamar('/senha-provisoria', { uid: gestor.localId, grupo: 'g1' }, { token: plantonista.idToken });
+test('senha provisória: só administrador; marca e exige a troca', async () => {
+  // A rota antiga (gestor/auxiliar do grupo) não existe mais
+  const antiga = await chamar('/senha-provisoria', { uid: plantonista.localId, grupo: 'g1' }, { token: gestor.idToken });
+  assert.equal(antiga.status, 404);
+
+  // Gestor de grupo que não é administrador da plataforma não gera
+  admins = [];
+  const negada = await chamar('/admin/senha-provisoria', { uid: plantonista.localId }, { token: gestor.idToken });
   assert.equal(negada.status, 403);
 
-  const r = await chamar('/senha-provisoria', { uid: plantonista.localId, grupo: 'g1' }, { token: gestor.idToken });
+  admins = [gestor.localId];
+  const r = await chamar('/admin/senha-provisoria', { uid: plantonista.localId }, { token: gestor.idToken });
   assert.equal(r.status, 200, r.erro);
 
   // A senha antiga não vale mais; a provisória entra, com a marca trocarSenha

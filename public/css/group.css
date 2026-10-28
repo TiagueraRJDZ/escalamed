@@ -149,10 +149,7 @@
 .role-option.is-danger svg { width: 18px; height: 18px; }
 .role-option.is-danger:hover { background: var(--cor-perigo-suave); }
 
-/* "Gerar senha provisória" no modal de perfil */
-.role-option-extra { justify-content: flex-start; margin-top: var(--esp-2); border-top: 1px solid var(--cor-borda); border-radius: 0; }
-.role-option-extra svg { width: 18px; height: 18px; color: var(--cor-texto-2); }
-.role-option-extra small { margin-left: auto; }
+/* Senha provisória gerada (Configurações > Usuários) */
 .temp-password { font-family: ui-monospace, Consolas, monospace; font-size: var(--texto-lg) !important; letter-spacing: 0.08em; }
 
 /* Link do convite com botão de copiar */
@@ -176,4 +173,26 @@
   .group-header-card { padding: var(--esp-4); }
   .tab-panel { padding: var(--esp-4); }
   .invite-item { flex-wrap: wrap; }
+}
+
+/* ---------- Convidar: busca de pessoas da plataforma ---------- */
+.invite-picker { position: relative; }
+/* Dentro do modal (que tem rolagem própria) a lista fica no fluxo, logo abaixo do campo */
+.invite-picker .search-results {
+  position: static;
+  min-width: 0;
+  max-height: 260px;
+  margin-top: var(--esp-1);
+  box-shadow: var(--sombra);
+}
+.search-option.is-disabled { cursor: default; opacity: 0.55; }
+.search-option.is-disabled:hover { background: none; }
+.invite-chosen {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-primaria-borda);
+  border-radius: var(--raio);
+  background: var(--cor-primaria-suave);
 }

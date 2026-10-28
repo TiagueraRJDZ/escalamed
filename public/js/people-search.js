@@ -26,7 +26,8 @@ const details = (person) => [professionLabel(person), councilLabel(person.counci
 
 // Procura por: começo do nome completo, começo do nome de usuário e palavra inteira do nome.
 // Depois, cada palavra digitada precisa começar alguma palavra do nome ou do usuário.
-async function searchPeople(text, selfUid) {
+// Também usada no convite para o grupo (group.js)
+export async function searchPeople(text, selfUid) {
   const term = normalize(text);
   const words = term.split(' ').filter(Boolean);
   const users = collection(db, 'users');

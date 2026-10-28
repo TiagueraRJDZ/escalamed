@@ -32,20 +32,3 @@ export function motivoUsuarioInvalido(usuario) {
   if (/^[.]|[.]$|\.\./.test(texto)) return 'O nome de usuário não pode começar ou terminar com ponto, nem ter dois pontos seguidos.';
   return '';
 }
-
-/* ----- Quem pode gerar senha provisória para quem ----- */
-
-// grupo: { type, memberIds, managerIds, assistantIds } (lido do Firestore com o token de quem pediu)
-// Gestor: para qualquer membro. Auxiliar: só para quem não é gestor nem auxiliar. Nunca para si.
-export function motivoSemPermissaoSenha(grupo, quem, alvo) {
-  if (!grupo || grupo.type !== 'team') return 'Grupo não encontrado.';
-  if (quem === alvo) return 'Para a sua própria senha, use Configurações > Alterar senha.';
-  if (!grupo.memberIds.includes(alvo)) return 'Esta pessoa não faz parte do grupo.';
-  const gestor = grupo.managerIds.includes(quem);
-  const auxiliar = grupo.assistantIds.includes(quem);
-  if (!gestor && !auxiliar) return 'Só o gestor ou um auxiliar do grupo gera senha provisória.';
-  if (!gestor && (grupo.managerIds.includes(alvo) || grupo.assistantIds.includes(alvo))) {
-    return 'Auxiliar não gera senha para o gestor nem para outro auxiliar.';
-  }
-  return '';
-}

@@ -21,7 +21,7 @@ CREATE TABLE eventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   uid TEXT NOT NULL,                          -- conta afetada
   tipo TEXT NOT NULL,                         -- senha-provisoria, email, usuario
-  por_uid TEXT,                               -- quem fez (senha provisória: o gestor)
+  por_uid TEXT,                               -- quem fez (senha provisória: o administrador)
   ip TEXT,
   em INTEGER NOT NULL
 );

@@ -4,6 +4,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -14,15 +15,18 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { db } from './firebase.js';
+import { auth, db } from './firebase.js';
 import { ROLE_ARRAY, roleOf, changeRolePatch, removeMemberPatch } from './permissions.js';
 
 export const INVITE_DAYS = 7;
 
-// Dados do perfil copiados para o cartão do membro (evita uma leitura por pessoa)
+// Dados do perfil copiados para o cartão do membro (evita uma leitura por pessoa).
+// O cartão é sempre gravado pela própria pessoa: o e-mail é o da conta logada
+// (as regras recusam outro), usado na busca da aba Membros.
 export function memberCard(profile = {}) {
   return {
     name: profile.name ?? 'Usuário',
+    email: auth.currentUser?.email?.toLowerCase() ?? null,
     photoURL: profile.photoURL ?? null,
     categoryId: profile.categoryId ?? null,
     specialty: profile.specialty ?? null,
@@ -32,7 +36,10 @@ export function memberCard(profile = {}) {
 
 const groupRef = (groupId) => doc(db, 'groups', groupId);
 const memberRef = (groupId, uid) => doc(db, 'groups', groupId, 'members', uid);
-const inviteRef = (groupId, email) => doc(db, 'groups', groupId, 'invites', email.toLowerCase());
+// Convite por e-mail (id = e-mail em minúsculas) ou por pessoa da plataforma (id = uid;
+// o e-mail dela continua privado). inviteKey devolve o id de um convite.
+export const inviteKey = (invite) => invite.uid ?? invite.email;
+const inviteRef = (groupId, key) => doc(db, 'groups', groupId, 'invites', key.includes('@') ? key.toLowerCase() : key);
 
 // Muda o cargo de alguém. Para "manager" é a transferência de gestão:
 // o gestor antigo vira auxiliar (se houver vaga) ou plantonista.
@@ -57,10 +64,12 @@ export async function removeMember(group, uid) {
   await batch.commit();
 }
 
-export async function createInvite(group, email, role, inviter) {
+// target: { email } ou { uid, name } (pessoa escolhida na busca)
+export async function createInvite(group, target, role, inviter) {
   const now = Date.now();
-  await setDoc(inviteRef(group.id, email), {
-    email: email.toLowerCase(),
+  const who = target.uid ? { uid: target.uid, name: target.name } : { email: target.email.toLowerCase() };
+  await setDoc(inviteRef(group.id, inviteKey(who)), {
+    ...who,
     role,
     groupName: group.name,
     unitName: group.unit?.name ?? null,
@@ -71,19 +80,33 @@ export async function createInvite(group, email, role, inviter) {
   });
 }
 
-export const cancelInvite = (groupId, email) => deleteDoc(inviteRef(groupId, email));
+export const cancelInvite = (groupId, key) => deleteDoc(inviteRef(groupId, key));
 
 export async function listInvites(groupId) {
   const snapshot = await getDocs(collection(db, 'groups', groupId, 'invites'));
   return snapshot.docs.map((d) => d.data());
 }
 
-// Convites pendentes para o e-mail de quem está logado, em todos os grupos
-export async function myInvites(email) {
-  const snapshot = await getDocs(query(collectionGroup(db, 'invites'), where('email', '==', email.toLowerCase())));
-  return snapshot.docs
+// Convites pendentes de quem está logado (pelo e-mail ou pela pessoa), em todos os grupos
+export async function myInvites(user) {
+  const invites = collectionGroup(db, 'invites');
+  const queries = [query(invites, where('uid', '==', user.uid))];
+  if (user.email) queries.push(query(invites, where('email', '==', user.email.toLowerCase())));
+  const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
+  return snapshots
+    .flatMap((s) => s.docs)
     .map((d) => ({ groupId: d.ref.parent.parent.id, ...d.data() }))
     .filter((invite) => invite.expiresAt?.toMillis() > Date.now());
+}
+
+// Convite de quem está logado para um grupo (por pessoa ou por e-mail), ou null
+export async function myInviteFor(groupId, user) {
+  const keys = [user.uid, user.email?.toLowerCase()].filter(Boolean);
+  for (const key of keys) {
+    const snapshot = await getDoc(inviteRef(groupId, key)).catch(() => null);
+    if (snapshot?.exists()) return snapshot.data();
+  }
+  return null;
 }
 
 // Aceitar: entra no grupo (no cargo do convite), cria o cartão e apaga o convite
@@ -101,13 +124,13 @@ export async function acceptInvite(groupId, invite, user, profile) {
     joinedAt: serverTimestamp(),
     addedBy: invite.invitedBy,
   });
-  batch.delete(inviteRef(groupId, invite.email));
+  batch.delete(inviteRef(groupId, inviteKey(invite)));
   await batch.commit();
 }
 
 export const inviteLink = (groupId) => `${location.origin}/invite.html?g=${encodeURIComponent(groupId)}`;
 
-// Depois de mudar nome, foto ou profissão: atualiza o cartão em todos os grupos
+// Depois de mudar nome, e-mail, foto ou profissão: atualiza o cartão em todos os grupos
 export async function syncMemberCards(uid, profile) {
   const snapshot = await getDocs(query(collection(db, 'groups'), where('memberIds', 'array-contains', uid)));
   if (snapshot.empty) return;

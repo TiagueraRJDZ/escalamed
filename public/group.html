@@ -50,7 +50,7 @@
         <div class="input-icon">
           <span data-icon="search"></span>
           <label class="sr-only" for="member-search">Procurar membro</label>
-          <input class="input" id="member-search" type="search" placeholder="Procurar membro" autocomplete="off" />
+          <input class="input" id="member-search" type="search" placeholder="Procurar por nome ou e-mail" autocomplete="off" />
         </div>
         <button type="button" class="btn btn-primary" id="invite-button" hidden><span data-icon="userPlus"></span>Convidar</button>
       </div>
@@ -74,9 +74,13 @@
       <div class="dialog-body">
         <div class="alert form-alert" role="alert" hidden></div>
         <div class="field">
-          <label class="label" for="invite-email">E-mail da pessoa</label>
-          <input class="input" id="invite-email" name="email" type="email" autocomplete="off" placeholder="nome@exemplo.com" required />
-          <span class="field-hint">A pessoa entra no grupo ao abrir o link logada com este e-mail.</span>
+          <label class="label" for="invite-email">Pessoa ou e-mail</label>
+          <div class="invite-picker">
+            <input class="input" id="invite-email" name="email" type="text" autocomplete="off" spellcheck="false"
+              role="combobox" aria-autocomplete="list" aria-controls="invite-results" aria-expanded="false" />
+            <ul class="search-results" id="invite-results" role="listbox" aria-label="Pessoas encontradas" hidden></ul>
+          </div>
+          <div class="invite-chosen" id="invite-chosen" hidden></div>
           <span class="field-error"></span>
         </div>
         <div class="field">
@@ -120,24 +124,6 @@
     <div class="dialog-body">
       <div class="role-target" id="role-target"></div>
       <div class="role-options" id="role-options" role="group" aria-label="Cargos"></div>
-    </div>
-  </dialog>
-
-  <!-- Modal: senha provisória gerada -->
-  <dialog class="modal" id="modal-temp-password" aria-labelledby="modal-temp-password-title">
-    <div class="dialog-header">
-      <h2 id="modal-temp-password-title">Senha provisória</h2>
-      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
-    </div>
-    <div class="dialog-body">
-      <p class="muted" id="temp-password-text"></p>
-      <div class="copy-field">
-        <input class="input temp-password" id="temp-password" type="text" readonly aria-label="Senha provisória" />
-        <button type="button" class="btn btn-secondary" id="copy-temp-password">Copiar</button>
-      </div>
-    </div>
-    <div class="dialog-footer">
-      <button type="button" class="btn btn-primary" data-close>Pronto</button>
     </div>
   </dialog>
 

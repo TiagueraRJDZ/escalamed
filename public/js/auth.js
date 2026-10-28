@@ -50,7 +50,7 @@ export async function requireAuth({ profileComplete = true, allowTemporaryPasswo
     return halt();
   }
 
-  // Entrou com senha provisória (gerada pelo gestor): cria uma senha nova antes de tudo
+  // Entrou com senha provisória (gerada pelo administrador): cria uma senha nova antes de tudo
   if (!allowTemporaryPassword && (await mustChangePassword(user))) {
     navigate(`/new-password.html${nextParam()}`, { replace: true });
     return halt();

@@ -34,7 +34,7 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 | Criador do grupo vira gestor | `ownerId`, `managerIds`, `memberIds`, `members/{uid}` com `role: 'manager'` | Pronto |
 | Escala individual (`type: 'personal'`) | wizard | Pronto. **Manter**: não existe no grupo de referência, mas faz parte do EscalaMed |
 | Acesso, cadastro em 4 etapas (sem confirmação de e-mail), guards | `index.html`, `signup.html`, `auth.js` | Pronto |
-| Login por e-mail (Firebase) ou nome de usuário (Worker na Cloudflare + D1), senha provisória pelo gestor, troca de e-mail sem link | `worker/`, `auth-api.js`, `new-password.html` | Pronto, falta publicar o Worker |
+| Login por e-mail (Firebase) ou nome de usuário (Worker na Cloudflare + D1), senha provisória pelo administrador da plataforma, troca de e-mail sem link | `worker/`, `auth-api.js`, `new-password.html` | Pronto, falta publicar o Worker |
 | Cargos com limites, convites, alterar perfil, transferir gestão, remover, sair | `group.html` (aba Membros), `invite.html`, `permissions.js`, `members.js`, regras | Pronto, com testes |
 | Configurações da conta (dados, profissão, foto, senha, exclusão) | `settings.html` | Pronto |
 

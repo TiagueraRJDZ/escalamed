@@ -113,11 +113,11 @@ O Live Server já está configurado para servir a pasta `public` (arquivo `.vsco
 - **Continuar com Google** (tela de acesso e etapa 1 do cadastro): abre a janela do Google. No primeiro acesso a conta já nasce no Firebase e o cadastro começa nos dados pessoais (etapa 3), com o aceite dos termos ali e a foto do Google no perfil. Conta só com Google não tem senha: nas Configurações, a aba vira **Criar senha** (para entrar também por e-mail ou usuário), a exclusão da conta é confirmada pelo Google e a troca de e-mail só aparece depois de criar a senha.
 - **Serviço de contas** (`escalamed-auth`, pasta `worker/`, Cloudflare Worker gratuito, no mesmo padrão do `sacflow-senha`) faz só o que o navegador não consegue sozinho:
   - **Login por nome de usuário:** o banco D1 (`escalamed-contas`) guarda só "usuário → uid". O Worker acha a conta, confere a senha no próprio Firebase e devolve um token personalizado para o app entrar. O e-mail não é exposto. Limite de 10 tentativas por minuto por IP.
-  - **Senha provisória:** o gestor (ou auxiliar, mas não para o gestor nem para outro auxiliar) gera na aba Membros do grupo; o administrador da plataforma, para qualquer pessoa, em **Configurações › Usuários**. A senha antiga para de valer, as sessões abertas caem e a conta fica marcada (`trocarSenha`): ao entrar, o app pede uma senha nova (`new-password.html`).
+  - **Senha provisória:** só o administrador da plataforma gera, em **Configurações › Usuários** (gestor e auxiliar de grupo não geram). A senha antiga para de valer, as sessões abertas caem e a conta fica marcada (`trocarSenha`): ao entrar, o app pede uma senha nova (`new-password.html`).
   - **Troca de e-mail sem link:** o app confere a senha e o Worker troca na hora.
   - **Administração da plataforma** (**Configurações › Usuários**, só para administradores): lista todas as contas (nome, usuário, e-mail, profissão, situação) e, em cada linha, **redefinir senha** (senha provisória), **inativar/reativar acesso** (a pessoa não entra mais e as sessões caem; os dados ficam) e **excluir acesso** (apaga login e perfil e libera o nome de usuário; nos grupos o nome continua até o gestor remover).
   - Tudo fica registrado na tabela `eventos` (inclusive quem gerou cada senha provisória, quem inativou e quem excluiu).
-- **Esqueci a senha:** a tela orienta a pedir uma senha provisória ao gestor do grupo.
+- **Esqueci a senha:** a tela orienta a pedir uma senha provisória ao administrador do EscalaMed.
 
 ### Publicar o Worker (uma vez)
 

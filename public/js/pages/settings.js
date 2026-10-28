@@ -266,6 +266,7 @@ emailForm.addEventListener('submit', async (event) => {
   try {
     await changeEmail(newEmail, emailForm.password.value);
     await updateDoc(privateRef, { email: currentEmail(), updatedAt: serverTimestamp() });
+    syncMemberCards(user.uid, profile).catch(() => {}); // e-mail novo nos cartões dos grupos
     $('account-email').value = currentEmail();
     $('modal-email').close();
     toast(`E-mail alterado para ${currentEmail()}. Use-o no próximo login.`, 'success', 6000);
