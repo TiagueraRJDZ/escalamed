@@ -85,18 +85,18 @@ firebase emulators:start --import=./emulator-data --export-on-exit
 
 O Live Server já está configurado para servir a pasta `public` (arquivo `.vscode/settings.json`). Se os emuladores estiverem desligados, o app mostra uma faixa amarela avisando.
 
-## Configurar o projeto Firebase real
+## Projeto Firebase real
 
-1. Crie um projeto no [console do Firebase](https://console.firebase.google.com) (plano gratuito).
-2. Em **Authentication > Método de login**, ative **E-mail/senha**.
-3. Em **Firestore Database**, crie o banco (região `southamerica-east1`, São Paulo).
-4. Em **Configurações do projeto > Seus apps**, registre um app da **Web** e copie o `firebaseConfig` para [public/js/config.js](public/js/config.js).
-5. Troque o ID do projeto em `.firebaserc`.
+- Projeto: **escalamed-hapvida** (nome "EscalaMed"), na conta tiago.tlmsmartins@gmail.com, plano gratuito.
+- Firestore em `southamerica-east1` (São Paulo). Login por **E-mail/senha**.
+- Configuração do app web em [public/js/config.js](public/js/config.js). Em `localhost`/`127.0.0.1` o app usa o projeto `demo-escalamed` dos emuladores; nos demais endereços, o projeto real.
+- Em `.firebaserc`, o projeto padrão é o dos emuladores (`demo-escalamed`) e o real tem o apelido `prod`. Assim, um `firebase deploy` sem `--project prod` nunca publica no projeto real por engano.
 
 ## Publicar
 
 ```bash
-firebase deploy
+firebase deploy --project prod                         # site + regras + índices
+firebase deploy --project prod --only firestore        # só regras e índices
 ```
 
 ## Commits

@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-escalamed"
+    "default": "demo-escalamed",
+    "prod": "escalamed-hapvida"
   }
 }
