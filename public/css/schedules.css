@@ -90,7 +90,6 @@
 .group-info span { font-size: var(--texto-md); color: var(--cor-texto-3); }
 
 .group-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-1); }
-.badge-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
 
 .group-skeleton {
   display: flex;
@@ -168,6 +167,24 @@
 .cal-day.is-past { color: var(--cor-texto-3); font-weight: 400; }
 .cal-day[aria-current='date'] { border-color: var(--cor-primaria); font-weight: 700; }
 .cal-day[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
+
+/* Dia com plantão: fundo suave e um ponto embaixo do número */
+.cal-day.is-marked {
+  position: relative;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria-hover);
+  font-weight: 700;
+}
+.cal-day.is-marked::after {
+  content: '';
+  position: absolute;
+  bottom: 12%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.cal-day.is-marked[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
 
 /* Seções da lista: cargo do usuário em cada grupo */
 .group-section h2 {

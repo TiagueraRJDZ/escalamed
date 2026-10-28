@@ -13,6 +13,8 @@ import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessag
 import { normalize } from '../validators.js';
 import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
 import { myInvites, acceptInvite, cancelInvite, inviteKey } from '../members.js';
+import { monthKey, userDays } from '../schedule-math.js';
+import { loadSchedule } from '../schedule-data.js';
 
 renderIcons();
 const { user, profile } = await initLayout({ active: 'schedules' });
@@ -23,7 +25,29 @@ let groups = [];
 let loaded = false;
 
 setupMenu(document.getElementById('new-button'), document.getElementById('new-menu'));
-createCalendar(document.getElementById('calendar'));
+// Calendário: marca os dias em que o usuário tem plantão, em todos os grupos
+let calendarMonth = null;
+let markedFor = ''; // mês + grupos já marcados (evita ler de novo à toa)
+const calendar = createCalendar(document.getElementById('calendar'), {
+  onMonthChange: (year, monthIndex) => {
+    calendarMonth = monthKey(year, monthIndex);
+    markMyDays();
+  },
+});
+
+async function markMyDays() {
+  if (!loaded || !calendarMonth) return;
+  const month = calendarMonth;
+  const ready = groups.filter((g) => g.setupStep === 'done');
+  const signature = `${month}|${ready.map((g) => g.id).join(',')}`;
+  if (signature === markedFor) return;
+  markedFor = signature;
+  const schedules = await Promise.all(ready.map((g) => loadSchedule(g.id, month).catch(() => null)));
+  if (month !== calendarMonth) return; // trocou de mês enquanto carregava
+  const days = new Set();
+  schedules.forEach((s) => userDays(s?.assignments, user.uid).forEach((day) => days.add(day)));
+  calendar.setMarks(days);
+}
 
 // Aviso depois de concluir o wizard
 const params = new URLSearchParams(location.search);
@@ -133,6 +157,7 @@ onSnapshot(
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
     loaded = true;
     render();
+    markMyDays();
   },
   (error) => {
     if (isLeaving()) return; // trocando de página: não é erro de verdade

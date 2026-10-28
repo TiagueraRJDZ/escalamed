@@ -1,4 +1,4 @@
-// Tela do grupo: cabeçalho, abas (Calendário, Membros), convites e cargos.
+// Tela do grupo: cabeçalho, abas (Calendário, Editar escala, Membros), convites e cargos.
 import { doc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout, avatarHtml } from '../layout.js';
@@ -18,6 +18,18 @@ import {
 } from '../permissions.js';
 import { changeRole, removeMember, createInvite, cancelInvite, inviteLink, inviteKey, INVITE_DAYS } from '../members.js';
 import { searchPeople } from '../people-search.js';
+import { createCalendar } from '../calendar.js';
+import { formatClock } from '../shifts.js';
+import {
+  monthKey,
+  monthParts,
+  cellsOf,
+  userDays,
+  dayShifts,
+  memberMinutes,
+  formatHours,
+} from '../schedule-math.js';
+import { loadShifts, loadSchedule, scheduleShifts } from '../schedule-data.js';
 import {
   escapeHtml,
   initials,
@@ -120,7 +132,8 @@ function selectTab(tab, { focus = false } = {}) {
     $(t.getAttribute('aria-controls')).hidden = !selected;
   });
   if (focus) tab.focus();
-  history.replaceState(null, '', `${location.pathname}${location.search}${tab.id === 'tab-members' ? '#membros' : ''}`);
+  const hash = { 'tab-members': '#membros', 'tab-schedule': '#escala' }[tab.id] ?? '';
+  history.replaceState(null, '', `${location.pathname}${location.search}${hash}`);
 }
 
 $('group-tabs').addEventListener('click', (event) => {
@@ -560,6 +573,185 @@ function listenInvites() {
   }
 }
 
+// ---------- Calendário: meus plantões e plantões do dia ----------
+let liveShifts = null; // turnos do grupo (lidos uma vez)
+const months = new Map(); // "YYYY-MM" → escala (ou null)
+let shownMonth = null;
+
+const monthTitle = (month) => {
+  const { year, monthIndex } = monthParts(month);
+  const name = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(year, monthIndex, 1));
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}`;
+};
+const longDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+const shortDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+const dateOf = (month, day) => {
+  const { year, monthIndex } = monthParts(month);
+  return new Date(year, monthIndex, day);
+};
+
+async function monthData(month) {
+  if (!liveShifts) liveShifts = await loadShifts(groupId).catch(() => ({}));
+  if (!months.has(month)) months.set(month, await loadSchedule(groupId, month));
+  return months.get(month);
+}
+
+const calendar = createCalendar($('group-calendar'), {
+  onMonthChange: (year, monthIndex) => showMonth(monthKey(year, monthIndex)),
+  onSelect: (date) => openDay(monthKey(date.getFullYear(), date.getMonth()), date.getDate()),
+});
+
+async function showMonth(month) {
+  shownMonth = month;
+  $('my-shifts-title').textContent = `Meus plantões · ${monthTitle(month)}`;
+  $('my-shifts').innerHTML = '<li class="muted">Carregando…</li>';
+  $('my-shifts-note').textContent = '';
+  let schedule;
+  try {
+    schedule = await monthData(month);
+  } catch (error) {
+    $('my-shifts').innerHTML = `<li class="muted">${escapeHtml(firebaseErrorMessage(error) ?? '')}</li>`;
+    return;
+  }
+  if (shownMonth !== month) return; // trocou de mês enquanto carregava
+  calendar.setMarks(userDays(schedule?.assignments, user.uid));
+
+  const shifts = scheduleShifts(schedule, liveShifts);
+  const mine = cellsOf(schedule?.assignments, user.uid).filter((c) => shifts[c.shiftId]);
+  $('my-shifts-note').textContent = !schedule
+    ? 'Ainda não há escala para este mês.'
+    : schedule.status === 'draft'
+      ? 'Escala em rascunho: só gestor, auxiliares e analistas veem.'
+      : `${mine.length} ${mine.length === 1 ? 'plantão' : 'plantões'} · ${formatHours(memberMinutes(schedule.assignments, shifts, user.uid))}`;
+  $('my-shifts').innerHTML = mine.length
+    ? mine
+        .map(({ day, shiftId }) => {
+          const shift = shifts[shiftId];
+          return `<li><button type="button" class="my-shift" data-open-day="${day}">
+            <span class="my-shift-date">${escapeHtml(shortDate.format(dateOf(month, day)))}</span>
+            <strong>${escapeHtml(shift.title)}</strong>
+            <span class="muted">${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</span>
+          </button></li>`;
+        })
+        .join('')
+    : schedule
+      ? '<li class="muted">Você não tem plantões neste mês.</li>'
+      : '';
+}
+
+$('my-shifts').addEventListener('click', (event) => {
+  const item = event.target.closest('[data-open-day]');
+  if (item) openDay(shownMonth, Number(item.dataset.openDay));
+});
+
+// Gaveta "Plantões do dia"
+const dayState = { month: null, day: 1, mode: 'dynamic' };
+
+async function openDay(month, day) {
+  Object.assign(dayState, { month, day });
+  if (!$('drawer-day').open) $('drawer-day').showModal();
+  await renderDay();
+}
+
+async function renderDay() {
+  const { month, day } = dayState;
+  const label = longDate.format(dateOf(month, day));
+  $('day-label').textContent = label.charAt(0).toUpperCase() + label.slice(1); // "Terça-feira, 06/10/2026"
+  $('day-shifts').innerHTML = '<p class="muted">Carregando…</p>';
+  const schedule = await monthData(month).catch(() => null);
+  if (dayState.month !== month || dayState.day !== day) return;
+
+  const hasFixed = schedule?.status === 'published' && schedule.fixed;
+  $('day-mode').hidden = !hasFixed;
+  if (!hasFixed) dayState.mode = 'dynamic';
+  $('day-mode').querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === dayState.mode)));
+
+  if (!schedule) {
+    $('day-shifts').innerHTML = `<div class="empty-state">${icon('calendar')}<h3>Sem escala</h3><p>${escapeHtml(monthTitle(month))} ainda não tem escala publicada.</p></div>`;
+    return;
+  }
+  const shifts = scheduleShifts(schedule, liveShifts);
+  const list = dayShifts(schedule, shifts, day, { fixed: dayState.mode === 'fixed' });
+  if (!list.length) {
+    $('day-shifts').innerHTML = '<p class="muted">O grupo não tem turnos cadastrados.</p>';
+    return;
+  }
+  const byId = new Map(members.map((m) => [m.id, m]));
+  $('day-shifts').innerHTML = list
+    .map(({ shift, uids, vacancies }) => {
+      const people = uids
+        .map((uid) => byId.get(uid) ?? { id: uid, name: 'Ex-membro' })
+        .map(
+          (m) => `<li class="day-person${m.id === user.uid ? ' is-me' : ''}">${avatarHtml(m, 'avatar day-avatar')}
+            <span>${escapeHtml(m.name)}${m.id === user.uid ? ' <span class="muted">(você)</span>' : ''}</span></li>`,
+        )
+        .join('');
+      const open = vacancies ? `<span class="badge badge-warning">${vacancies} ${vacancies === 1 ? 'vaga' : 'vagas'}</span>` : '';
+      return `<article class="day-shift">
+        <header><strong>${escapeHtml(shift.title)} · ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>${open}</header>
+        ${people ? `<ul>${people}</ul>` : '<p class="muted text-sm">Ninguém escalado.</p>'}
+      </article>`;
+    })
+    .join('');
+}
+
+$('drawer-day').addEventListener('click', (event) => {
+  const nav = event.target.closest('[data-day-nav]');
+  if (nav) {
+    const date = dateOf(dayState.month, dayState.day + Number(nav.dataset.dayNav));
+    Object.assign(dayState, { month: monthKey(date.getFullYear(), date.getMonth()), day: date.getDate() });
+    renderDay();
+    return;
+  }
+  const mode = event.target.closest('[data-mode]');
+  if (mode) {
+    dayState.mode = mode.dataset.mode;
+    renderDay();
+  }
+});
+
+// ---------- Editar escala: meses do ano ----------
+let listYear = new Date().getFullYear();
+let monthsLoaded = null; // ano já carregado na lista
+
+const STATUS = {
+  none: ['Sem escala', 'badge-muted'],
+  draft: ['Em rascunho', 'badge-warning'],
+  published: ['Publicada', 'badge-primary'],
+};
+
+async function renderMonthList(force = false) {
+  if (!can(myRole, 'editSchedule')) return;
+  if (monthsLoaded === listYear && !force) return;
+  monthsLoaded = listYear;
+  const year = listYear;
+  $('year-label').textContent = year;
+  $('month-list').innerHTML = '<li class="muted">Carregando…</li>';
+  // Mais recente primeiro
+  const keys = Array.from({ length: 12 }, (_, i) => monthKey(year, 11 - i));
+  const data = await Promise.all(keys.map((m) => loadSchedule(groupId, m).catch(() => null)));
+  if (year !== listYear) return;
+  $('month-list').innerHTML = keys
+    .map((m, i) => {
+      const [label, badge] = STATUS[data[i]?.status ?? 'none'];
+      return `<li class="month-item">
+        <div><strong>${escapeHtml(monthTitle(m))}</strong> <span class="badge ${badge}">${label}</span></div>
+        <a class="btn btn-secondary" href="/schedule-edit.html?group=${encodeURIComponent(groupId)}&month=${m}">${icon('edit')}Editar escala</a>
+      </li>`;
+    })
+    .join('');
+}
+
+$('year-prev').addEventListener('click', () => {
+  listYear -= 1;
+  renderMonthList();
+});
+$('year-next').addEventListener('click', () => {
+  listYear += 1;
+  renderMonthList();
+});
+$('tab-schedule').addEventListener('click', () => renderMonthList());
+
 // ---------- Dados em tempo real ----------
 let firstLoad = true;
 
@@ -574,6 +766,7 @@ onSnapshot(
     renderHeader();
     const isTeam = group.type === 'team';
     $('tab-members').hidden = !isTeam;
+    $('tab-schedule').hidden = !can(myRole, 'editSchedule');
     $('invite-button').hidden = !can(myRole, 'inviteMembers');
     listenInvites();
     renderMembers();
@@ -581,7 +774,9 @@ onSnapshot(
 
     if (firstLoad) {
       firstLoad = false;
-      selectTab(isTeam && location.hash === '#membros' ? $('tab-members') : $('tab-calendar'));
+      const fromHash = { '#membros': isTeam && $('tab-members'), '#escala': !$('tab-schedule').hidden && $('tab-schedule') }[location.hash];
+      selectTab(fromHash || $('tab-calendar'));
+      if (fromHash === $('tab-schedule')) renderMonthList();
     }
   },
   (error) => {
@@ -595,6 +790,7 @@ onSnapshot(
   (snapshot) => {
     members = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (group) renderMembers();
+    if ($('drawer-day').open) renderDay();
   },
   () => {}, // sem acesso: o listener do grupo já cuida de sair da página
 );

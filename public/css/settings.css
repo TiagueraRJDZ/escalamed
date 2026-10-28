@@ -82,5 +82,3 @@
 .user-actions .btn-icon[data-action='delete']:hover:not(:disabled) { background: var(--cor-perigo-suave); }
 .user-item.is-inactive .avatar,
 .user-item.is-inactive .member-info { opacity: 0.55; }
-.badge-muted { background: var(--cor-superficie-2); color: var(--cor-texto-2); }
-.badge-danger { background: var(--cor-perigo-suave); color: var(--cor-perigo); }

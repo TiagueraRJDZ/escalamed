@@ -206,6 +206,50 @@ async function main() {
     expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
   });
   console.log(`✔ grupo TELEAUDITORIA HAPVIDA: ${inGroup.length} membros, ${SHIFTS.length} turnos, 1 convite pendente (novo@teste.com)`);
+
+  // Escalas: mês atual publicado e o seguinte em rascunho.
+  // Plantonistas em rodízio nos turnos M, T e N (sem sobreposição), 1 vaga no N de sábado.
+  const staffIds = inGroup.filter((u) => u.role === 'staff').map((u) => ids[u.email]);
+  const rotation = ['m', 't', 'n'];
+  const key = (day, shiftId) => `${String(day).padStart(2, '0')}_${shiftId}`;
+  const monthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  function buildMonth(year, monthIndex) {
+    const assignments = {};
+    const vacancies = {};
+    const days = new Date(year, monthIndex + 1, 0).getDate();
+    for (let day = 1; day <= days; day++) {
+      rotation.forEach((shiftId, i) => {
+        assignments[key(day, shiftId)] = [staffIds[(day + i) % staffIds.length]];
+      });
+      if (new Date(year, monthIndex, day).getDay() === 6) vacancies[key(day, 'n')] = 1;
+    }
+    return { assignments, vacancies };
+  }
+  const frozenShifts = Object.fromEntries(
+    SHIFTS.map((s) => [s.id, { title: s.title, startMinute: toMinutes(s.start), endMinute: toMinutes(s.end) }]),
+  );
+  const current = new Date(now.getFullYear(), now.getMonth(), 1);
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const published = buildMonth(current.getFullYear(), current.getMonth());
+  await setDoc(`groups/${GROUP_ID}/schedules/${monthId(current)}`, {
+    status: 'published',
+    ...published,
+    fixed: published.assignments,
+    shifts: frozenShifts,
+    publishedAt: now,
+    publishedBy: ids[manager.email],
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: ids[manager.email],
+  });
+  await setDoc(`groups/${GROUP_ID}/schedules/${monthId(next)}`, {
+    status: 'draft',
+    ...buildMonth(next.getFullYear(), next.getMonth()),
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: ids[manager.email],
+  });
+  console.log(`✔ escalas: ${monthId(current)} publicada e ${monthId(next)} em rascunho`);
 }
 
 main().catch((err) => {

@@ -4,7 +4,7 @@
 //   firebase emulators:exec --config firebase.test.json --project demo-escalamed-test "node --test tests/rules/rules.test.mjs"
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { w, NOW, commit, admin, canRead, canQueryGroup, clearFirestore, clearAuth, createUser } from './emulator.mjs';
+import { w, NOW, commit, admin, canRead, canQueryGroup, clearFirestore, clearAuth, createUser, PROJECT } from './emulator.mjs';
 
 let manager, assistant, analyst, observer, staff, outsider, invited, unverified;
 const G = 'groups/g1';
@@ -413,4 +413,68 @@ test('convite por pessoa: só ela vê, acha na lista e entra no cargo do convite
 test('convite por pessoa de outra pessoa não deixa ninguém entrar', async () => {
   await admin([w.set(`${G}/invites/${invited.uid}`, personInvite(invited))]);
   assert.ok(!(await join(outsider, {}, 'staff')));
+});
+
+// ---------- Escala mensal (groups/{g}/schedules/{YYYY-MM}) ----------
+const S = `${G}/schedules/2026-10`;
+
+function schedule(actor, extra = {}) {
+  return {
+    status: 'draft',
+    assignments: { '05_m': [staff.uid] },
+    vacancies: { '05_n': 2 },
+    createdAt: NOW,
+    updatedAt: NOW,
+    updatedBy: actor.uid,
+    ...extra,
+  };
+}
+
+test('escala: gestor e auxiliar criam e editam; os demais não', async () => {
+  assert.ok(!(await commit(staff.token, [w.set(S, schedule(staff))])));
+  assert.ok(!(await commit(analyst.token, [w.set(S, schedule(analyst))])));
+  assert.ok(!(await commit(outsider.token, [w.set(S, schedule(outsider))])));
+  assert.ok(await commit(assistant.token, [w.set(S, schedule(assistant))]));
+  // Alocar como o app faz: arrayUnion no campo da célula + quem e quando
+  const allocate = (actor) =>
+    commit(actor.token, [
+      {
+        update: { name: `projects/${PROJECT}/databases/(default)/documents/${S}`, fields: { updatedBy: { stringValue: actor.uid } } },
+        updateMask: { fieldPaths: ['updatedBy'] },
+        updateTransforms: [
+          { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+          { fieldPath: 'assignments.`05_t`', appendMissingElements: { values: [{ stringValue: staff.uid }] } },
+        ],
+        currentDocument: { exists: true },
+      },
+    ]);
+  assert.ok(await allocate(manager));
+  assert.ok(!(await allocate(staff)));
+  assert.ok(await commit(manager.token, [w.update(S, { status: 'published', updatedAt: NOW, updatedBy: manager.uid })]));
+  // updatedBy precisa ser quem grava
+  assert.ok(!(await commit(manager.token, [w.update(S, { status: 'draft', updatedAt: NOW, updatedBy: staff.uid })])));
+  assert.ok(!(await commit(staff.token, [w.update(S, { status: 'draft', updatedAt: NOW, updatedBy: staff.uid })])));
+});
+
+test('escala: id precisa ser um mês válido e campos estranhos são recusados', async () => {
+  assert.ok(!(await commit(manager.token, [w.set(`${G}/schedules/2026-13`, schedule(manager))])));
+  assert.ok(!(await commit(manager.token, [w.set(`${G}/schedules/outubro`, schedule(manager))])));
+  assert.ok(!(await commit(manager.token, [w.set(S, schedule(manager, { extra: 1 }))])));
+  assert.ok(!(await commit(manager.token, [w.set(S, schedule(manager, { status: 'final' }))])));
+});
+
+test('escala: rascunho só gestor, auxiliar e analista leem; publicada todos os membros', async () => {
+  await admin([w.set(S, { ...schedule(manager), createdAt: new Date(), updatedAt: new Date() })]);
+  assert.ok(await canRead(manager.token, S));
+  assert.ok(await canRead(assistant.token, S));
+  assert.ok(await canRead(analyst.token, S));
+  assert.ok(!(await canRead(observer.token, S)));
+  assert.ok(!(await canRead(staff.token, S)));
+  assert.ok(!(await canRead(outsider.token, S)));
+  await admin([w.update(S, { status: 'published' })]);
+  assert.ok(await canRead(observer.token, S));
+  assert.ok(await canRead(staff.token, S));
+  assert.ok(!(await canRead(outsider.token, S)));
+  // Mês sem escala: membro consegue perguntar (e recebe "não existe")
+  assert.ok(await canRead(staff.token, `${G}/schedules/2026-11`));
 });

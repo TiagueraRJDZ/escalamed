@@ -1,0 +1,197 @@
+/* Editor da escala mensal: grade de dias × membros/turnos e barra de ações */
+
+.schedule-back { margin-bottom: var(--esp-3); }
+
+.schedule-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-4);
+  margin-bottom: var(--esp-4);
+  padding: var(--esp-4) var(--esp-5);
+}
+.schedule-head h1 { font-size: var(--texto-xl); }
+.schedule-month-nav { display: flex; align-items: center; gap: var(--esp-2); }
+.schedule-month-nav h2 { min-width: 170px; font-size: var(--texto-lg); text-align: center; }
+
+.schedule-card { padding: 0; overflow: hidden; }
+.schedule-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-6);
+  text-align: center;
+  color: var(--cor-texto-2);
+}
+
+/* Rolagem nos dois sentidos, com cabeçalho e nomes fixos */
+.schedule-scroll {
+  max-height: calc(100vh - 260px);
+  min-height: 320px;
+  overflow: auto;
+}
+
+.schedule-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--texto-sm);
+}
+.schedule-grid th,
+.schedule-grid td {
+  padding: 0;
+  border-right: 1px solid var(--cor-borda);
+  border-bottom: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+}
+.schedule-grid .is-weekend { background: var(--cor-superficie-2); }
+
+/* Cabeçalho dos dias */
+.schedule-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--esp-2) 0;
+  background: var(--cor-superficie);
+  font-weight: 600;
+}
+.day-head { min-width: 36px; text-align: center; }
+.day-head span { display: block; font-size: var(--texto-xs); color: var(--cor-texto-3); }
+.day-head.is-weekend { background: var(--cor-superficie-2); }
+
+/* Colunas fixas: nome e turno */
+.schedule-grid .col-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+  padding: var(--esp-2) var(--esp-3);
+  text-align: left;
+  vertical-align: middle;
+}
+.schedule-grid .col-shift {
+  position: sticky;
+  left: 200px;
+  z-index: 1;
+  min-width: 52px;
+  padding: 0 var(--esp-2);
+  font-weight: 600;
+  text-align: center;
+  color: var(--cor-texto-2);
+}
+.schedule-grid thead .col-name,
+.schedule-grid thead .col-shift { z-index: 3; }
+
+/* Separação entre blocos (cada membro) */
+.schedule-grid tr.block-start > * { border-top: 2px solid var(--cor-borda-forte); }
+
+.member-cell { display: flex; align-items: center; gap: var(--esp-2); }
+.member-cell-avatar { width: 32px; height: 32px; font-size: var(--texto-xs); }
+.member-cell span { display: flex; flex-direction: column; min-width: 0; }
+.member-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--texto-sm); }
+.member-cell small { color: var(--cor-primaria-hover); font-weight: 700; }
+
+.block-label { font-weight: 700; color: var(--cor-alerta); }
+.row-vacancy .col-shift { color: var(--cor-alerta); }
+
+/* Células */
+.cell {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cell:hover { background: var(--cor-primaria-suave); }
+.cell:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--cor-primaria); }
+/* Pessoa alocada: círculo com as iniciais */
+.cell-dot {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+  font-size: 0.625rem;
+}
+
+.cell-vacancy.has-vacancy { color: var(--cor-alerta); background: var(--cor-alerta-suave); font-size: var(--texto-sm); }
+
+tr.is-found .col-name { box-shadow: inset 4px 0 0 var(--cor-primaria); background: var(--cor-primaria-suave); }
+
+/* Barra de ações grudada no rodapé da área da página */
+.schedule-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-3);
+  margin-top: var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  box-shadow: 0 -4px 12px rgb(16 24 40 / 0.06);
+}
+.schedule-find { flex: 1; min-width: 200px; max-width: 360px; }
+.schedule-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin-left: auto; }
+
+/* Replicar: opções */
+.replicate-modes { display: grid; gap: var(--esp-2); margin: var(--esp-4) 0 0; padding: 0; border: 0; }
+.radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  cursor: pointer;
+}
+.radio-option:has(input:checked) { border-color: var(--cor-primaria); background: var(--cor-primaria-suave); }
+.radio-option input { margin-top: 3px; }
+.radio-option span { display: flex; flex-direction: column; gap: 2px; }
+.radio-option small { color: var(--cor-texto-3); }
+
+@media (max-width: 899px) {
+  .schedule-bar { padding: var(--esp-3); }
+  .schedule-grid .col-name { width: 120px; min-width: 120px; max-width: 120px; padding: var(--esp-2); }
+  .schedule-grid .col-shift { left: 120px; min-width: 44px; }
+  .member-cell-avatar { display: none; }
+}
+
+/* Celular: a barra vai para o fim da página e a grade fica com a tela */
+@media (max-width: 600px) {
+  .schedule-head { padding: var(--esp-3) var(--esp-4); }
+  .schedule-scroll { max-height: calc(100vh - 120px); }
+  .schedule-bar { position: static; }
+  .schedule-find { max-width: none; flex-basis: 100%; }
+  .schedule-actions { width: 100%; margin-left: 0; }
+  .schedule-actions .btn { flex: 1; justify-content: center; }
+}
+
+/* Impressão (também serve para salvar em PDF): só a grade */
+@media print {
+  @page { size: landscape; margin: 8mm; }
+  .sidebar, .sidebar-toggle, .topbar, .app-footer, .schedule-bar, .schedule-back, .schedule-month-nav .btn-icon { display: none !important; }
+  .app, .app.is-collapsed { display: block !important; }
+  .page { padding: 0 !important; }
+  .schedule-head, .schedule-card { border: 0; box-shadow: none; }
+  .schedule-scroll { max-height: none; overflow: visible; }
+  .schedule-grid { font-size: 9px; }
+  .schedule-grid .col-name, .schedule-grid .col-shift, .schedule-grid thead th { position: static; }
+  .day-head { min-width: 0; }
+  .cell { width: 22px; height: 20px; }
+  .cell-dot { width: 16px; height: 16px; font-size: 7px; }
+  .schedule-grid th, .schedule-grid td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

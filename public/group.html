@@ -30,18 +30,35 @@
       <button type="button" class="tab" role="tab" id="tab-calendar" aria-controls="panel-calendar" aria-selected="true">
         <span data-icon="calendar"></span>Calendário
       </button>
+      <button type="button" class="tab" role="tab" id="tab-schedule" aria-controls="panel-schedule" aria-selected="false" tabindex="-1" hidden>
+        <span data-icon="edit"></span>Editar escala
+      </button>
       <button type="button" class="tab" role="tab" id="tab-members" aria-controls="panel-members" aria-selected="false" tabindex="-1" hidden>
         <span data-icon="users"></span>Membros <span class="tab-count" id="members-count"></span>
       </button>
     </div>
 
-    <!-- Calendário (próxima fase) -->
-    <section class="card tab-panel" role="tabpanel" id="panel-calendar" aria-labelledby="tab-calendar">
-      <div class="empty-state">
-        <span data-icon="calendar"></span>
-        <h3>Calendário do grupo</h3>
-        <p>A escala mensal, com plantões, trocas e cessões, chega na próxima fase.</p>
+    <!-- Calendário: dias com plantão do usuário e plantões do dia -->
+    <section class="tab-panel group-calendar-panel" role="tabpanel" id="panel-calendar" aria-labelledby="tab-calendar">
+      <div class="card calendar-card" id="group-calendar" aria-label="Calendário do grupo"></div>
+      <div class="card my-shifts-card">
+        <h2 class="my-shifts-title" id="my-shifts-title">Meus plantões</h2>
+        <p class="muted text-sm" id="my-shifts-note"></p>
+        <ul class="my-shifts" id="my-shifts" aria-live="polite"></ul>
       </div>
+    </section>
+
+    <!-- Editar escala: meses do ano com a situação de cada um -->
+    <section class="card tab-panel" role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" hidden>
+      <div class="months-head">
+        <h2>Gerenciamento de escalas</h2>
+        <div class="year-nav">
+          <button type="button" class="btn-icon" id="year-prev" aria-label="Ano anterior"><span data-icon="chevronLeft"></span></button>
+          <strong id="year-label" aria-live="polite"></strong>
+          <button type="button" class="btn-icon" id="year-next" aria-label="Próximo ano"><span data-icon="chevronRight"></span></button>
+        </div>
+      </div>
+      <ul class="month-list" id="month-list"></ul>
     </section>
 
     <!-- Membros -->
@@ -124,6 +141,26 @@
     <div class="dialog-body">
       <div class="role-target" id="role-target"></div>
       <div class="role-options" id="role-options" role="group" aria-label="Cargos"></div>
+    </div>
+  </dialog>
+
+  <!-- Gaveta: plantões do dia -->
+  <dialog class="drawer" id="drawer-day" aria-labelledby="drawer-day-title">
+    <div class="dialog-header">
+      <h2 id="drawer-day-title">Plantões do dia</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body">
+      <div class="day-nav">
+        <button type="button" class="btn-icon" data-day-nav="-1" aria-label="Dia anterior"><span data-icon="chevronLeft"></span></button>
+        <strong id="day-label" aria-live="polite"></strong>
+        <button type="button" class="btn-icon" data-day-nav="1" aria-label="Próximo dia"><span data-icon="chevronRight"></span></button>
+      </div>
+      <div class="segmented" id="day-mode" role="group" aria-label="Escala" hidden>
+        <button type="button" data-mode="dynamic" aria-pressed="true">Dinâmica</button>
+        <button type="button" data-mode="fixed" aria-pressed="false">Fixa</button>
+      </div>
+      <div id="day-shifts"></div>
     </div>
   </dialog>
 

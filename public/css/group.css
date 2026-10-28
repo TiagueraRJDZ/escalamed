@@ -196,3 +196,85 @@
   border-radius: var(--raio);
   background: var(--cor-primaria-suave);
 }
+
+/* ---------- Calendário do grupo ---------- */
+.group-calendar-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--esp-4);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .group-calendar-panel { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); }
+}
+.group-calendar-panel[hidden] { display: none; }
+
+.my-shifts-card { padding: var(--esp-5); }
+.my-shifts-title { font-size: var(--texto-lg); }
+.my-shifts { display: grid; gap: var(--esp-2); margin: var(--esp-3) 0 0; padding: 0; list-style: none; }
+.my-shift {
+  display: grid;
+  grid-template-columns: 110px 56px 1fr;
+  align-items: center;
+  gap: var(--esp-2);
+  width: 100%;
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.my-shift:hover { background: var(--cor-primaria-suave); border-color: var(--cor-primaria-borda); }
+.my-shift-date { text-transform: capitalize; color: var(--cor-texto-2); font-size: var(--texto-sm); }
+
+/* Gaveta "Plantões do dia" */
+.day-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-bottom: var(--esp-3); }
+.day-nav strong { text-align: center; }
+
+.segmented {
+  display: inline-flex;
+  margin-bottom: var(--esp-3);
+  padding: 3px;
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie-2);
+}
+.segmented[hidden] { display: none; }
+.segmented button {
+  padding: var(--esp-1) var(--esp-4);
+  border: 0;
+  border-radius: var(--raio-total);
+  background: none;
+  font: inherit;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--cor-texto-2);
+  cursor: pointer;
+}
+.segmented button[aria-pressed='true'] { background: var(--cor-superficie); color: var(--cor-primaria); box-shadow: var(--sombra-sm); }
+
+.day-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-radius: var(--raio); }
+.day-shift + .day-shift { margin-top: var(--esp-2); }
+.day-shift header { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-bottom: var(--esp-2); }
+.day-shift ul { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
+.day-person { display: flex; align-items: center; gap: var(--esp-2); font-size: var(--texto-sm); }
+.day-person.is-me { font-weight: 700; }
+.day-avatar { width: 28px; height: 28px; font-size: 0.625rem; }
+
+/* ---------- Editar escala: meses do ano ---------- */
+.months-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-3); margin-bottom: var(--esp-3); }
+.months-head h2 { font-size: var(--texto-lg); }
+.year-nav { display: flex; align-items: center; gap: var(--esp-2); }
+.month-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.month-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  padding: var(--esp-3) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.month-item:last-child { border-bottom: 0; }
+.month-item .badge { margin-left: var(--esp-2); }

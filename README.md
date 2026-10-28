@@ -21,7 +21,8 @@ escalamed/
 │  ├─ signup.html       cadastro em 4 etapas (e-mail, senha, dados pessoais e profissionais)
 │  ├─ schedules.html    Escalas: grupos por cargo, convites, calendário e disponíveis
 │  ├─ group-new.html    wizard de criação de grupo ou escala individual
-│  ├─ group.html        tela do grupo: calendário e membros (cargos e convites)
+│  ├─ group.html        tela do grupo: calendário (plantões do dia), meses da escala e membros
+│  ├─ schedule-edit.html editor da escala mensal: grade, vagas, publicar, replicar, imprimir
 │  ├─ invite.html       aceitar ou recusar um convite
 │  ├─ new-password.html troca obrigatória da senha provisória
 │  ├─ settings.html     configurações da conta (dados, profissão, foto, senha, exclusão)
@@ -35,6 +36,8 @@ escalamed/
 │  │  ├─ auth-api.js    login, cadastro e senhas (Firebase) e chamadas ao serviço de contas (Worker)
 │  │  ├─ permissions.js cargos, limites e can() (sem Firebase, com testes)
 │  │  ├─ members.js     mudar cargo, remover, convites
+│  │  ├─ schedule-math.js escala: horas, conflitos de horário, replicação (sem Firebase, com testes)
+│  │  ├─ schedule-data.js escala no Firestore: ler, alocar, vagas, publicar, replicar
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
 │  │  └─ pages/         código de cada tela
 │  ├─ fonts/            fonte Pitanga (woff2)

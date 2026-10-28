@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Editar escala | EscalaMed</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/schedule.css" />
+</head>
+<body class="is-booting">
+  <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
+
+  <main id="page" class="page schedule-page" data-active="schedules">
+    <a class="btn btn-ghost schedule-back" id="back-link" href="/schedules.html"><span data-icon="arrowLeft"></span>Voltar para o grupo</a>
+
+    <header class="card schedule-head">
+      <div class="schedule-head-info">
+        <h1 id="schedule-group">Carregando…</h1>
+        <p class="muted" id="schedule-unit"></p>
+      </div>
+      <div class="schedule-month-nav">
+        <a class="btn-icon" id="prev-month" aria-label="Mês anterior"><span data-icon="chevronLeft"></span></a>
+        <h2 id="schedule-month" aria-live="polite"></h2>
+        <a class="btn-icon" id="next-month" aria-label="Próximo mês"><span data-icon="chevronRight"></span></a>
+      </div>
+    </header>
+
+    <section class="card schedule-card" aria-labelledby="schedule-month">
+      <div class="schedule-empty" id="schedule-empty" hidden></div>
+      <div class="schedule-scroll" id="schedule-scroll">
+        <table class="schedule-grid" id="schedule-grid" aria-describedby="grid-help"></table>
+      </div>
+      <p class="sr-only" id="grid-help">Cada botão da grade aloca ou tira a pessoa daquele turno no dia. A linha "Plantão vago" guarda a quantidade de vagas abertas.</p>
+    </section>
+
+    <div class="schedule-bar" role="toolbar" aria-label="Ações da escala">
+      <div class="input-icon schedule-find">
+        <span data-icon="search"></span>
+        <label class="sr-only" for="find-member">Encontrar membro na grade</label>
+        <input class="input" id="find-member" type="search" placeholder="Quem gostaria de encontrar?" autocomplete="off" />
+      </div>
+      <span class="badge" id="schedule-status"></span>
+      <div class="schedule-actions">
+        <button type="button" class="btn btn-secondary" id="print-button"><span data-icon="printer"></span>Imprimir</button>
+        <button type="button" class="btn btn-secondary" id="replicate-button"><span data-icon="copy"></span>Replicar</button>
+        <button type="button" class="btn btn-primary" id="publish-button"><span data-icon="check"></span>Publicar</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: vagas da célula -->
+  <dialog class="modal" id="modal-vacancy" aria-labelledby="modal-vacancy-title">
+    <form id="vacancy-form">
+      <div class="dialog-header">
+        <h2 id="modal-vacancy-title">Plantão vago</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <p class="muted" id="vacancy-text"></p>
+        <div class="field">
+          <label class="label" for="vacancy-count">Vagas abertas</label>
+          <select class="select" id="vacancy-count" name="count"></select>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: replicar para o mês seguinte -->
+  <dialog class="modal" id="modal-replicate" aria-labelledby="modal-replicate-title">
+    <form id="replicate-form">
+      <div class="dialog-header">
+        <h2 id="modal-replicate-title">Replicar escala</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <p id="replicate-text"></p>
+        <fieldset class="replicate-modes">
+          <legend class="label">Como copiar</legend>
+          <label class="radio-option">
+            <input type="radio" name="mode" value="weekday" checked />
+            <span><strong>Pelo dia da semana</strong><small>A 1ª segunda-feira vai para a 1ª segunda-feira, e assim por diante.</small></span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="mode" value="day" />
+            <span><strong>Pelo número do dia</strong><small>O dia 5 vai para o dia 5.</small></span>
+          </label>
+        </fieldset>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Replicar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/pages/schedule-edit.js"></script>
+</body>
+</html>

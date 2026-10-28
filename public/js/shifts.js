@@ -22,6 +22,20 @@ export function endsNextDay(start, end) {
   return end <= start;
 }
 
+// Dois turnos se sobrepõem quando começam no mesmo dia? (ex.: REF dentro do T; N e N1).
+// A virada da meia-noite entra no cálculo: NF (22h-01h) e N (19h-01h) se sobrepõem.
+// Conflitos entre dias diferentes ficam em schedule-math.js.
+export function overlaps(a, b) {
+  const endA = a.startMinute + durationMinutes(a.startMinute, a.endMinute);
+  const endB = b.startMinute + durationMinutes(b.startMinute, b.endMinute);
+  return a.startMinute < endB && b.startMinute < endA;
+}
+
+// 420 -> "07h00" (horário como aparece na escala)
+export function formatClock(minutes) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}h${String(minutes % 60).padStart(2, '0')}`;
+}
+
 // 720 -> "12h"; 750 -> "12h30"
 export function formatDuration(minutes) {
   const h = Math.floor(minutes / 60);

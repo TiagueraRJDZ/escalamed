@@ -441,6 +441,40 @@ service cloud.firestore {
           && incoming().createdAt == resource.data.createdAt;
         allow delete: if isManagerOf(groupData());
       }
+
+      // ----- Escala mensal (id = "YYYY-MM") -----
+      // assignments: { "07_<turno>": [uid] } (escala dinâmica); vacancies: { "07_<turno>": n };
+      // fixed: cópia de assignments ao publicar (escala fixa); shifts: turnos congelados ao publicar.
+      // Alocar e desalocar usam arrayUnion/arrayRemove no campo da célula.
+      match /schedules/{month} {
+        function validSchedule(d) {
+          return d.keys().hasOnly(['status', 'assignments', 'vacancies', 'fixed', 'shifts',
+                                   'publishedAt', 'publishedBy', 'createdAt', 'updatedAt', 'updatedBy'])
+            && month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+            && d.status in ['draft', 'published']
+            && d.assignments is map && d.assignments.size() <= 1500
+            && d.vacancies is map && d.vacancies.size() <= 1500
+            && d.get('fixed', {}) is map && d.get('fixed', {}).size() <= 1500
+            && d.get('shifts', {}) is map && d.get('shifts', {}).size() <= 50
+            && d.updatedBy == me()
+            && d.updatedAt == request.time;
+        }
+
+        // Rascunho: só gestor, auxiliar e analista veem
+        function seesDrafts(g) {
+          return isAdminOf(g) || me() in g.get('analystIds', []);
+        }
+
+        allow read: if isMemberOf(groupData())
+          && (resource == null || resource.data.status == 'published' || seesDrafts(groupData()));
+        allow create: if isAdminOf(groupData())
+          && validSchedule(incoming())
+          && incoming().createdAt == request.time;
+        allow update: if isAdminOf(groupData())
+          && validSchedule(incoming())
+          && incoming().createdAt == resource.data.createdAt;
+        allow delete: if isManagerOf(groupData());
+      }
     }
 
     // Administradores da plataforma: qualquer usuário logado lê (o app decide se mostra

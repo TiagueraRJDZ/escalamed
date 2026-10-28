@@ -354,6 +354,9 @@ a:hover {
 }
 .badge-primary { background: var(--cor-primaria-suave); color: var(--cor-primaria-hover); }
 .badge-new { background: var(--cor-destaque); color: #fff; }
+.badge-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
+.badge-muted { background: var(--cor-superficie-2); color: var(--cor-texto-2); }
+.badge-danger { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
 
 .divider {
   display: flex;

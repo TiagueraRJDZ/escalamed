@@ -1,5 +1,7 @@
-// Calendário mensal: navegação entre meses, dia de hoje destacado e seleção de dia.
-// Uso: createCalendar(elemento, { onSelect: (data) => ... })
+// Calendário mensal: navegação entre meses, dia de hoje destacado, seleção de dia
+// e dias marcados (ex.: dias com plantão).
+// Uso: const cal = createCalendar(elemento, { onSelect: (data) => ..., onMonthChange: (ano, mês) => ... })
+//      cal.setMarks(new Set([3, 9]))   // dias do mês mostrado com marcação
 import { icon } from './icons.js';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -11,11 +13,12 @@ const sameDay = (a, b) =>
 
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
-export function createCalendar(container, { onSelect } = {}) {
+export function createCalendar(container, { onSelect, onMonthChange, markLabel = 'com plantão' } = {}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let month = new Date(today.getFullYear(), today.getMonth(), 1);
   let selected = null;
+  let marks = new Set();
 
   function render() {
     const year = month.getFullYear();
@@ -27,10 +30,12 @@ export function createCalendar(container, { onSelect } = {}) {
       const date = new Date(year, month.getMonth(), i + 1);
       const classes = ['cal-day'];
       if (date < today) classes.push('is-past');
+      const marked = marks.has(i + 1);
+      if (marked) classes.push('is-marked');
       const isToday = sameDay(date, today);
       const isSelected = selected && sameDay(date, selected);
       return `<button type="button" class="${classes.join(' ')}" data-day="${i + 1}"
-        aria-label="${dayLabelFormat.format(date)}"${isToday ? ' aria-current="date"' : ''}
+        aria-label="${dayLabelFormat.format(date)}${marked ? `, ${markLabel}` : ''}"${isToday ? ' aria-current="date"' : ''}
         aria-pressed="${Boolean(isSelected)}">${i + 1}</button>`;
     });
 
@@ -50,7 +55,9 @@ export function createCalendar(container, { onSelect } = {}) {
     const nav = event.target.closest('[data-nav]');
     if (nav) {
       month = new Date(month.getFullYear(), month.getMonth() + Number(nav.dataset.nav), 1);
+      marks = new Set(); // as marcações do mês novo chegam por setMarks
       render();
+      onMonthChange?.(month.getFullYear(), month.getMonth());
       return;
     }
     const day = event.target.closest('[data-day]');
@@ -59,9 +66,18 @@ export function createCalendar(container, { onSelect } = {}) {
       selected = selected && sameDay(selected, date) ? null : date;
       render();
       container.querySelector(`[data-day="${day.dataset.day}"]`)?.focus();
-      onSelect?.(selected);
+      onSelect?.(selected ?? date);
     }
   });
 
   render();
+  onMonthChange?.(month.getFullYear(), month.getMonth());
+
+  return {
+    setMarks(days) {
+      marks = new Set(days);
+      render();
+    },
+    month: () => ({ year: month.getFullYear(), monthIndex: month.getMonth() }),
+  };
 }
