@@ -149,6 +149,12 @@
 .role-option.is-danger svg { width: 18px; height: 18px; }
 .role-option.is-danger:hover { background: var(--cor-perigo-suave); }
 
+/* "Gerar senha provisória" no modal de perfil */
+.role-option-extra { justify-content: flex-start; margin-top: var(--esp-2); border-top: 1px solid var(--cor-borda); border-radius: 0; }
+.role-option-extra svg { width: 18px; height: 18px; color: var(--cor-texto-2); }
+.role-option-extra small { margin-left: auto; }
+.temp-password { font-family: ui-monospace, Consolas, monospace; font-size: var(--texto-lg) !important; letter-spacing: 0.08em; }
+
 /* Link do convite com botão de copiar */
 .copy-field { display: flex; gap: var(--esp-2); margin-top: var(--esp-3); }
 .copy-field .input { flex: 1; font-size: var(--texto-sm); }

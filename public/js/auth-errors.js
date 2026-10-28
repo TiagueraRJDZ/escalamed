@@ -25,6 +25,8 @@ export const ERROR_MESSAGES = {
 const SILENT = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
 
 export function errorMessage(error) {
+  // Erros do serviço de contas já vêm com a mensagem em português
+  if (error?.name === 'AuthApiError' || error?.constructor?.name === 'AuthApiError') return error.message;
   const code = error?.code ?? '';
   if (SILENT.includes(code)) return null;
   if (!ERROR_MESSAGES[code]) console.error(error);

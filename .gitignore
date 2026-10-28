@@ -13,3 +13,12 @@ desktop.ini
 .vscode/*
 !.vscode/settings.json
 node_modules/
+
+# Cloudflare Worker (serviço de contas)
+worker/.wrangler/
+worker/.dev.vars
+
+# Chaves de serviço: nunca no repositório
+*adminsdk*.json
+conta-servico*.json
+escalamed-hapvida-*.json

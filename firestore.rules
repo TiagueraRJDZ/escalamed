@@ -12,11 +12,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Logado e com e-mail confirmado: exigido para tudo, menos para terminar o cadastro
-    function verified() {
-      return signedIn() && request.auth.token.email_verified == true;
-    }
-
     function me() {
       return request.auth.uid;
     }
@@ -92,8 +87,7 @@ service cloud.firestore {
           && d.searchKeywords is list && d.searchKeywords.size() <= 60;
       }
 
-      // O próprio usuário lê mesmo antes de confirmar o e-mail (para terminar o cadastro)
-      allow read: if isSelf(uid) || verified();
+      allow read: if signedIn();
       allow create: if isSelf(uid)
         && validUser(incoming())
         && incoming().createdAt == request.time
@@ -123,10 +117,10 @@ service cloud.firestore {
     }
 
     // ---------- Unidades de saúde ----------
-    // Qualquer usuário confirmado pode cadastrar uma unidade que ainda não existe.
+    // Qualquer usuário logado pode cadastrar uma unidade que ainda não existe.
     match /healthUnits/{unitId} {
-      allow read: if verified();
-      allow create: if verified()
+      allow read: if signedIn();
+      allow create: if signedIn()
         && incoming().keys().hasOnly(['name', 'nameLower', 'city', 'cityLower', 'state',
                                       'keywords', 'createdBy', 'createdAt'])
         && str(incoming().name, 3, 120)
@@ -158,16 +152,16 @@ service cloud.firestore {
       }
 
       function isMemberOf(g) {
-        return verified() && me() in g.memberIds;
+        return signedIn() && me() in g.memberIds;
       }
 
       function isManagerOf(g) {
-        return verified() && me() in g.managerIds;
+        return signedIn() && me() in g.managerIds;
       }
 
       // Gestor ou auxiliar
       function isAdminOf(g) {
-        return verified() && (me() in g.managerIds || me() in g.get('assistantIds', []));
+        return signedIn() && (me() in g.managerIds || me() in g.get('assistantIds', []));
       }
 
       function unique(list) {
@@ -237,7 +231,7 @@ service cloud.firestore {
       allow read: if isMemberOf(resource.data);
 
       // Quem cria vira dono, gestor e único membro
-      allow create: if verified()
+      allow create: if signedIn()
         && validGroup(incoming())
         && incoming().ownerId == me()
         && incoming().managerIds == [me()]
@@ -266,7 +260,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
 
       // Aceitar convite: entra só a própria pessoa, só no cargo do convite e antes de vencer
-      allow update: if verified()
+      allow update: if signedIn()
         && resource.data.type == 'team'
         && !(me() in resource.data.memberIds)
         && exists(invitePath())
@@ -286,7 +280,7 @@ service cloud.firestore {
         && incoming().managerIds == resource.data.managerIds
         && incoming().updatedAt == request.time;
 
-      allow delete: if verified() && me() == resource.data.ownerId;
+      allow delete: if signedIn() && me() == resource.data.ownerId;
 
       // ----- Membros (cartão: cargo + dados copiados do perfil) -----
       match /members/{memberId} {
@@ -313,7 +307,7 @@ service cloud.firestore {
         allow read: if isMemberOf(groupData());
 
         // Criação do grupo (mesmo lote): o dono entra como gestor
-        allow create: if isSelf(memberId) && verified()
+        allow create: if isSelf(memberId) && signedIn()
           && !exists(groupPath())
           && getAfter(groupPath()).data.ownerId == memberId
           && validCard(incoming())
@@ -321,7 +315,7 @@ service cloud.firestore {
           && incoming().joinedAt == request.time;
 
         // Aceitando convite (mesmo lote da entrada no grupo)
-        allow create: if isSelf(memberId) && verified()
+        allow create: if isSelf(memberId) && signedIn()
           && exists(groupPath())
           && !(memberId in groupData().memberIds)
           && memberId in groupAfter().memberIds
@@ -341,7 +335,7 @@ service cloud.firestore {
           && validCard(incoming());
 
         // Remover membro, sair do grupo ou excluir o grupo: o cartão sai junto
-        allow delete: if verified()
+        allow delete: if signedIn()
           && (isSelf(memberId) || isAdminOf(groupData()))
           && (!existsAfter(groupPath()) || !(memberId in groupAfter().memberIds));
       }
@@ -368,11 +362,11 @@ service cloud.firestore {
             && d.expiresAt <= request.time + duration.value(31, 'd');
         }
 
-        allow read: if verified() && (email == myEmail() || isAdminOf(groupData()));
+        allow read: if signedIn() && (email == myEmail() || isAdminOf(groupData()));
         allow create, update: if isAdminOf(groupData())
           && groupData().type == 'team'
           && validInvite(incoming());
-        allow delete: if verified() && (email == myEmail() || isAdminOf(groupData()));
+        allow delete: if signedIn() && (email == myEmail() || isAdminOf(groupData()));
       }
 
       // ----- Turnos -----
@@ -400,7 +394,7 @@ service cloud.firestore {
 
     // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail
     match /{path=**}/invites/{email} {
-      allow read: if verified() && resource.data.email == myEmail();
+      allow read: if signedIn() && resource.data.email == myEmail();
     }
   }
 }

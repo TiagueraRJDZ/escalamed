@@ -8,19 +8,202 @@
   <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/group.css" />
+  <link rel="stylesheet" href="/css/settings.css" />
 </head>
 <body class="is-booting">
   <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
 
-  <main id="page" class="page" data-active="settings">
-    <div class="card">
-      <div class="empty-state" data-icon="settings">
-        <h1 style="font-size:var(--texto-xl)">Configurações</h1>
-        <p>Esta tela está em construção e chega em uma próxima versão.</p>
+  <main id="page" class="page settings-page" data-active="settings">
+    <h1 class="settings-title">Configurações da conta</h1>
+
+    <div class="settings-layout">
+      <div class="tabs settings-tabs" role="tablist" aria-label="Configurações" aria-orientation="vertical" id="settings-tabs">
+        <button type="button" class="tab" role="tab" id="tab-account" data-hash="conta" aria-controls="panel-account"><span data-icon="user"></span>Informações da conta</button>
+        <button type="button" class="tab" role="tab" id="tab-professional" data-hash="profissional" aria-controls="panel-professional"><span data-icon="users"></span>Informações profissionais</button>
+        <button type="button" class="tab" role="tab" id="tab-photo" data-hash="foto" aria-controls="panel-photo"><span data-icon="edit"></span>Editar perfil</button>
+        <button type="button" class="tab" role="tab" id="tab-password" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span>Alterar senha</button>
+        <button type="button" class="tab is-danger" role="tab" id="tab-delete" data-hash="excluir" aria-controls="panel-delete"><span data-icon="trash"></span>Excluir minha conta</button>
+      </div>
+
+      <div class="settings-panels">
+        <!-- Informações da conta -->
+        <section class="card tab-panel" role="tabpanel" id="panel-account" aria-labelledby="tab-account" hidden>
+          <h2>Informações da conta</h2>
+          <form id="form-account" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="account-name">Nome completo</label>
+              <input class="input" id="account-name" name="name" type="text" autocomplete="name" maxlength="80" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="account-username">Nome de usuário <span class="field-hint">(opcional)</span></label>
+              <input class="input" id="account-username" name="username" type="text" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="ex.: ana.souza" />
+              <span class="field-hint">Para entrar com ele no lugar do e-mail. Letras sem acento, números, ponto ou _.</span>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="account-email">E-mail de acesso</label>
+              <div class="copy-field" style="margin:0">
+                <input class="input" id="account-email" type="email" readonly />
+                <button type="button" class="btn btn-secondary" id="change-email">Alterar e-mail</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label class="label" for="account-phone">Telefone</label>
+                <input class="input" id="account-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(99) 99999-9999" required />
+                <span class="field-error"></span>
+              </div>
+              <div class="field">
+                <label class="label" for="account-state">Estado</label>
+                <select class="select" id="account-state" name="state" required><option value="">Selecione</option></select>
+                <span class="field-error"></span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="account-cpf">CPF <span class="field-hint">(opcional)</span></label>
+              <input class="input" id="account-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" />
+              <span class="field-hint">Só você vê seu CPF, telefone e e-mail.</span>
+              <span class="field-error"></span>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Salvar alterações</button></div>
+          </form>
+        </section>
+
+        <!-- Informações profissionais -->
+        <section class="card tab-panel" role="tabpanel" id="panel-professional" aria-labelledby="tab-professional" hidden>
+          <h2>Informações profissionais</h2>
+          <form id="form-professional" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="pro-category">Profissão</label>
+              <select class="select" id="pro-category" name="categoryId" required><option value="">Selecione</option></select>
+              <span class="field-error"></span>
+            </div>
+            <div class="field" id="pro-specialty-field" hidden>
+              <label class="label" for="pro-specialty">Especialidade</label>
+              <input class="input" id="pro-specialty" name="specialty" type="text" maxlength="80" list="pro-specialties" placeholder="Ex.: Clínico Geral" />
+              <datalist id="pro-specialties"></datalist>
+              <span class="field-error"></span>
+            </div>
+            <div class="form-row" id="pro-council-fields" hidden>
+              <div class="field">
+                <label class="label" for="pro-council-number" id="pro-council-label">Registro no conselho</label>
+                <input class="input" id="pro-council-number" name="councilNumber" type="text" inputmode="numeric" maxlength="20" />
+                <span class="field-error"></span>
+              </div>
+              <div class="field">
+                <label class="label" for="pro-council-state">UF do registro</label>
+                <select class="select" id="pro-council-state" name="councilState"><option value="">UF</option></select>
+                <span class="field-error"></span>
+              </div>
+            </div>
+            <p class="field-hint">Os gestores dos seus grupos veem estas informações no seu cartão de membro.</p>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Salvar alterações</button></div>
+          </form>
+        </section>
+
+        <!-- Editar perfil (foto) -->
+        <section class="card tab-panel" role="tabpanel" id="panel-photo" aria-labelledby="tab-photo" hidden>
+          <h2>Editar perfil</h2>
+          <div class="photo-editor">
+            <div class="photo-preview" id="photo-preview"></div>
+            <div class="photo-actions">
+              <p class="muted">Use uma foto de rosto, de frente. Ela aparece para os membros dos seus grupos.</p>
+              <div class="form-actions" style="justify-content:flex-start">
+                <label class="btn btn-primary" for="photo-input"><span data-icon="edit"></span>Escolher foto</label>
+                <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp" class="sr-only" />
+                <button type="button" class="btn btn-ghost is-danger" id="photo-remove">Remover foto</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Alterar senha -->
+        <section class="card tab-panel" role="tabpanel" id="panel-password" aria-labelledby="tab-password" hidden>
+          <h2>Alterar senha</h2>
+          <form id="form-password" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <input type="email" name="username" id="password-username" autocomplete="username" hidden />
+            <div class="field">
+              <label class="label" for="password-current">Senha atual</label>
+              <div class="password-wrap"><input class="input" id="password-current" name="current" type="password" autocomplete="current-password" required /></div>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="password-new">Nova senha</label>
+              <div class="password-wrap"><input class="input" id="password-new" name="password" type="password" autocomplete="new-password" aria-describedby="password-rules" required /></div>
+              <div class="strength-meter" id="strength-meter" aria-live="polite"><i></i><i></i><i></i><i></i><span></span></div>
+              <ul class="password-rules" id="password-rules" aria-label="Requisitos da senha"></ul>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="password-confirm">Confirmar nova senha</label>
+              <div class="password-wrap"><input class="input" id="password-confirm" name="confirm" type="password" autocomplete="new-password" required /></div>
+              <span class="field-error"></span>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Alterar senha</button></div>
+          </form>
+        </section>
+
+        <!-- Excluir conta -->
+        <section class="card tab-panel" role="tabpanel" id="panel-delete" aria-labelledby="tab-delete" hidden>
+          <h2>Excluir minha conta</h2>
+          <div class="alert alert-error">
+            Esta ação não pode ser desfeita. Seu perfil e seus dados pessoais são apagados, você sai de todos os grupos
+            e suas escalas individuais são excluídas. Plantões em escalas passadas continuam com o seu nome no histórico.
+          </div>
+          <div id="delete-blockers"></div>
+          <form id="form-delete" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <input type="email" name="username" id="delete-username" autocomplete="username" hidden />
+            <div class="field">
+              <label class="label" for="delete-confirm">Digite <strong>EXCLUIR</strong> para confirmar</label>
+              <input class="input" id="delete-confirm" name="confirmText" type="text" autocomplete="off" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="delete-password">Sua senha</label>
+              <div class="password-wrap"><input class="input" id="delete-password" name="password" type="password" autocomplete="current-password" required /></div>
+              <span class="field-error"></span>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-danger">Excluir minha conta</button></div>
+          </form>
+        </section>
       </div>
     </div>
   </main>
 
-  <script type="module" src="/js/pages/placeholder.js"></script>
+  <!-- Modal: alterar e-mail -->
+  <dialog class="modal" id="modal-email" aria-labelledby="modal-email-title">
+    <form id="form-email" novalidate>
+      <div class="dialog-header">
+        <h2 id="modal-email-title">Alterar e-mail</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <div class="alert form-alert" role="alert" hidden></div>
+        <p class="muted" style="margin-bottom:var(--esp-3)">O novo e-mail passa a valer no login na hora. Confirme com a sua senha.</p>
+        <div class="field">
+          <label class="label" for="email-new">Novo e-mail</label>
+          <input class="input" id="email-new" name="email" type="email" autocomplete="email" required />
+          <span class="field-error"></span>
+        </div>
+        <div class="field">
+          <label class="label" for="email-password">Senha atual</label>
+          <div class="password-wrap"><input class="input" id="email-password" name="password" type="password" autocomplete="current-password" required /></div>
+          <span class="field-error"></span>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Alterar e-mail</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/pages/settings.js"></script>
 </body>
 </html>

@@ -154,7 +154,7 @@ async function main() {
     });
     await setDoc(`users/${uid}/private/data`, { email: user.email, phone: '85999990000', cpf: null, state: 'CE', updatedAt: now });
   }
-  console.log(`✔ ${USERS.length} usuários (senha ${PASSWORD}, e-mail já confirmado)`);
+  console.log(`✔ ${USERS.length} usuários (senha ${PASSWORD})`);
 
   // Grupo TELEAUDITORIA HAPVIDA com cargos variados
   const inGroup = USERS.filter((u) => u.role);

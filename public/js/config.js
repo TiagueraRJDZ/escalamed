@@ -1,8 +1,12 @@
 // Configurações do app. Estes dados NÃO são senha: o Firebase protege os dados
 // pelas regras de segurança (firestore.rules), não por esconder esta configuração.
 
-// Em localhost, conecta nos emuladores (Auth e Firestore) em vez do projeto real.
-export const useEmulators = ['localhost', '127.0.0.1'].includes(location.hostname);
+// O app usa o projeto real em qualquer endereço, inclusive localhost e Go Live.
+// Para testar sem mexer no banco real: troque para true, rode "firebase emulators:start"
+// e "node scripts/seed-emulator.mjs" (dados de teste). Só vale em localhost/127.0.0.1.
+const USE_LOCAL_EMULATORS = false;
+
+export const useEmulators = USE_LOCAL_EMULATORS && ['localhost', '127.0.0.1'].includes(location.hostname);
 
 // Projeto real (Firebase, conta tiago.tlmsmartins@gmail.com).
 const prodConfig = {
@@ -23,6 +27,16 @@ const emulatorConfig = {
 };
 
 export const firebaseConfig = useEmulators ? emulatorConfig : prodConfig;
+
+// Serviço de contas (Cloudflare Worker, pasta worker/): login, cadastro e senhas.
+// Com os emuladores, use o Worker local: "npx wrangler dev" na pasta worker/ (porta 8787).
+export const authApiUrl = useEmulators
+  ? 'http://127.0.0.1:8787'
+  : 'https://escalamed-auth.tiago-tlmsmartins.workers.dev';
+
+// App Check com reCAPTCHA v3 (invisível): bloqueia robôs no login, no cadastro e no banco.
+// Vazio = desligado. Para ligar, veja "App Check" no README e cole aqui a chave do site.
+export const appCheckSiteKey = '';
 
 // Link do botão "Falar pelo WhatsApp" (gaveta de Ajuda).
 export const whatsappUrl = 'https://wa.me/5500000000000';

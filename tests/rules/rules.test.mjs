@@ -79,14 +79,11 @@ const roleChange = (actor, target, fields, role) =>
   ]);
 
 // ---------- Leitura ----------
-test('membros leem o grupo; estranhos e e-mail não confirmado não', async () => {
+test('membros leem o grupo; estranhos não', async () => {
   assert.ok(await canRead(staff.token, G));
   assert.ok(await canRead(observer.token, `${G}/members/${manager.uid}`));
   assert.ok(!(await canRead(outsider.token, G)));
   assert.ok(!(await canRead(outsider.token, `${G}/members/${manager.uid}`)));
-
-  await admin([w.update(G, { memberIds: [...baseGroup().memberIds, unverified.uid] })]);
-  assert.ok(!(await canRead(unverified.token, G)));
 });
 
 test('ninguém lê os dados pessoais de outra pessoa', async () => {
@@ -274,7 +271,7 @@ test('cada um vê só os próprios convites', async () => {
 });
 
 // ---------- Criação de grupo e perfil ----------
-test('criar grupo: dono vira gestor; e-mail não confirmado não cria', async () => {
+test('criar grupo: quem cria vira gestor; não dá para criar no nome de outra pessoa', async () => {
   const create = (actor, path) =>
     commit(actor.token, [
       w.set(path, {
@@ -293,10 +290,13 @@ test('criar grupo: dono vira gestor; e-mail não confirmado não cria', async ()
       w.set(`${path}/members/${actor.uid}`, { ...card('manager'), joinedAt: NOW }),
     ]);
   assert.ok(await create(outsider, 'groups/novo1'));
-  assert.ok(!(await create(unverified, 'groups/novo2')));
+  const forOther = await commit(outsider.token, [
+    w.set('groups/novo2', { ...baseGroup({ setupStep: 'shifts', assistantIds: [], analystIds: [], observerIds: [], memberIds: [manager.uid] }), createdAt: NOW, updatedAt: NOW }),
+  ]);
+  assert.ok(!forOther);
 });
 
-test('perfil: cadastro sem e-mail confirmado funciona; profissão inválida não', async () => {
+test('perfil: a própria pessoa cria; profissão inválida e perfil alheio não', async () => {
   const profile = (categoryId) => ({
     name: 'Fulano de Tal',
     nameLower: 'fulano de tal',

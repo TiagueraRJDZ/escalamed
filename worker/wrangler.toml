@@ -1,0 +1,27 @@
+# EscalaMed - serviço de contas: login por usuário, senha provisória e troca de e-mail (Cloudflare Worker)
+# Primeira vez (dentro da pasta worker/), veja o passo a passo no README:
+#   npx wrangler d1 create escalamed-contas        (cole o database_id abaixo)
+#   npx wrangler d1 migrations apply escalamed-contas --remote
+#   npx wrangler deploy
+#   Get-Content C:\caminho\da\chave.json -Raw | npx wrangler secret put CONTA_SERVICO
+name = "escalamed-auth"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[vars]
+PROJETO = "escalamed-hapvida"
+# apiKey do app web (pública, a mesma de public/js/config.js): confere a senha no Firebase
+CHAVE_API = "AIzaSyA1MGKuclBlaiIyU5PdSzzJZBMx9GOiNQ8"
+# Endereços do app que podem chamar o serviço: Hosting do Firebase, firebase serve (5000)
+# e Live Server do VS Code (5500)
+ORIGENS = "https://escalamed-hapvida.web.app,https://escalamed-hapvida.firebaseapp.com,http://localhost:5000,http://127.0.0.1:5000,http://127.0.0.1:5500,http://localhost:5500"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "escalamed-contas"
+database_id = "COLE_AQUI_O_ID_DO_D1"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true

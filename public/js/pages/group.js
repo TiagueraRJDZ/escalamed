@@ -17,6 +17,7 @@ import {
   assignableRoles,
 } from '../permissions.js';
 import { changeRole, removeMember, createInvite, cancelInvite, inviteLink, INVITE_DAYS } from '../members.js';
+import { temporaryPassword } from '../auth-api.js';
 import {
   escapeHtml,
   initials,
@@ -224,7 +225,12 @@ function openRoleModal(uid) {
     })
     .join('');
 
-  $('role-options').innerHTML = `${options}
+  // Senha provisória: o gestor para qualquer membro; o auxiliar só para quem não é gestor nem auxiliar
+  const canReset = myRole === 'manager' || !['manager', 'assistant'].includes(current);
+  const reset = canReset
+    ? `<button type="button" class="role-option role-option-extra" data-password>${icon('lock')}<span>Gerar senha provisória</span><small>Para quem esqueceu a senha</small></button>`
+    : '';
+  $('role-options').innerHTML = `${options}${reset}
     <button type="button" class="role-option is-danger" data-remove>${icon('trash')}<span>Remover membro</span></button>`;
   $('role-options').dataset.uid = uid;
   $('modal-role').showModal();
@@ -236,6 +242,24 @@ $('role-options').addEventListener('click', async (event) => {
   const uid = $('role-options').dataset.uid;
   const member = members.find((m) => m.id === uid);
   $('modal-role').close();
+
+  if (button.hasAttribute('data-password')) {
+    const ok = await confirmDialog({
+      title: 'Gerar senha provisória?',
+      message: `A senha atual de ${member.name} deixa de funcionar e ela é desconectada. Ao entrar com a provisória, cria uma senha nova.`,
+      confirmText: 'Gerar senha',
+    });
+    if (!ok) return;
+    try {
+      const password = await temporaryPassword(uid, group.id);
+      $('temp-password-text').innerHTML = `Passe esta senha para <strong>${escapeHtml(member.name)}</strong> por um canal seguro. Ela não fica guardada: anote antes de fechar.`;
+      $('temp-password').value = password;
+      $('modal-temp-password').showModal();
+    } catch (error) {
+      toast(firebaseErrorMessage(error), 'error');
+    }
+    return;
+  }
 
   if (button.hasAttribute('data-remove')) {
     const ok = await confirmDialog({
@@ -330,17 +354,18 @@ function showInviteLink(email, renewed = false) {
   $('modal-invite-link').showModal();
 }
 
-async function copyText(text) {
+async function copyText(text, done = 'Link copiado.') {
   try {
     await navigator.clipboard.writeText(text);
-    toast('Link copiado.', 'success');
+    toast(done, 'success');
   } catch {
-    $('invite-link').select();
-    toast('Selecione e copie o link (Ctrl+C).');
+    toast('Não foi possível copiar. Selecione o texto e use Ctrl+C.');
   }
 }
 
 $('copy-link').addEventListener('click', () => copyText($('invite-link').value));
+$('copy-temp-password').addEventListener('click', () => copyText($('temp-password').value, 'Senha copiada.'));
+$('modal-temp-password').addEventListener('close', () => ($('temp-password').value = ''));
 
 function renderInvites() {
   const show = can(myRole, 'inviteMembers') && invites.length > 0;

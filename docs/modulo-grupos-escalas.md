@@ -8,7 +8,7 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 
 ## 0. Regras do projeto (valem para todas as etapas)
 
-- **Tecnologia já definida**: HTML, CSS e JavaScript puros (módulos ES, sem build) + **Firebase**: Authentication (e-mail e senha), Firestore e Hosting. Não introduzir framework, bundler, Prisma ou servidor próprio.
+- **Tecnologia já definida**: HTML, CSS e JavaScript puros (módulos ES, sem build) + **Firebase** (Authentication com e-mail e senha, Firestore e Hosting) + **Cloudflare Worker** com D1 de apoio (login por usuário, senha provisória, troca de e-mail; pasta `worker/`). Não introduzir framework, bundler ou Prisma; o único servidor é o Worker de contas.
 - **A segurança fica nas regras do Firestore** ([firestore.rules](../firestore.rules)). Toda gravação nova precisa de regra correspondente, com validação de campos (`hasOnly`, tipos e tamanhos), como já é feito hoje. Coleção sem regra fica bloqueada.
 - **Plano gratuito (Spark)** por padrão: sem Cloud Functions. O que exigir servidor fica marcado como **[Blaze]** e entra só se o plano mudar.
 - **Custo de leitura**: o plano gratuito tem cerca de 50 mil leituras e 20 mil gravações por dia. Por isso a escala de um mês é **um documento só**, e não um documento por plantão.
@@ -33,6 +33,10 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 | Lista de grupos com busca e calendário lateral | [schedules.js](../public/js/pages/schedules.js) | Pronto (sem seções por papel) |
 | Criador do grupo vira gestor | `ownerId`, `managerIds`, `memberIds`, `members/{uid}` com `role: 'manager'` | Pronto |
 | Escala individual (`type: 'personal'`) | wizard | Pronto. **Manter**: não existe no grupo de referência, mas faz parte do EscalaMed |
+| Acesso, cadastro em 4 etapas (sem confirmação de e-mail), guards | `index.html`, `signup.html`, `auth.js` | Pronto |
+| Login por e-mail (Firebase) ou nome de usuário (Worker na Cloudflare + D1), senha provisória pelo gestor, troca de e-mail sem link | `worker/`, `auth-api.js`, `new-password.html` | Pronto, falta publicar o Worker |
+| Cargos com limites, convites, alterar perfil, transferir gestão, remover, sair | `group.html` (aba Membros), `invite.html`, `permissions.js`, `members.js`, regras | Pronto, com testes |
+| Configurações da conta (dados, profissão, foto, senha, exclusão) | `settings.html` | Pronto |
 
 ---
 
@@ -56,7 +60,7 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 | `assistant` | Auxiliar | 3 | Editar e publicar escala, gerenciar membros (não pode mudar o gestor) |
 | `analyst` | Analista | 3 | Leitura total, relatórios e exportação |
 | `observer` | Observador | 3 | Só leitura do calendário e da escala publicada |
-| `member` | Plantonista | sem limite | Vê a escala, recebe plantões, pede troca ou cessão, pega vaga, faz check-in/out |
+| `staff` | Plantonista | sem limite | Vê a escala, recebe plantões, pede troca ou cessão, pega vaga, faz check-in/out |
 
 ### Como guardar (pensado para as regras)
 No documento do grupo, um array por papel, além do `memberIds` que já existe:
@@ -79,11 +83,11 @@ Um helper central, `can(group, uid, action)`, em `public/js/permissions.js`, sem
 
 ### Telas
 - **Membros** (aba do grupo): cartões com avatar ou iniciais, nome, `Categoria / Especialidade`, `Nº do conselho / UF` e selo do papel quando não for plantonista. Busca por nome.
-- **Adicionar membro** (gestor e auxiliar): busca usuários cadastrados (`users`, campo `searchKeywords`, que já existe) e adiciona como plantonista. Convite por link fica como evolução.
+- **Convidar** (gestor e auxiliar): convite por e-mail em `groups/{g}/invites/{email}` com o cargo inicial e validade de 7 dias. O gestor compartilha o link `/invite.html?g=<grupo>` (copiar ou WhatsApp). Ninguém é adicionado sem aceitar: as regras só deixam a própria pessoa entrar, no cargo do convite.
 - **Alterar perfil**: mostra o uso de cada limite, ex.: `Tornar gestor (1/1)`, `Tornar auxiliar (2/3)`. A opção fica desabilitada quando o papel está cheio. Trocar de gestor só pode ser feito pelo próprio gestor (passa o papel).
 - **Remover membro**, com confirmação. **Sair do grupo**: o próprio membro (o gestor precisa passar o papel antes).
 - Membros sem conselho (ex.: Administrativo) podem ser gestor ou auxiliar e não aparecem obrigatoriamente na grade da escala.
-- **Wizard, etapa 3 "Membros"**: o `setupStep: 'members'` já está previsto nas regras. Tela para adicionar os primeiros membros, que pode ser pulada.
+- **Wizard, etapa 3 "Membros"**: não foi feita; os convites ficam na aba Membros do grupo, depois de criado.
 - **Lista de grupos** ([schedules.js](../public/js/pages/schedules.js)): agrupar em seções pelo papel do usuário (GESTOR, AUXILIAR, ANALISTA, OBSERVADOR, PLANTONISTA), cada item com o nome do grupo e o nome da unidade embaixo. A busca continua igual.
 
 ---
@@ -322,8 +326,8 @@ groups/{g}/punches/{id}                      NOVO
 
 ## 12. Ordem de implementação
 
-0. **Projeto Firebase real**: `escalamed-hapvida`, na conta tiago.tlmsmartins@gmail.com, com o app web registrado e ligado em [config.js](../public/js/config.js) e [.firebaserc](../.firebaserc) (apelido `prod`). Firestore em `southamerica-east1` (São Paulo; a região não pode ser mudada depois) e login por e-mail e senha. Os emuladores continuam sendo usados em localhost.
-1. **Membros e papéis**: campos do grupo, regras, `permissions.js` com testes, wizard etapa 3, aba Membros (adicionar, alterar perfil, remover, sair) e lista de grupos em seções por papel. Seed: unidade "HAPVIDA ANTONIO PRUDENTE", grupo "TELEAUDITORIA HAPVIDA", os 6 turnos e cerca de 12 membros **fictícios** com papéis variados.
+0. **Projeto Firebase real**: `escalamed-hapvida`, na conta tiago.tlmsmartins@gmail.com, com o app web registrado e ligado em [config.js](../public/js/config.js) e [.firebaserc](../.firebaserc) (apelido `prod`). Firestore em `southamerica-east1` (São Paulo; a região não pode ser mudada depois) e login por e-mail e senha. O app usa o banco real também em localhost; os emuladores são opcionais (`USE_LOCAL_EMULATORS` em config.js).
+1. **Membros e papéis** (feito): campos do grupo, regras, `permissions.js` com testes, wizard etapa 3, aba Membros (adicionar, alterar perfil, remover, sair) e lista de grupos em seções por papel. Seed: unidade "HAPVIDA ANTONIO PRUDENTE", grupo "TELEAUDITORIA HAPVIDA", os 6 turnos e cerca de 12 membros **fictícios** com papéis variados.
 2. **Tela do grupo**: abas, menu ⋮ e calendário ainda sem plantões.
 3. **Turnos**: `order`, exclusão segura e `overlaps()` com testes (inclusive a virada da meia-noite).
 4. **Escala mensal**: lista de meses, grade, horas, vagas, revisar, replicar, imprimir e publicar (escala fixa + notificações). Seed: janeiro a setembro publicados e outubro em rascunho.

@@ -22,11 +22,9 @@ before(async () => {
   execFileSync(process.execPath, ['scripts/seed-emulator.mjs'], { stdio: 'inherit' });
 });
 
-test('usuários do seed entram com e-mail confirmado e leem o grupo', async () => {
+test('usuários do seed entram e leem o grupo', async () => {
   const gestor = await login('gestor@teste.com');
   assert.ok(gestor.idToken);
-  const claims = JSON.parse(Buffer.from(gestor.idToken.split('.')[1], 'base64url').toString());
-  assert.equal(claims.email_verified, true);
   assert.ok(await canRead(gestor.idToken, 'groups/teleauditoria-hapvida'));
   assert.ok(await canRead(gestor.idToken, `users/${gestor.localId}`));
 });

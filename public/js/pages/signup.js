@@ -1,11 +1,7 @@
 // Cadastro em 4 etapas: e-mail e termos → senha (cria a conta) → dados pessoais → dados profissionais.
 // Se a pessoa fechar no meio, users/{uid}.signupStep guarda a última etapa concluída
 // e os guards trazem ela de volta para cá no próximo acesso.
-import {
-  createUserWithEmailAndPassword,
-  sendEmailVerification,
-  updateProfile,
-} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import { updateProfile } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
   doc,
   getDoc,
@@ -15,6 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, navigate } from '../firebase.js';
 import { currentUser, loadProfile, isProfileComplete, nextUrl, nextParam } from '../auth.js';
+import { signUp } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
 import { setupCarousel, setupPasswordToggles, setupPasswordRules } from '../auth-ui.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
@@ -67,11 +64,11 @@ document.querySelectorAll('[data-go]').forEach((button) =>
   button.addEventListener('click', () => goTo(Number(button.dataset.go))),
 );
 
-const finish = () => navigate(`/verify-email.html${nextParam()}`, { replace: true });
+// Cadastro completo: segue para onde a pessoa ia (ou para a tela Escalas)
+const finish = () => navigate(nextUrl(), { replace: true });
 
 // ---------- Etapa 1: e-mail e termos ----------
-// Não conferimos aqui se o e-mail já existe: a proteção contra enumeração do Firebase
-// não permite, e isso também evita revelar quem tem cadastro. O aviso vem na etapa 2.
+// O e-mail repetido só é avisado na etapa 2, quando o serviço de contas tenta criar a conta.
 $('form-email').addEventListener('submit', (event) => {
   event.preventDefault();
   const form = event.target;
@@ -95,7 +92,7 @@ $('form-email').addEventListener('submit', (event) => {
   goTo(2);
 });
 
-// ---------- Etapa 2: senha (cria a conta no Firebase) ----------
+// ---------- Etapa 2: senha (cria a conta no serviço de contas) ----------
 setupPasswordRules($('signup-password'), $('password-rules'), $('strength-meter'));
 
 $('form-password').addEventListener('submit', async (event) => {
@@ -116,9 +113,8 @@ $('form-password').addEventListener('submit', async (event) => {
   const button = form.querySelector('[type=submit]');
   setLoading(button, true);
   try {
-    ({ user } = await createUserWithEmailAndPassword(auth, email, password));
-    // O link chega enquanto a pessoa termina o cadastro; falha aqui não impede seguir
-    sendEmailVerification(user).catch(() => {});
+    await signUp(email, password);
+    user = auth.currentUser;
     goTo(3);
   } catch (error) {
     showFormAlert(form, firebaseErrorMessage(error));

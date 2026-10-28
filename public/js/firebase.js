@@ -6,9 +6,21 @@ import {
   connectFirestoreEmulator,
   terminate,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { firebaseConfig, useEmulators } from './config.js';
+import { firebaseConfig, useEmulators, appCheckSiteKey } from './config.js';
 
 export const app = initializeApp(firebaseConfig);
+
+// App Check (proteção contra robôs) só no projeto real e com a chave configurada.
+// Precisa vir antes de qualquer acesso ao Auth ou ao Firestore. Desligado, nem é baixado.
+if (!useEmulators && appCheckSiteKey) {
+  const { initializeAppCheck, ReCaptchaV3Provider } = await import(
+    'https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js'
+  );
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 

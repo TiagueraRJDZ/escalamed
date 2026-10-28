@@ -123,6 +123,24 @@
     </div>
   </dialog>
 
+  <!-- Modal: senha provisória gerada -->
+  <dialog class="modal" id="modal-temp-password" aria-labelledby="modal-temp-password-title">
+    <div class="dialog-header">
+      <h2 id="modal-temp-password-title">Senha provisória</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted" id="temp-password-text"></p>
+      <div class="copy-field">
+        <input class="input temp-password" id="temp-password" type="text" readonly aria-label="Senha provisória" />
+        <button type="button" class="btn btn-secondary" id="copy-temp-password">Copiar</button>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button type="button" class="btn btn-primary" data-close>Pronto</button>
+    </div>
+  </dialog>
+
   <script type="module" src="/js/pages/group.js"></script>
 </body>
 </html>

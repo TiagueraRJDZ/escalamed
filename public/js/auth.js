@@ -2,11 +2,12 @@
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, navigate } from './firebase.js';
+import { mustChangePassword } from './auth-api.js';
 
 export const HOME = '/schedules.html';
 
 // Páginas do fluxo de entrada: elas repassam o "next" em vez de virar o destino
-const AUTH_PAGES = ['/', '/index.html', '/signup.html', '/verify-email.html'];
+const AUTH_PAGES = ['/', '/index.html', '/signup.html', '/new-password.html'];
 
 // Espera o Firebase dizer se há alguém logado (só a primeira resposta)
 export function currentUser() {
@@ -40,24 +41,19 @@ export const isProfileComplete = (profile) => (profile?.signupStep ?? 0) >= 4;
 
 const halt = () => new Promise(() => {}); // a página para aqui enquanto redireciona
 
-// Guard das páginas. Ordem: login → e-mail verificado → cadastro completo.
+// Guard das páginas. Ordem: login → senha provisória trocada → cadastro completo.
 // Devolve { user, profile } (profile só quando profileComplete = true).
-export async function requireAuth({ verified = true, profileComplete = true } = {}) {
+export async function requireAuth({ profileComplete = true, allowTemporaryPassword = false } = {}) {
   const user = await currentUser();
   if (!user) {
     navigate(`/${nextParam()}`, { replace: true });
     return halt();
   }
 
-  if (verified && !user.emailVerified) {
-    // Pode ter confirmado em outra aba: atualiza antes de mandar para a verificação
-    await user.reload().catch(() => {});
-    if (user.emailVerified) {
-      await user.getIdToken(true); // o banco só enxerga a verificação com um token novo
-    } else {
-      navigate(`/verify-email.html${nextParam()}`, { replace: true });
-      return halt();
-    }
+  // Entrou com senha provisória (gerada pelo gestor): cria uma senha nova antes de tudo
+  if (!allowTemporaryPassword && (await mustChangePassword(user))) {
+    navigate(`/new-password.html${nextParam()}`, { replace: true });
+    return halt();
   }
 
   let profile = null;

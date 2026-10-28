@@ -236,36 +236,6 @@
   text-align: center;
 }
 
-/* Campo de senha com botão de mostrar/ocultar */
-.password-wrap { position: relative; }
-.password-wrap .input { padding-right: 3rem; }
-.password-wrap .btn-icon {
-  position: absolute;
-  right: 1px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-/* Lista de requisitos da senha */
-.password-rules {
-  display: grid;
-  gap: 2px;
-  margin: var(--esp-2) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--texto-xs);
-  color: var(--cor-texto-3);
-}
-
-.password-rules li {
-  display: flex;
-  align-items: center;
-  gap: var(--esp-1);
-}
-
-.password-rules svg { width: 14px; height: 14px; }
-.password-rules li.is-ok { color: var(--cor-sucesso); }
-
 /* ---------- Acesso, cadastro e verificação ---------- */
 .auth-back {
   align-self: flex-start;
@@ -338,61 +308,14 @@
   transition: width 250ms ease;
 }
 
-/* Caixa de seleção com texto ao lado */
-.checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--esp-2);
-  font-size: var(--texto-sm);
+/* Passos de "Problemas para acessar" */
+.forgot-steps {
+  display: grid;
+  gap: var(--esp-3);
+  margin: 0;
+  padding-left: var(--esp-5);
   color: var(--cor-texto-2);
-  cursor: pointer;
 }
-.checkbox input {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 2px 0 0;
-  accent-color: var(--auth-azul);
-}
-.checkbox-field { margin-top: var(--esp-2); }
 
-/* Força da senha: 4 barrinhas que acendem */
-.strength-meter {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr) auto;
-  align-items: center;
-  gap: var(--esp-1);
-  margin-top: var(--esp-2);
-  font-size: var(--texto-xs);
-  color: var(--cor-texto-3);
-}
-.strength-meter i {
-  height: 4px;
-  border-radius: var(--raio-total);
-  background: var(--cor-superficie-2);
-}
-.strength-meter span { min-width: 9ch; text-align: right; }
-.strength-meter[data-level='0'] i:nth-child(-n + 1) { background: var(--cor-perigo); }
-.strength-meter[data-level='1'] i:nth-child(-n + 2) { background: var(--cor-perigo); }
-.strength-meter[data-level='2'] i:nth-child(-n + 2) { background: var(--cor-alerta); }
-.strength-meter[data-level='3'] i:nth-child(-n + 3) { background: var(--cor-sucesso); }
-.strength-meter[data-level='4'] i:nth-child(-n + 4) { background: var(--cor-sucesso); }
-
-/* Página só com o painel (verificação de e-mail) */
-.auth-single {
-  min-height: 100vh;
-  background: var(--cor-superficie);
-}
-.auth-single .auth-box .auth-brand { display: flex; }
-
-.verify-icon {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  margin: 0 auto;
-  border-radius: 20px;
-  background: var(--cor-primaria-suave);
-  color: var(--auth-azul);
-}
-.verify-icon svg { width: 36px; height: 36px; }
+/* Aviso do formulário com espaço antes do primeiro campo */
+.auth-view form .form-alert:not([hidden]) { margin-bottom: var(--esp-3); }

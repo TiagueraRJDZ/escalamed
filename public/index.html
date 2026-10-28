@@ -53,10 +53,10 @@
           <form id="login-form" novalidate>
             <div class="alert form-alert" role="alert" hidden></div>
             <div class="field">
-              <label class="label" for="login-email">E-mail</label>
+              <label class="label" for="login-identifier">Nome de usuário ou E-mail</label>
               <div class="input-icon">
-                <span data-icon="mail"></span>
-                <input class="input" id="login-email" name="email" type="email" autocomplete="username" placeholder="Seu e-mail" required />
+                <span data-icon="user"></span>
+                <input class="input" id="login-identifier" name="identifier" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Seu usuário ou e-mail" required />
               </div>
               <span class="field-error"></span>
             </div>
@@ -73,25 +73,19 @@
           </form>
         </section>
 
-        <!-- Recuperar senha -->
+        <!-- Recuperar senha: o gestor do grupo gera uma senha provisória -->
         <section class="auth-view" id="view-forgot" aria-labelledby="forgot-title" hidden>
           <a class="btn btn-ghost auth-back" href="#entrar"><span data-icon="arrowLeft"></span>Voltar</a>
           <header class="auth-header">
             <h1 id="forgot-title">Problemas para acessar a plataforma?</h1>
-            <p class="muted">Informe seu e-mail para que possamos tentar localizar sua conta.</p>
           </header>
-          <form id="forgot-form" novalidate>
-            <div class="alert form-alert" role="alert" hidden></div>
-            <div class="field">
-              <label class="label" for="forgot-email">E-mail</label>
-              <div class="input-icon">
-                <span data-icon="mail"></span>
-                <input class="input" id="forgot-email" name="email" type="email" autocomplete="email" placeholder="Seu e-mail" required />
-              </div>
-              <span class="field-error"></span>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">Localizar conta</button>
-          </form>
+          <ol class="forgot-steps">
+            <li>Peça ao <strong>gestor</strong> ou a um <strong>auxiliar</strong> do seu grupo uma <strong>senha provisória</strong>. Ele gera na aba Membros do grupo.</li>
+            <li>Entre com o seu usuário ou e-mail e a senha provisória.</li>
+            <li>O EscalaMed pede, em seguida, que você crie uma senha nova.</li>
+          </ol>
+          <p class="auth-switch">Se a sua conta foi bloqueada por senhas erradas, ela libera sozinha em 15 minutos.</p>
+          <a class="btn btn-primary btn-block auth-cta" href="#entrar">Voltar para o login</a>
         </section>
       </div>
     </main>
