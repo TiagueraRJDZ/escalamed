@@ -13,6 +13,7 @@ import { auth, db, navigate } from '../firebase.js';
 import { currentUser, loadProfile, isProfileComplete, nextUrl, nextParam } from '../auth.js';
 import { signUp } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
+import { mountCredits } from '../version.js';
 import { setupCarousel, setupPasswordToggles, setupPasswordRules } from '../auth-ui.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
@@ -259,6 +260,7 @@ $('form-professional').addEventListener('submit', async (event) => {
 // ---------- Início ----------
 renderIcons();
 setupCarousel();
+mountCredits();
 setupPasswordToggles();
 ['form-email', 'form-password', 'form-personal', 'form-professional'].forEach((id) =>
   clearErrorsWhileTyping($(id)),

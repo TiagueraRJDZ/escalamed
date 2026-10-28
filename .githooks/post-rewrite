@@ -1,0 +1,3 @@
+#!/bin/sh
+# Atualiza public/version.json com a versão do último commit (ver scripts/write-version.mjs)
+node scripts/write-version.mjs >/dev/null 2>&1 || true

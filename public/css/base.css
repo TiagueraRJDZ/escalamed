@@ -539,3 +539,10 @@ a:hover {
 .checkbox-field { margin-top: var(--esp-2); }
 
 .alert-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); border-color: #fde68a; }
+
+/* Rodapé "Desenvolvido por Tiago Martins · v1.0.X" (login e app) */
+.app-credits {
+  font-size: var(--texto-xs);
+  color: var(--cor-texto-3);
+  text-align: center;
+}

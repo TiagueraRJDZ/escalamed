@@ -199,3 +199,18 @@ Cada commit começa com a versão seguida de um resumo curto:
 ```
 
 A versão sobe no último número a cada commit (`1.0.1`, `1.0.2`…).
+
+### Versão no rodapé
+
+O rodapé do login e do app mostra "Desenvolvido por Tiago Martins · v1.0.X". A versão vem de `public/version.json`, gerado por [scripts/write-version.mjs](scripts/write-version.mjs) a partir da mensagem do último commit. Ele roda sozinho:
+
+- depois de cada commit, checkout, pull e rebase (hooks em `.githooks/`);
+- antes de publicar no Firebase (`predeploy` em `firebase.json`).
+
+O `version.json` não vai para o repositório. Num clone novo, ative os hooks uma vez:
+
+```bash
+git config core.hooksPath .githooks
+node scripts/write-version.mjs
+```
+

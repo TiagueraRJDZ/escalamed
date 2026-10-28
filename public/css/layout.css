@@ -33,6 +33,14 @@ body:not(.is-booting) .boot-spinner { display: none; }
   min-width: 0;
 }
 
+/* Rodapé do app: centralizado na tela inteira (puxa para a esquerda a largura do menu) */
+.app-footer { padding: 0 var(--esp-5) var(--esp-4); }
+
+@media (min-width: 900px) {
+  .app-footer { margin-left: calc(var(--sidebar-w) * -1); }
+  .app.is-collapsed .app-footer { margin-left: calc(var(--sidebar-w-collapsed) * -1); }
+}
+
 /* ---------- Menu lateral ---------- */
 .sidebar {
   position: sticky;

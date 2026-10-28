@@ -4,6 +4,7 @@ import { navigate } from '../firebase.js';
 import { currentUser, nextUrl, nextParam } from '../auth.js';
 import { signIn } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
+import { mountCredits } from '../version.js';
 import { setupCarousel, setupPasswordToggles } from '../auth-ui.js';
 import {
   setLoading,
@@ -73,6 +74,7 @@ function setupLogin() {
 // ---------- Início ----------
 renderIcons();
 setupCarousel();
+mountCredits();
 setupPasswordToggles();
 setupLogin();
 document.getElementById('signup-link').href = `/signup.html${nextParam()}`;

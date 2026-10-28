@@ -5,6 +5,7 @@
   },
   "hosting": {
     "public": "public",
+    "predeploy": ["node scripts/write-version.mjs"],
     "cleanUrls": false,
     "ignore": ["**/.*"]
   },

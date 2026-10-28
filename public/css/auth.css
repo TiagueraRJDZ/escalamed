@@ -15,8 +15,9 @@
   background: var(--cor-superficie);
 }
 
+/* Painel branco mais estreito: o lado azul fica com o resto da tela */
 @media (min-width: 960px) {
-  .auth { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .auth { grid-template-columns: minmax(0, 1fr) clamp(420px, 34vw, 560px); }
 }
 
 /* Logos no topo do painel: Hapvida | EscalaMed */
@@ -153,17 +154,33 @@
   background: #fff;
 }
 
-.auth-showcase-footer {
+/* Crédito "Desenvolvido por" centralizado embaixo da parte azul */
+.auth-showcase-credits {
+  color: rgb(255 255 255 / 0.8);
   font-size: var(--texto-sm);
-  color: rgb(255 255 255 / 0.85);
 }
 
 /* ---------- Formulários ---------- */
 .auth-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--esp-6) var(--esp-4);
+  /* espaço embaixo para o rodapé "Desenvolvido por" */
+  padding: var(--esp-6) var(--esp-5) calc(var(--esp-6) + 1.5rem);
+}
+
+.auth-panel > .app-credits {
+  position: absolute;
+  right: 0;
+  bottom: var(--esp-4);
+  left: 0;
+}
+
+/* Com a parte azul na tela, o crédito fica só nela */
+@media (min-width: 960px) {
+  .auth-panel > .auth-panel-credits { display: none; }
+  .auth-panel:has(> .auth-panel-credits) { padding-bottom: var(--esp-6); }
 }
 
 .auth-box {

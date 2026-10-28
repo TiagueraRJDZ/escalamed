@@ -4,6 +4,7 @@
 import { requireAuth, signOutUser } from './auth.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
+import { mountCredits } from './version.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
@@ -210,6 +211,7 @@ export async function initLayout({ active } = {}) {
   app.className = `app${collapsed ? ' is-collapsed' : ''}`;
   app.innerHTML = shellHtml(user, profile, active, collapsed);
   app.querySelector('.app-main').append(page);
+  app.querySelector('.app-main').insertAdjacentHTML('beforeend', '<footer class="app-footer app-credits" data-credits></footer>');
   document.body.prepend(app);
   document.body.insertAdjacentHTML('beforeend', dialogsHtml());
 
@@ -222,6 +224,7 @@ export async function initLayout({ active } = {}) {
     toast('A busca de pessoas chega em uma próxima versão.');
   });
 
+  mountCredits(app);
   document.body.classList.remove('is-booting');
   return { user, profile };
 }

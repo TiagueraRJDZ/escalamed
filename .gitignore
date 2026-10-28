@@ -22,3 +22,6 @@ worker/.dev.vars
 *adminsdk*.json
 conta-servico*.json
 escalamed-hapvida-*.json
+
+# Gerado a cada commit (scripts/write-version.mjs)
+public/version.json

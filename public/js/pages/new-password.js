@@ -3,6 +3,7 @@ import { navigate } from '../firebase.js';
 import { requireAuth, nextUrl, signOutUser } from '../auth.js';
 import { changePassword, mustChangePassword } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
+import { mountCredits } from '../version.js';
 import { setupPasswordToggles, setupPasswordRules } from '../auth-ui.js';
 import { isStrongPassword } from '../validators.js';
 import {
@@ -15,6 +16,7 @@ import {
 } from '../ui.js';
 
 renderIcons();
+mountCredits();
 const { user } = await requireAuth({ profileComplete: false, allowTemporaryPassword: true });
 
 // Sem senha provisória: nada a fazer aqui
