@@ -273,6 +273,32 @@
   font-weight: 600;
 }
 
+/* Divisor "Ou acesse com": linha dos dois lados do texto */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+  margin: var(--esp-4) 0 var(--esp-1);
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-3);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--cor-borda-forte);
+}
+
+/* Botão de login social (Google) */
+.auth-social {
+  min-height: 52px;
+  font-size: var(--texto-md);
+  font-weight: 500;
+  color: var(--cor-texto-2);
+  border-color: var(--cor-borda);
+}
+
 .auth-forgot {
   margin: calc(var(--esp-1) * -1) 0 0;
   font-size: var(--texto-sm);

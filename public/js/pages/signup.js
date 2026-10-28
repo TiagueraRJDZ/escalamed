@@ -1,6 +1,7 @@
 // Cadastro em 4 etapas: e-mail e termos → senha (cria a conta) → dados pessoais → dados profissionais.
 // Se a pessoa fechar no meio, users/{uid}.signupStep guarda a última etapa concluída
 // e os guards trazem ela de volta para cá no próximo acesso.
+// Pelo Google, a conta já vem criada: começa nos dados pessoais, com o aceite dos termos ali.
 import { updateProfile } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
   doc,
@@ -14,7 +15,7 @@ import { currentUser, loadProfile, isProfileComplete, nextUrl, nextParam } from 
 import { signUp } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
 import { mountCredits } from '../version.js';
-import { setupCarousel, setupPasswordToggles, setupPasswordRules } from '../auth-ui.js';
+import { setupCarousel, setupPasswordToggles, setupPasswordRules, setupGoogleButtons } from '../auth-ui.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
 import {
@@ -46,6 +47,7 @@ const $ = (id) => document.getElementById(id);
 let email = '';
 let user = await currentUser();
 let profile = null;
+let termsAccepted = false; // marcado na etapa 1 (quem entra pelo Google confirma na etapa 3)
 
 // ---------- Etapas ----------
 function goTo(step, { focus = true } = {}) {
@@ -88,6 +90,7 @@ $('form-email').addEventListener('submit', (event) => {
   if (!valid) return;
 
   email = value;
+  termsAccepted = true;
   $('step-2-email').innerHTML = `Conta para <strong>${escapeHtml(email)}</strong>`;
   $('signup-username').value = email;
   goTo(2);
@@ -125,6 +128,12 @@ $('form-password').addEventListener('submit', async (event) => {
 });
 
 // ---------- Etapa 3: dados pessoais ----------
+// Foto da conta Google, se houver (as regras aceitam endereço https)
+function googlePhoto() {
+  const url = user.photoURL;
+  return url && url.startsWith('https://') && url.length <= 2000 ? url : null;
+}
+
 $('signup-state').insertAdjacentHTML(
   'beforeend',
   STATES.map((s) => `<option value="${s.uf}">${s.name}</option>`).join(''),
@@ -146,6 +155,9 @@ $('form-personal').addEventListener('submit', async (event) => {
   if (!isValidPhone(phone)) errors.push([form.phone, 'Informe um telefone com DDD.']);
   if (!state) errors.push([form.state, 'Escolha o estado.']);
   if (cpf && !isValidCPF(cpf)) errors.push([form.cpf, 'CPF inválido.']);
+  if (!$('personal-terms').hidden && !form.terms.checked) {
+    errors.push([form.terms, 'Para continuar, aceite os Termos de Uso e o Aviso de Privacidade.']);
+  }
   if (errors.length) {
     errors.forEach(([input, message]) => setFieldError(input, message));
     errors[0][0].focus();
@@ -168,7 +180,7 @@ $('form-personal').addEventListener('submit', async (event) => {
     } else {
       batch.set(userRef, {
         ...publicData,
-        photoURL: null,
+        photoURL: googlePhoto(),
         username: null,
         categoryId: null,
         specialty: null,
@@ -188,6 +200,7 @@ $('form-personal').addEventListener('submit', async (event) => {
     });
     await batch.commit();
     profile = { ...profile, name, signupStep: profile?.signupStep ?? 3 };
+    $('personal-terms').hidden = true;
     updateProfile(user, { displayName: name }).catch(() => {});
     goTo(4);
   } catch (error) {
@@ -262,6 +275,7 @@ renderIcons();
 setupCarousel();
 mountCredits();
 setupPasswordToggles();
+setupGoogleButtons();
 ['form-email', 'form-password', 'form-personal', 'form-professional'].forEach((id) =>
   clearErrorsWhileTyping($(id)),
 );
@@ -283,6 +297,7 @@ if (user) {
     goTo(4, { focus: false });
   } else {
     $('form-personal').name.value = user.displayName ?? '';
+    $('personal-terms').hidden = false; // conta criada fora da etapa 1 (ex.: Google): confirma os termos aqui
     goTo(3, { focus: false });
   }
 } else {

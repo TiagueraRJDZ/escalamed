@@ -1,11 +1,12 @@
 // Tela de acesso: escolher (entrar ou criar conta), login e "esqueci a senha".
-// Login por e-mail no Firebase; por nome de usuário, pelo serviço de contas (ver auth-api.js).
+// Login por e-mail no Firebase; por nome de usuário, pelo serviço de contas (ver auth-api.js);
+// pela conta Google, no botão "Continuar com Google" (ver auth-ui.js).
 import { navigate } from '../firebase.js';
 import { currentUser, nextUrl, nextParam } from '../auth.js';
 import { signIn } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
 import { mountCredits } from '../version.js';
-import { setupCarousel, setupPasswordToggles } from '../auth-ui.js';
+import { setupCarousel, setupPasswordToggles, setupGoogleButtons } from '../auth-ui.js';
 import {
   setLoading,
   setFieldError,
@@ -77,6 +78,7 @@ setupCarousel();
 mountCredits();
 setupPasswordToggles();
 setupLogin();
+setupGoogleButtons();
 document.getElementById('signup-link').href = `/signup.html${nextParam()}`;
 
 clearErrorsWhileTyping(document.getElementById('login-form'));

@@ -1,4 +1,4 @@
-// Login e senhas: Firebase Authentication (e-mail e senha). O serviço de contas
+// Login e senhas: Firebase Authentication (e-mail e senha, ou conta Google). O serviço de contas
 // (Cloudflare Worker, pasta worker/) faz só o que o navegador não consegue sozinho:
 // login por nome de usuário, senha provisória gerada pelo gestor e troca de e-mail
 // sem link de confirmação.
@@ -9,6 +9,9 @@ import {
   reauthenticateWithCredential,
   updatePassword,
   EmailAuthProvider,
+  GoogleAuthProvider,
+  signInWithPopup,
+  reauthenticateWithPopup,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { auth } from './firebase.js';
 import { authApiUrl } from './config.js';
@@ -59,10 +62,24 @@ export async function signIn(identifier, password) {
 
 export const signUp = (email, password) => createUserWithEmailAndPassword(auth, email, password);
 
-// Confere a senha atual de novo (antes de ações sensíveis)
-export const reauthenticate = (password) =>
-  reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password));
+// ---------- Conta Google ----------
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' }); // sempre deixa escolher a conta
 
+// Abre a janela do Google. Primeiro acesso cria a conta no Firebase (o perfil vem no cadastro).
+export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+
+// A conta tem senha? Quem entrou só pelo Google não tem, até criar uma nas Configurações.
+export const hasPassword = (user = auth.currentUser) =>
+  user?.providerData.some((provider) => provider.providerId === 'password') ?? false;
+
+// Confere a identidade de novo (antes de ações sensíveis): pela senha ou, sem senha, pelo Google
+export const reauthenticate = (password) =>
+  hasPassword()
+    ? reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, password))
+    : reauthenticateWithPopup(auth.currentUser, googleProvider);
+
+// Sem senha (conta Google), confirma pelo Google e a senha nova passa a valer também
 export async function changePassword(currentPassword, newPassword) {
   await reauthenticate(currentPassword);
   await updatePassword(auth.currentUser, newPassword);

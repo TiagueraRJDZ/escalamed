@@ -6,7 +6,7 @@ Plataforma web de gestão de escalas e plantões para equipes de saúde (hospita
 
 - **HTML, CSS e JavaScript puros**, sem etapa de build. Cada tela é um arquivo `.html` e o JavaScript usa módulos ES.
 - **Firebase, plano gratuito (Spark)**:
-  - **Authentication**: e-mail e senha.
+  - **Authentication**: e-mail e senha, e conta Google.
   - **Firestore**: banco de dados. A segurança fica nas regras (`firestore.rules`).
   - **Hosting**: publicação do site.
 - Fonte **Pitanga** (fonte da marca Hapvida), versão variável em `public/fonts/PitangaVariable.woff2`, declarada em `public/css/base.css`.
@@ -110,6 +110,7 @@ O Live Server já está configurado para servir a pasta `public` (arquivo `.vsco
 ## Login e senhas
 
 - **Firebase Authentication (e-mail e senha)** cuida do cadastro, do login por e-mail e das senhas. Sem e-mail de confirmação: a conta é liberada ao terminar o cadastro.
+- **Continuar com Google** (tela de acesso e etapa 1 do cadastro): abre a janela do Google. No primeiro acesso a conta já nasce no Firebase e o cadastro começa nos dados pessoais (etapa 3), com o aceite dos termos ali e a foto do Google no perfil. Conta só com Google não tem senha: nas Configurações, a aba vira **Criar senha** (para entrar também por e-mail ou usuário), a exclusão da conta é confirmada pelo Google e a troca de e-mail só aparece depois de criar a senha.
 - **Serviço de contas** (`escalamed-auth`, pasta `worker/`, Cloudflare Worker gratuito, no mesmo padrão do `sacflow-senha`) faz só o que o navegador não consegue sozinho:
   - **Login por nome de usuário:** o banco D1 (`escalamed-contas`) guarda só "usuário → uid". O Worker acha a conta, confere a senha no próprio Firebase e devolve um token personalizado para o app entrar. O e-mail não é exposto. Limite de 10 tentativas por minuto por IP.
   - **Senha provisória:** o gestor (ou auxiliar, mas não para o gestor nem para outro auxiliar) gera na aba Membros. A senha antiga para de valer, as sessões abertas caem e a conta fica marcada (`trocarSenha`): ao entrar, o app pede uma senha nova (`new-password.html`).
@@ -161,14 +162,14 @@ firebase emulators:exec --config firebase.test.json --project demo-escalamed-tes
 ## Projeto Firebase real
 
 - Projeto: **escalamed-hapvida** (nome "EscalaMed"), na conta tiago.tlmsmartins@gmail.com, plano gratuito.
-- Firestore em `southamerica-east1` (São Paulo). Login por **E-mail/senha**.
+- Firestore em `southamerica-east1` (São Paulo). Login por **E-mail/senha** e **Google**.
 - Configuração do app web em [public/js/config.js](public/js/config.js). O app usa o projeto real em qualquer endereço; os emuladores (projeto `demo-escalamed`) só com `USE_LOCAL_EMULATORS = true`.
 - Login e senhas: Firebase (e-mail e senha) com o serviço de contas na Cloudflare (seção "Login e senhas" acima).
 - Em `.firebaserc`, o projeto padrão é o dos emuladores (`demo-escalamed`) e o real tem o apelido `prod`. Assim, um `firebase deploy` sem `--project prod` nunca publica no projeto real por engano.
 
 ### Ajustes no console do Firebase
 
-- **Authentication > Método de login**: E-mail/senha ativado.
+- **Authentication > Método de login**: E-mail/senha e **Google** ativados (no Google, escolha o e-mail de suporte do projeto).
 - **Foto de perfil**: fica no próprio Firestore (160 px, cerca de 10 KB), porque o Cloud Storage só funciona no plano pago em projetos novos.
 
 ### App Check (proteção contra robôs)

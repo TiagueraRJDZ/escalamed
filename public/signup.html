@@ -64,6 +64,8 @@
             <button type="submit" class="btn btn-primary btn-block">Próximo<span data-icon="chevronRight"></span></button>
           </form>
           <p class="auth-switch">Já tem conta? <a id="login-link" href="/#entrar">Entrar</a></p>
+          <p class="auth-divider"><span>Ou cadastre-se com</span></p>
+          <button type="button" class="btn btn-secondary btn-block auth-social" data-google-login>Continuar com Google</button>
         </section>
 
         <!-- Etapa 2: senha (cria a conta) -->
@@ -130,6 +132,14 @@
                 <input class="input" id="signup-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" />
                 <span class="field-error"></span>
               </div>
+            </div>
+            <!-- Só para quem não passou pela etapa 1 (entrou pelo Google) -->
+            <div class="field checkbox-field" id="personal-terms" hidden>
+              <label class="checkbox">
+                <input type="checkbox" id="signup-terms-google" name="terms" />
+                <span>Confirmo que li e concordo com os <strong>Termos de Uso</strong> e o <strong>Aviso de Privacidade</strong> do EscalaMed.</span>
+              </label>
+              <span class="field-error"></span>
             </div>
             <button type="submit" class="btn btn-primary btn-block">Próximo<span data-icon="chevronRight"></span></button>
           </form>

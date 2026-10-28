@@ -22,7 +22,7 @@
         <button type="button" class="tab" role="tab" id="tab-account" data-hash="conta" aria-controls="panel-account"><span data-icon="user"></span>Informações da conta</button>
         <button type="button" class="tab" role="tab" id="tab-professional" data-hash="profissional" aria-controls="panel-professional"><span data-icon="users"></span>Informações profissionais</button>
         <button type="button" class="tab" role="tab" id="tab-photo" data-hash="foto" aria-controls="panel-photo"><span data-icon="edit"></span>Editar perfil</button>
-        <button type="button" class="tab" role="tab" id="tab-password" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span>Alterar senha</button>
+        <button type="button" class="tab" role="tab" id="tab-password" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span><span data-password-title>Alterar senha</span></button>
         <button type="button" class="tab is-danger" role="tab" id="tab-delete" data-hash="excluir" aria-controls="panel-delete"><span data-icon="trash"></span>Excluir minha conta</button>
       </div>
 
@@ -49,6 +49,7 @@
                 <input class="input" id="account-email" type="email" readonly />
                 <button type="button" class="btn btn-secondary" id="change-email">Alterar e-mail</button>
               </div>
+              <span class="field-hint" id="email-google-hint" hidden>Você entra com a conta Google deste e-mail. Para trocar o e-mail, crie antes uma senha.</span>
             </div>
             <div class="form-row">
               <div class="field">
@@ -123,11 +124,12 @@
 
         <!-- Alterar senha -->
         <section class="card tab-panel" role="tabpanel" id="panel-password" aria-labelledby="tab-password" hidden>
-          <h2>Alterar senha</h2>
+          <h2 data-password-title>Alterar senha</h2>
           <form id="form-password" novalidate>
             <div class="alert form-alert" role="alert" hidden></div>
+            <p class="muted" id="password-google-hint" hidden>Você entra com a conta Google. Crie uma senha para entrar também com e-mail ou nome de usuário. Vamos pedir para confirmar pelo Google.</p>
             <input type="email" name="username" id="password-username" autocomplete="username" hidden />
-            <div class="field">
+            <div class="field" id="password-current-field">
               <label class="label" for="password-current">Senha atual</label>
               <div class="password-wrap"><input class="input" id="password-current" name="current" type="password" autocomplete="current-password" required /></div>
               <span class="field-error"></span>
@@ -144,7 +146,7 @@
               <div class="password-wrap"><input class="input" id="password-confirm" name="confirm" type="password" autocomplete="new-password" required /></div>
               <span class="field-error"></span>
             </div>
-            <div class="form-actions"><button type="submit" class="btn btn-primary">Alterar senha</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" data-password-title>Alterar senha</button></div>
           </form>
         </section>
 
@@ -164,7 +166,7 @@
               <input class="input" id="delete-confirm" name="confirmText" type="text" autocomplete="off" required />
               <span class="field-error"></span>
             </div>
-            <div class="field">
+            <div class="field" id="delete-password-field">
               <label class="label" for="delete-password">Sua senha</label>
               <div class="password-wrap"><input class="input" id="delete-password" name="password" type="password" autocomplete="current-password" required /></div>
               <span class="field-error"></span>

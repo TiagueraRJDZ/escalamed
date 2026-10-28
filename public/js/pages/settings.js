@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db } from '../firebase.js';
 import { signOutUser } from '../auth.js';
-import { changePassword, changeEmail, changeUsername, reauthenticate } from '../auth-api.js';
+import { changePassword, changeEmail, changeUsername, reauthenticate, hasPassword } from '../auth-api.js';
 import { initLayout, avatarHtml } from '../layout.js';
 import { renderIcons } from '../icons.js';
 import { setupPasswordToggles, setupPasswordRules } from '../auth-ui.js';
@@ -66,13 +66,30 @@ const currentEmail = () => auth.currentUser?.email ?? user.email;
 
 // Senha errada aparece no campo da senha; o resto, no alerta do formulário
 function handleAuthError(form, error, passwordInput) {
+  const message = firebaseErrorMessage(error);
+  if (!message) return; // fechou a janela do Google
   if (['auth/wrong-password', 'auth/invalid-credential'].includes(error.code)) {
     setFieldError(passwordInput, 'Senha incorreta.');
     passwordInput.focus();
   } else {
-    showFormAlert(form, firebaseErrorMessage(error));
+    showFormAlert(form, message);
   }
 }
+
+// Conta só com Google (sem senha): confirma ações sensíveis pelo Google e a aba
+// de senha vira "Criar senha". Atualiza de novo depois que a senha é criada.
+function renderPasswordMode() {
+  const google = !hasPassword();
+  $('change-email').hidden = google;
+  $('email-google-hint').hidden = !google;
+  $('password-google-hint').hidden = !google;
+  $('password-current-field').hidden = google;
+  $('delete-password-field').hidden = google;
+  document.querySelectorAll('[data-password-title]').forEach((el) => {
+    el.textContent = google ? 'Criar senha' : 'Alterar senha';
+  });
+}
+renderPasswordMode();
 
 // ---------- Abas (verticais) ----------
 const tabList = [...document.querySelectorAll('#settings-tabs .tab')];
@@ -346,7 +363,8 @@ passwordForm.addEventListener('submit', async (event) => {
   clearFormErrors(passwordForm);
   const { current, password, confirm } = passwordForm;
   const errors = [];
-  if (!current.value) errors.push([current, 'Informe a senha atual.']);
+  const google = !hasPassword();
+  if (!google && !current.value) errors.push([current, 'Informe a senha atual.']);
   if (!isStrongPassword(password.value)) errors.push([password, 'A nova senha não atende aos requisitos acima.']);
   else if (password.value === current.value) errors.push([password, 'A nova senha precisa ser diferente da atual.']);
   if (confirm.value !== password.value) errors.push([confirm, 'As senhas não conferem.']);
@@ -358,7 +376,11 @@ passwordForm.addEventListener('submit', async (event) => {
     await changePassword(current.value, password.value);
     passwordForm.reset();
     password.dispatchEvent(new Event('input'));
-    toast('Senha alterada.', 'success');
+    if (google) {
+      await auth.currentUser.reload(); // passa a constar o login por senha
+      renderPasswordMode();
+    }
+    toast(google ? 'Senha criada. Agora você também entra com e-mail e senha.' : 'Senha alterada.', 'success');
   } catch (error) {
     handleAuthError(passwordForm, error, current);
   } finally {
@@ -407,7 +429,7 @@ deleteForm.addEventListener('submit', async (event) => {
   clearFormErrors(deleteForm);
   const errors = [];
   if (deleteForm.confirmText.value.trim() !== 'EXCLUIR') errors.push([deleteForm.confirmText, 'Digite EXCLUIR, em maiúsculas.']);
-  if (!deleteForm.password.value) errors.push([deleteForm.password, 'Informe sua senha.']);
+  if (hasPassword() && !deleteForm.password.value) errors.push([deleteForm.password, 'Informe sua senha.']);
   if (showErrors(errors)) return;
 
   const button = deleteForm.querySelector('[type=submit]');
