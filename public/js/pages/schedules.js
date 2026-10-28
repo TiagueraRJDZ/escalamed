@@ -9,11 +9,13 @@ import { db, isLeaving } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { createCalendar } from '../calendar.js';
-import { escapeHtml, initials, setupMenu, toast } from '../ui.js';
+import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessage } from '../ui.js';
 import { normalize } from '../validators.js';
+import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
+import { myInvites, acceptInvite, cancelInvite } from '../members.js';
 
 renderIcons();
-const { user } = await initLayout({ active: 'schedules' });
+const { user, profile } = await initLayout({ active: 'schedules' });
 
 const listEl = document.getElementById('group-list');
 const searchInput = document.getElementById('group-search');
@@ -46,13 +48,9 @@ function groupSubtitle(group) {
 }
 
 function groupItem(group) {
-  const isManager = group.managerIds?.includes(user.uid);
   const pending = group.setupStep !== 'done';
   const href = pending ? `/group-new.html?id=${group.id}` : `/group.html?id=${group.id}`;
-  const badges = [
-    pending ? '<span class="badge badge-warning">Configuração pendente</span>' : '',
-    isManager && group.type === 'team' ? '<span class="badge badge-primary">Gestor</span>' : '',
-  ].join('');
+  const badges = pending ? '<span class="badge badge-warning">Configuração pendente</span>' : '';
 
   return `<li>
     <a class="group-item" href="${href}">
@@ -65,6 +63,27 @@ function groupItem(group) {
       ${icon('chevronRight')}
     </a>
   </li>`;
+}
+
+// Seções pelo cargo do usuário em cada grupo (GESTOR, AUXILIAR...); escalas individuais por último
+const SECTION_TITLES = {
+  manager: 'Gestor',
+  assistant: 'Auxiliar',
+  analyst: 'Analista',
+  observer: 'Observador',
+  staff: 'Plantonista',
+  personal: 'Escalas individuais',
+};
+
+function sectionsHtml(list) {
+  const keyOf = (g) => (g.type === 'personal' ? 'personal' : roleOf(g, user.uid) ?? 'staff');
+  return [...ROLE_ORDER, 'personal']
+    .map((key) => {
+      const items = list.filter((g) => keyOf(g) === key);
+      if (!items.length) return '';
+      return `<li class="group-section"><h2>${SECTION_TITLES[key]}</h2></li>${items.map(groupItem).join('')}`;
+    })
+    .join('');
 }
 
 function emptyState() {
@@ -96,7 +115,7 @@ function render() {
     : groups;
 
   listEl.innerHTML = filtered.length
-    ? filtered.map(groupItem).join('')
+    ? sectionsHtml(filtered)
     : `<li class="empty-state">${icon('search')}<h3>Nenhum grupo encontrado</h3>
         <p>Nenhum grupo corresponde a "${escapeHtml(searchInput.value.trim())}".</p></li>`;
 }
@@ -124,3 +143,63 @@ onSnapshot(
       <div class="empty-actions"><button type="button" class="btn btn-secondary" onclick="location.reload()">Tentar de novo</button></div></li>`;
   },
 );
+
+// ---------- Convites pendentes (para o e-mail de quem está logado) ----------
+const invitesEl = document.getElementById('my-invites');
+let pendingInvites = [];
+
+function renderInvites() {
+  invitesEl.hidden = !pendingInvites.length;
+  invitesEl.innerHTML = pendingInvites
+    .map(
+      (invite, i) => `<div class="invite-card">
+        <span class="group-avatar" style="background:var(--cor-primaria)" aria-hidden="true">${icon('mail')}</span>
+        <div class="group-info" style="flex:1;min-width:200px">
+          <strong>Convite para ${escapeHtml(invite.groupName)}</strong>
+          <span>${escapeHtml(invite.invitedByName)} convidou você como ${ROLES[invite.role]}${
+            invite.unitName ? ` · ${escapeHtml(invite.unitName)}` : ''
+          }</span>
+        </div>
+        <div class="empty-actions" style="margin:0">
+          <button type="button" class="btn btn-secondary" data-decline="${i}">Recusar</button>
+          <button type="button" class="btn btn-primary" data-accept="${i}">Aceitar</button>
+        </div>
+      </div>`,
+    )
+    .join('');
+}
+
+invitesEl.addEventListener('click', async (event) => {
+  const accept = event.target.closest('[data-accept]');
+  const decline = event.target.closest('[data-decline]');
+  const button = accept ?? decline;
+  if (!button) return;
+  const invite = pendingInvites[Number(button.dataset.accept ?? button.dataset.decline)];
+  setLoading(button, true);
+  try {
+    if (accept) {
+      await acceptInvite(invite.groupId, invite, user, profile);
+      toast(`Você entrou no grupo ${invite.groupName}.`, 'success');
+    } else {
+      await cancelInvite(invite.groupId, invite.email);
+      toast('Convite recusado.');
+    }
+    pendingInvites = pendingInvites.filter((i) => i !== invite);
+    renderInvites();
+  } catch (error) {
+    setLoading(button, false);
+    toast(
+      accept && error.code === 'permission-denied'
+        ? 'Não foi possível entrar: o cargo do convite pode ter atingido o limite. Peça um novo convite.'
+        : firebaseErrorMessage(error),
+      'error',
+    );
+  }
+});
+
+myInvites(user.email)
+  .then((list) => {
+    pendingInvites = list;
+    renderInvites();
+  })
+  .catch((error) => console.error(error));

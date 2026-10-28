@@ -1,0 +1,173 @@
+/* Tela do grupo: cabeçalho, abas, membros e convites */
+
+.group-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+  max-width: 1100px;
+}
+
+.group-back { align-self: flex-start; margin-left: calc(var(--esp-3) * -1); }
+
+/* ---------- Cabeçalho ---------- */
+.group-header-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-4);
+  padding: var(--esp-5);
+}
+
+.group-title { flex: 1; min-width: 200px; }
+.group-title h1 { font-size: var(--texto-2xl); line-height: 1.2; }
+.group-title p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); margin-top: var(--esp-1); }
+
+.group-header-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+
+.btn-ghost.is-danger { color: var(--cor-perigo); }
+.btn-ghost.is-danger:hover:not(:disabled) { background: var(--cor-perigo-suave); color: var(--cor-perigo-hover); }
+
+/* ---------- Abas ---------- */
+.tabs {
+  display: flex;
+  gap: var(--esp-1);
+  border-bottom: 1px solid var(--cor-borda);
+  overflow-x: auto;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-4);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--cor-texto-2);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab svg { width: 18px; height: 18px; }
+.tab:hover { color: var(--cor-texto); }
+.tab[aria-selected='true'] { color: var(--cor-primaria); border-bottom-color: var(--cor-primaria); }
+.tab:focus-visible { outline: none; box-shadow: var(--foco); border-radius: var(--raio-sm); }
+.tab-count { color: var(--cor-texto-3); font-weight: 500; }
+
+.tab-panel { padding: var(--esp-5); }
+
+/* ---------- Membros ---------- */
+.members-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+}
+.members-toolbar .input-icon { flex: 1; min-width: 220px; }
+
+.member-section .section-title .muted { text-transform: none; font-weight: 500; }
+
+.member-list,
+.invite-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-item,
+.invite-item {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.member-item:last-child,
+.invite-item:last-child { border-bottom: 0; }
+
+.member-avatar { width: 44px; height: 44px; }
+
+.member-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.member-info strong,
+.member-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-info span { font-size: var(--texto-sm); color: var(--cor-texto-3); }
+
+.invite-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-1); }
+
+/* ---------- Modal "Alterar perfil" ---------- */
+.role-target {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding-bottom: var(--esp-4);
+  margin-bottom: var(--esp-2);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.role-options { display: grid; gap: var(--esp-1); }
+
+.role-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  background: none;
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.role-option:hover:not(:disabled) { background: var(--cor-superficie-2); }
+.role-option:focus-visible { outline: none; box-shadow: var(--foco); }
+.role-option:disabled { color: var(--cor-texto-3); cursor: not-allowed; }
+.role-option small { color: var(--cor-texto-3); font-size: var(--texto-xs); font-weight: 500; }
+.role-count { color: var(--cor-texto-3); font-weight: 500; }
+.role-option.is-danger {
+  justify-content: flex-start;
+  margin-top: var(--esp-2);
+  border-top: 1px solid var(--cor-borda);
+  border-radius: 0 0 var(--raio) var(--raio);
+  color: var(--cor-perigo);
+}
+.role-option.is-danger svg { width: 18px; height: 18px; }
+.role-option.is-danger:hover { background: var(--cor-perigo-suave); }
+
+/* Link do convite com botão de copiar */
+.copy-field { display: flex; gap: var(--esp-2); margin-top: var(--esp-3); }
+.copy-field .input { flex: 1; font-size: var(--texto-sm); }
+
+/* ---------- Convites na tela Escalas e na página do convite ---------- */
+.invite-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-4);
+  border: 1px solid var(--cor-primaria-borda);
+  border-radius: var(--raio);
+  background: var(--cor-primaria-suave);
+}
+.invite-card + .invite-card { margin-top: var(--esp-2); }
+
+@media (max-width: 640px) {
+  .group-header-card { padding: var(--esp-4); }
+  .tab-panel { padding: var(--esp-4); }
+  .invite-item { flex-wrap: wrap; }
+}

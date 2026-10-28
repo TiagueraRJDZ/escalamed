@@ -168,3 +168,17 @@
 .cal-day.is-past { color: var(--cor-texto-3); font-weight: 400; }
 .cal-day[aria-current='date'] { border-color: var(--cor-primaria); font-weight: 700; }
 .cal-day[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
+
+/* Seções da lista: cargo do usuário em cada grupo */
+.group-section h2 {
+  margin: var(--esp-4) var(--esp-2) var(--esp-1);
+  font-size: var(--texto-lg);
+  font-weight: 700;
+  color: var(--cor-texto-3);
+  text-transform: uppercase;
+}
+.group-section:first-child h2 { margin-top: var(--esp-1); }
+
+/* Convites pendentes acima da lista */
+.my-invites { padding: var(--esp-4) var(--esp-4) 0; }
+.invite-card .group-avatar svg { width: 24px; height: 24px; }

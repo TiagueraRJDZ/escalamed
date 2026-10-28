@@ -3,25 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Escala do grupo | EscalaMed</title>
+  <title>Grupo | EscalaMed</title>
   <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
   <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/schedules.css" />
+  <link rel="stylesheet" href="/css/group.css" />
 </head>
 <body class="is-booting">
   <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
 
-  <main id="page" class="page" data-active="schedules">
-    <div class="card">
-      <div class="empty-state" data-icon="calendar">
-        <h1 style="font-size:var(--texto-xl)">Escala do grupo</h1>
-        <p>O calendário do grupo, com plantões, trocas e cessões, chega na próxima fase.</p>
-        <a class="btn btn-secondary" href="/schedules.html">Voltar para escalas</a>
+  <main id="page" class="page group-page" data-active="schedules">
+    <a class="btn btn-ghost group-back" href="/schedules.html"><span data-icon="arrowLeft"></span>Voltar para escalas</a>
+
+    <section class="card group-header-card" aria-labelledby="group-name">
+      <span class="group-avatar" id="group-avatar" aria-hidden="true"></span>
+      <div class="group-title">
+        <h1 id="group-name">Carregando…</h1>
+        <p class="muted" id="group-unit"></p>
       </div>
+      <div class="group-header-actions" id="group-actions"></div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Seções do grupo" id="group-tabs">
+      <button type="button" class="tab" role="tab" id="tab-calendar" aria-controls="panel-calendar" aria-selected="true">
+        <span data-icon="calendar"></span>Calendário
+      </button>
+      <button type="button" class="tab" role="tab" id="tab-members" aria-controls="panel-members" aria-selected="false" tabindex="-1" hidden>
+        <span data-icon="users"></span>Membros <span class="tab-count" id="members-count"></span>
+      </button>
     </div>
+
+    <!-- Calendário (próxima fase) -->
+    <section class="card tab-panel" role="tabpanel" id="panel-calendar" aria-labelledby="tab-calendar">
+      <div class="empty-state">
+        <span data-icon="calendar"></span>
+        <h3>Calendário do grupo</h3>
+        <p>A escala mensal, com plantões, trocas e cessões, chega na próxima fase.</p>
+      </div>
+    </section>
+
+    <!-- Membros -->
+    <section class="card tab-panel" role="tabpanel" id="panel-members" aria-labelledby="tab-members" hidden>
+      <div class="members-toolbar">
+        <div class="input-icon">
+          <span data-icon="search"></span>
+          <label class="sr-only" for="member-search">Procurar membro</label>
+          <input class="input" id="member-search" type="search" placeholder="Procurar membro" autocomplete="off" />
+        </div>
+        <button type="button" class="btn btn-primary" id="invite-button" hidden><span data-icon="userPlus"></span>Convidar</button>
+      </div>
+
+      <div id="invites-section" hidden>
+        <h2 class="section-title">Convites pendentes</h2>
+        <ul class="invite-list" id="invite-list"></ul>
+      </div>
+
+      <div id="member-sections" aria-live="polite"></div>
+    </section>
   </main>
 
-  <script type="module" src="/js/pages/placeholder.js"></script>
+  <!-- Modal: convidar -->
+  <dialog class="modal" id="modal-invite" aria-labelledby="modal-invite-title">
+    <form id="invite-form" novalidate>
+      <div class="dialog-header">
+        <h2 id="modal-invite-title">Convidar para o grupo</h2>
+        <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+      </div>
+      <div class="dialog-body">
+        <div class="alert form-alert" role="alert" hidden></div>
+        <div class="field">
+          <label class="label" for="invite-email">E-mail da pessoa</label>
+          <input class="input" id="invite-email" name="email" type="email" autocomplete="off" placeholder="nome@exemplo.com" required />
+          <span class="field-hint">A pessoa entra no grupo ao abrir o link logada com este e-mail.</span>
+          <span class="field-error"></span>
+        </div>
+        <div class="field">
+          <label class="label" for="invite-role">Cargo inicial</label>
+          <select class="select" id="invite-role" name="role"></select>
+          <span class="field-error"></span>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Criar convite</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: convite criado (link para compartilhar) -->
+  <dialog class="modal" id="modal-invite-link" aria-labelledby="modal-invite-link-title">
+    <div class="dialog-header">
+      <h2 id="modal-invite-link-title">Convite criado</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted" id="invite-link-text"></p>
+      <div class="copy-field">
+        <input class="input" id="invite-link" type="text" readonly aria-label="Link do convite" />
+        <button type="button" class="btn btn-secondary" id="copy-link">Copiar</button>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <a class="btn btn-secondary" id="share-whatsapp" target="_blank" rel="noopener">Enviar pelo WhatsApp</a>
+      <button type="button" class="btn btn-primary" data-close>Pronto</button>
+    </div>
+  </dialog>
+
+  <!-- Modal: alterar perfil (cargo) -->
+  <dialog class="modal" id="modal-role" aria-labelledby="modal-role-title">
+    <div class="dialog-header">
+      <h2 id="modal-role-title">Alterar perfil</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body">
+      <div class="role-target" id="role-target"></div>
+      <div class="role-options" id="role-options" role="group" aria-label="Cargos"></div>
+    </div>
+  </dialog>
+
+  <script type="module" src="/js/pages/group.js"></script>
 </body>
 </html>
