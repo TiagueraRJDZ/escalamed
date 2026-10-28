@@ -5,10 +5,10 @@ import { requireAuth, signOutUser } from './auth.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 import { mountCredits } from './version.js';
+import { setupPeopleSearch, personModalHtml } from './people-search.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
-  { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html' },
 ];
 
 const COLLAPSED_KEY = 'escalamed:menu-recolhido';
@@ -95,7 +95,8 @@ function shellHtml(user, profile, active, collapsed) {
                 <strong>${escapeHtml(profile.name || 'Minha conta')}</strong>
                 <span>${escapeHtml(user.email || '')}</span>
               </div>
-              <a class="menu-item" role="menuitem" href="/settings.html">${icon('user')}Minha conta</a>
+              <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('user')}Minha conta</a>
+              <a class="menu-item" role="menuitem" href="/settings.html#senha">${icon('settings')}Configurações</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -213,16 +214,13 @@ export async function initLayout({ active } = {}) {
   app.querySelector('.app-main').append(page);
   app.querySelector('.app-main').insertAdjacentHTML('beforeend', '<footer class="app-footer app-credits" data-credits></footer>');
   document.body.prepend(app);
-  document.body.insertAdjacentHTML('beforeend', dialogsHtml());
+  document.body.insertAdjacentHTML('beforeend', dialogsHtml() + personModalHtml());
 
   setupSidebar(app);
   setupUserMenu(app);
   setupDialogs();
 
-  app.querySelector('#global-search').addEventListener('submit', (event) => {
-    event.preventDefault();
-    toast('A busca de pessoas chega em uma próxima versão.');
-  });
+  setupPeopleSearch(app.querySelector('#global-search'), user.uid);
 
   mountCredits(app);
   document.body.classList.remove('is-booting');

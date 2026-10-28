@@ -316,3 +316,34 @@ test('perfil: a própria pessoa cria; profissão inválida e perfil alheio não'
   assert.ok(await commit(unverified.token, [w.set(`users/${unverified.uid}`, profile(null))]));
   assert.ok(!(await commit(outsider.token, [w.set(`users/${unverified.uid}`, profile(null))])));
 });
+
+// ---------- Administrador da plataforma (config/admins) ----------
+test('config/admins: todos os logados leem; ninguém grava pelo app', async () => {
+  await admin([w.set('config/admins', { uids: [manager.uid] })]);
+  assert.ok(await canRead(staff.token, 'config/admins'));
+  assert.ok(!(await commit(manager.token, [w.set('config/admins', { uids: [manager.uid, staff.uid] })])));
+  assert.ok(!(await commit(staff.token, [w.set('config/admins', { uids: [staff.uid] })])));
+});
+
+test('administrador apaga o perfil de outra pessoa; os demais não', async () => {
+  const profile = { name: 'Plantonista', signupStep: 4 };
+  const privateData = { email: staff.email, phone: null, cpf: null, state: 'CE', updatedAt: new Date() };
+  await admin([
+    w.set('config/admins', { uids: [analyst.uid] }),
+    w.set(`users/${staff.uid}`, profile),
+    w.set(`users/${staff.uid}/private/data`, privateData),
+  ]);
+  const removeProfile = (actor) =>
+    commit(actor.token, [w.delete(`users/${staff.uid}/private/data`), w.delete(`users/${staff.uid}`)]);
+  // Gestor de grupo não é administrador da plataforma
+  assert.ok(!(await removeProfile(manager)));
+  assert.ok(await removeProfile(analyst));
+  // Administrador não lê os dados pessoais de ninguém
+  await admin([w.set(`users/${staff.uid}/private/data`, privateData)]);
+  assert.ok(!(await canRead(analyst.token, `users/${staff.uid}/private/data`)));
+});
+
+test('sem config/admins, ninguém apaga perfil alheio', async () => {
+  await admin([w.set(`users/${staff.uid}`, { name: 'Plantonista', signupStep: 4 })]);
+  assert.ok(!(await commit(manager.token, [w.delete(`users/${staff.uid}`)])));
+});

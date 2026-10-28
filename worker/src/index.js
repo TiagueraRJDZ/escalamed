@@ -9,7 +9,11 @@
  *   - SENHA PROVISÓRIA: o gestor (ou auxiliar) do grupo gera para um membro
  *     que esqueceu a senha. A conta fica marcada (trocarSenha) até a pessoa
  *     criar uma senha nova;
- *   - TROCA DE E-MAIL sem link de confirmação (o app confere a senha antes).
+ *   - TROCA DE E-MAIL sem link de confirmação (o app confere a senha antes);
+ *   - ADMINISTRAÇÃO da plataforma (Configurações > Usuários): listar as contas,
+ *     senha provisória, inativar/reativar e excluir o acesso. Administradores são
+ *     os uids do documento config/admins (campo "uids") no Firestore, editado só
+ *     pelo console do Firebase. As regras do Firestore leem o mesmo documento.
  *
  * Rotas (todas POST, corpo JSON):
  *   /entrar-usuario    { usuario, senha }
@@ -18,6 +22,11 @@
  *   /trocar-email      { novoEmail }      exige login recente (até 5 min)
  *   /senha-provisoria  { uid, grupo }     gestor/auxiliar para um membro do grupo
  *   /senha-definida    {}                 tira a marca depois que a pessoa troca a senha
+ *   Só administradores:
+ *   /admin/contas            {}               todas as contas (uid, e-mail, situação, último acesso)
+ *   /admin/senha-provisoria  { uid }
+ *   /admin/acesso            { uid, ativo }   ativo=false inativa (e derruba as sessões)
+ *   /admin/excluir           { uid }          apaga o login e libera o nome de usuário
  * Falhas respondem { erro } com a mensagem pronta para mostrar.
  *
  * Configuração (wrangler.toml e segredo):
@@ -60,6 +69,10 @@ const ROTAS = {
   '/trocar-email': trocarEmail,
   '/senha-provisoria': senhaProvisoria,
   '/senha-definida': senhaDefinida,
+  '/admin/contas': adminContas,
+  '/admin/senha-provisoria': adminSenhaProvisoria,
+  '/admin/acesso': adminAcesso,
+  '/admin/excluir': adminExcluir,
 };
 
 export default {
@@ -203,6 +216,11 @@ async function senhaProvisoria(contexto) {
   const motivo = motivoSemPermissaoSenha(grupo, autor, alvo);
   if (motivo) throw new Falha(403, motivo);
 
+  return { senha: await aplicarSenhaProvisoria(env, local, alvo, autor, ip) };
+}
+
+// Troca a senha pela provisória. Devolve a senha (não fica guardada em lugar nenhum).
+async function aplicarSenhaProvisoria(env, local, alvo, autor, ip) {
   const contas = await authAdmin(env, local);
   const existe = (await contas(':lookup', { localId: [alvo] })).users?.[0];
   if (!existe) throw new Falha(404, 'Conta não encontrada.');
@@ -216,7 +234,7 @@ async function senhaProvisoria(contexto) {
     customAttributes: JSON.stringify({ trocarSenha: true }),
   });
   await registrar(env, alvo, 'senha-provisoria', autor, ip);
-  return { senha }; // não fica guardada em lugar nenhum
+  return senha;
 }
 
 // Tira a marca de senha provisória, mas só se a senha mudou depois dela
@@ -233,6 +251,85 @@ async function senhaDefinida(contexto) {
   const trocadaEm = Number(conta?.passwordUpdatedAt || 0);
   if (ultima?.em && trocadaEm <= ultima.em) throw new Falha(400, 'Crie a senha nova antes de continuar.');
   await contas(':update', { localId: uid, customAttributes: '{}' });
+  return { ok: true };
+}
+
+/* ----- Administração da plataforma ----- */
+
+// Confere se quem chamou está em config/admins. Devolve { uid, token }.
+async function exigirAdmin(contexto) {
+  const quem = await quemChamou(contexto);
+  const admins = await lerAdmins(contexto.env, quem.token, contexto.local);
+  if (!admins.includes(quem.uid)) throw new Falha(403, 'Só administradores da plataforma podem fazer isso.');
+  return quem;
+}
+
+// uid alvo do pedido (nunca o próprio administrador)
+function alvoDoPedido(corpo, autor, mensagemPropria) {
+  const alvo = String(corpo.uid || '');
+  if (!alvo) throw new Falha(400, 'Informe a conta.');
+  if (alvo === autor) throw new Falha(400, mensagemPropria);
+  return alvo;
+}
+
+// Todas as contas do Authentication (o perfil, com nome e profissão, o app lê no Firestore)
+async function adminContas(contexto) {
+  const { env, local } = contexto;
+  await exigirAdmin(contexto);
+  const contas = await authAdmin(env, local);
+  const lista = [];
+  let proxima = '';
+  do {
+    const pagina = proxima ? `&nextPageToken=${encodeURIComponent(proxima)}` : '';
+    const resposta = await contas(`:batchGet?maxResults=1000${pagina}`); // sem corpo = GET
+    lista.push(...(resposta.users || []));
+    proxima = resposta.nextPageToken || '';
+  } while (proxima && lista.length < 10000);
+  const nomes = await env.DB.prepare('SELECT usuario, uid FROM usuarios').all();
+  const usuarioDe = new Map((nomes.results || []).map((linha) => [linha.uid, linha.usuario]));
+  return {
+    contas: lista.map((c) => ({
+      uid: c.localId,
+      email: c.email || null,
+      usuario: usuarioDe.get(c.localId) || null,
+      inativa: c.disabled === true,
+      provedores: (c.providerUserInfo || []).map((p) => p.providerId),
+      criadaEm: Number(c.createdAt || 0) || null,
+      ultimoAcesso: Number(c.lastLoginAt || 0) || null,
+    })),
+  };
+}
+
+async function adminSenhaProvisoria(contexto) {
+  const { env, corpo, ip, local } = contexto;
+  const { uid: autor } = await exigirAdmin(contexto);
+  const alvo = alvoDoPedido(corpo, autor, 'Para a sua própria senha, use Configurações > Alterar senha.');
+  return { senha: await aplicarSenhaProvisoria(env, local, alvo, autor, ip) };
+}
+
+// Inativar: a pessoa não entra mais (nem por usuário) e as sessões abertas caem
+async function adminAcesso(contexto) {
+  const { env, corpo, ip, local } = contexto;
+  const { uid: autor } = await exigirAdmin(contexto);
+  const alvo = alvoDoPedido(corpo, autor, 'Você não pode inativar a sua própria conta.');
+  const ativo = corpo.ativo === true;
+  const contas = await authAdmin(env, local);
+  const mudanca = { localId: alvo, disableUser: !ativo };
+  if (!ativo) mudanca.validSince = String(Math.floor(Date.now() / 1000));
+  await contas(':update', mudanca);
+  await registrar(env, alvo, ativo ? 'reativar' : 'inativar', autor, ip);
+  return { ativo };
+}
+
+// Apaga o login e libera o nome de usuário. O app apaga o perfil no Firestore antes.
+async function adminExcluir(contexto) {
+  const { env, corpo, ip, local } = contexto;
+  const { uid: autor } = await exigirAdmin(contexto);
+  const alvo = alvoDoPedido(corpo, autor, 'Para excluir a sua própria conta, use Configurações > Excluir minha conta.');
+  const contas = await authAdmin(env, local);
+  await contas(':delete', { localId: alvo });
+  await env.DB.prepare('DELETE FROM usuarios WHERE uid = ?1').bind(alvo).run();
+  await registrar(env, alvo, 'excluir', autor, ip);
   return { ok: true };
 }
 
@@ -359,16 +456,29 @@ async function chavesDoGoogle() {
 
 /* ----- Firestore (com o token de quem pediu: valem as regras) ----- */
 
-async function lerGrupo(env, token, grupoId, local) {
+// Campos de um documento, ou null se não existe ou as regras não deixam ler
+async function lerDocumento(env, token, caminho, local) {
   const base = local ? `http://${env.EMULADOR_FIRESTORE || '127.0.0.1:8080'}` : 'https://firestore.googleapis.com';
-  const resposta = await fetch(
-    `${base}/v1/projects/${env.PROJETO}/databases/(default)/documents/groups/${encodeURIComponent(grupoId)}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
+  const resposta = await fetch(`${base}/v1/projects/${env.PROJETO}/databases/(default)/documents/${caminho}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (resposta.status === 403 || resposta.status === 404) return null;
   if (!resposta.ok) throw new Error(`Firestore: ${resposta.status} ${await resposta.text()}`);
-  const campos = (await resposta.json()).fields || {};
-  const lista = (nome) => (campos[nome]?.arrayValue?.values || []).map((v) => v.stringValue);
+  return (await resposta.json()).fields || {};
+}
+
+const listaDeTextos = (campo) => (campo?.arrayValue?.values || []).map((v) => v.stringValue).filter(Boolean);
+
+// uids dos administradores da plataforma (config/admins, campo "uids")
+async function lerAdmins(env, token, local) {
+  const campos = await lerDocumento(env, token, 'config/admins', local);
+  return listaDeTextos(campos?.uids);
+}
+
+async function lerGrupo(env, token, grupoId, local) {
+  const campos = await lerDocumento(env, token, `groups/${encodeURIComponent(grupoId)}`, local);
+  if (!campos) return null;
+  const lista = (nome) => listaDeTextos(campos[nome]);
   return {
     type: campos.type?.stringValue,
     memberIds: lista('memberIds'),
@@ -385,11 +495,12 @@ async function authAdmin(env, local) {
     : 'https://identitytoolkit.googleapis.com';
   const acesso = local ? 'owner' : await tokenDeServico(env);
 
+  // Sem corpo, faz GET (ex.: :batchGet, a listagem de contas)
   return async (acao, corpo) => {
     const resposta = await fetch(`${base}/v1/projects/${env.PROJETO}/accounts${acao}`, {
-      method: 'POST',
+      method: corpo === undefined ? 'GET' : 'POST',
       headers: { Authorization: `Bearer ${acesso}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpo),
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
     });
     if (!resposta.ok) {
       const texto = await resposta.text();

@@ -201,6 +201,79 @@ body:not(.is-booting) .boot-spinner { display: none; }
 }
 .topbar-search .input:focus { background: var(--cor-superficie); }
 
+/* Sugestões da busca de pessoas */
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  min-width: 280px;
+  max-height: 360px;
+  margin: 0;
+  padding: var(--esp-1);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-lg);
+}
+.search-option {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--raio-sm);
+  cursor: pointer;
+}
+.search-option > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.search-option strong,
+.search-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-option small { color: var(--cor-texto-3); font-size: var(--texto-xs); }
+.search-option[aria-selected='true'],
+.search-option:hover { background: var(--cor-primaria-suave); }
+.search-status { padding: var(--esp-2) var(--esp-3); font-size: var(--texto-sm); color: var(--cor-texto-3); }
+
+/* Cartão da pessoa (modal) */
+.person-avatar {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto var(--esp-3);
+  font-size: var(--texto-xl);
+}
+.person-details { margin-top: var(--esp-2); color: var(--cor-texto-2); }
+.person-groups { margin-top: var(--esp-4); text-align: left; }
+.person-groups .section-title { margin-top: 0; }
+.person-groups ul {
+  display: grid;
+  gap: var(--esp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.person-groups a {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+  font-weight: 600;
+}
+.person-groups a:hover { background: var(--cor-primaria-suave); text-decoration: none; }
+.person-groups a svg { width: 18px; height: 18px; color: var(--cor-primaria); }
+.person-groups > p { text-align: center; }
+
 .topbar-actions {
   display: flex;
   align-items: center;

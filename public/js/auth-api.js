@@ -105,3 +105,18 @@ export const changeUsername = async (username) =>
 // Gestor/auxiliar: senha provisória para um membro do grupo. Devolve a senha.
 export const temporaryPassword = async (uid, groupId) =>
   (await call('senha-provisoria', { uid, grupo: groupId }, { signedIn: true })).senha;
+
+// ---------- Administrador da plataforma (Configurações > Usuários) ----------
+// O Worker confere em config/admins se quem chamou é administrador.
+
+// Todas as contas: [{ uid, email, usuario, inativa, provedores, criadaEm, ultimoAcesso }]
+export const adminAccounts = async () => (await call('admin/contas', {}, { signedIn: true })).contas;
+
+export const adminTemporaryPassword = async (uid) =>
+  (await call('admin/senha-provisoria', { uid }, { signedIn: true })).senha;
+
+// active = false inativa (a pessoa não entra mais e as sessões abertas caem)
+export const adminSetAccess = (uid, active) => call('admin/acesso', { uid, ativo: active }, { signedIn: true });
+
+// Apaga o login e libera o nome de usuário (o perfil no Firestore é apagado antes, pelo app)
+export const adminDeleteAccount = (uid) => call('admin/excluir', { uid }, { signedIn: true });

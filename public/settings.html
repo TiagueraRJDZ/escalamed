@@ -15,15 +15,16 @@
   <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
 
   <main id="page" class="page settings-page" data-active="settings">
-    <h1 class="settings-title">Configurações da conta</h1>
+    <h1 class="settings-title" id="settings-title">Minha conta</h1>
 
     <div class="settings-layout">
-      <div class="tabs settings-tabs" role="tablist" aria-label="Configurações" aria-orientation="vertical" id="settings-tabs">
-        <button type="button" class="tab" role="tab" id="tab-account" data-hash="conta" aria-controls="panel-account"><span data-icon="user"></span>Informações da conta</button>
-        <button type="button" class="tab" role="tab" id="tab-professional" data-hash="profissional" aria-controls="panel-professional"><span data-icon="users"></span>Informações profissionais</button>
-        <button type="button" class="tab" role="tab" id="tab-photo" data-hash="foto" aria-controls="panel-photo"><span data-icon="edit"></span>Editar perfil</button>
-        <button type="button" class="tab" role="tab" id="tab-password" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span><span data-password-title>Alterar senha</span></button>
-        <button type="button" class="tab is-danger" role="tab" id="tab-delete" data-hash="excluir" aria-controls="panel-delete"><span data-icon="trash"></span>Excluir minha conta</button>
+      <div class="tabs settings-tabs" role="tablist" aria-labelledby="settings-title" aria-orientation="vertical" id="settings-tabs">
+        <button type="button" class="tab" role="tab" id="tab-account" data-section="account" data-hash="conta" aria-controls="panel-account"><span data-icon="user"></span>Informações da conta</button>
+        <button type="button" class="tab" role="tab" id="tab-professional" data-section="account" data-hash="profissional" aria-controls="panel-professional"><span data-icon="users"></span>Informações profissionais</button>
+        <button type="button" class="tab" role="tab" id="tab-photo" data-section="account" data-hash="foto" aria-controls="panel-photo"><span data-icon="edit"></span>Editar perfil</button>
+        <button type="button" class="tab" role="tab" id="tab-password" data-section="settings" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span><span data-password-title>Alterar senha</span></button>
+        <button type="button" class="tab" role="tab" id="tab-users" data-section="settings" data-hash="usuarios" data-off aria-controls="panel-users"><span data-icon="users"></span>Usuários</button>
+        <button type="button" class="tab is-danger" role="tab" id="tab-delete" data-section="settings" data-hash="excluir" aria-controls="panel-delete"><span data-icon="trash"></span>Excluir minha conta</button>
       </div>
 
       <div class="settings-panels">
@@ -150,6 +151,22 @@
           </form>
         </section>
 
+        <!-- Usuários: só para administradores da plataforma (config/admins no Firestore) -->
+        <section class="card tab-panel" role="tabpanel" id="panel-users" aria-labelledby="tab-users" hidden>
+          <div class="users-header">
+            <h2>Usuários</h2>
+            <span class="muted text-sm" id="users-count"></span>
+          </div>
+          <p class="muted users-intro">Todas as contas da plataforma. Ao fim de cada linha: redefinir senha, inativar acesso e excluir acesso.</p>
+          <div class="alert alert-warning" id="users-alert" hidden></div>
+          <div class="input-icon users-search">
+            <span data-icon="search"></span>
+            <input class="input" id="users-search" type="search" placeholder="Procurar por nome, usuário ou e-mail" aria-label="Procurar usuário" autocomplete="off" />
+          </div>
+          <ul class="member-list" id="users-list" aria-live="polite"></ul>
+          <p class="muted users-empty" id="users-empty" hidden></p>
+        </section>
+
         <!-- Excluir conta -->
         <section class="card tab-panel" role="tabpanel" id="panel-delete" aria-labelledby="tab-delete" hidden>
           <h2>Excluir minha conta</h2>
@@ -177,6 +194,24 @@
       </div>
     </div>
   </main>
+
+  <!-- Modal: senha provisória gerada -->
+  <dialog class="modal" id="modal-temp-password" aria-labelledby="modal-temp-password-title">
+    <div class="dialog-header">
+      <h2 id="modal-temp-password-title">Senha provisória</h2>
+      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted" id="temp-password-text"></p>
+      <div class="copy-field">
+        <input class="input temp-password" id="temp-password" type="text" readonly aria-label="Senha provisória" />
+        <button type="button" class="btn btn-secondary" id="copy-temp-password">Copiar</button>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button type="button" class="btn btn-primary" data-close>Pronto</button>
+    </div>
+  </dialog>
 
   <!-- Modal: alterar e-mail -->
   <dialog class="modal" id="modal-email" aria-labelledby="modal-email-title">

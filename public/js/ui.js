@@ -96,6 +96,10 @@ export function setupMenu(button, menu) {
   };
 
   button.addEventListener('click', () => setOpen(menu.hidden));
+  // Escolher um item fecha o menu (importa quando o link só troca a aba da página atual)
+  menu.addEventListener('click', (event) => {
+    if (event.target.closest('[role=menuitem]')) setOpen(false);
+  });
   document.addEventListener('click', (event) => {
     if (!menu.hidden && !button.contains(event.target) && !menu.contains(event.target)) setOpen(false);
   });

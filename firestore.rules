@@ -24,6 +24,13 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Administrador da plataforma: uid listado em config/admins (campo "uids").
+    // O documento só é editado pelo console do Firebase.
+    function isPlatformAdmin() {
+      let admins = /databases/$(database)/documents/config/admins;
+      return signedIn() && exists(admins) && get(admins).data.get('uids', []).hasAny([request.auth.uid]);
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -100,11 +107,13 @@ service cloud.firestore {
         && incoming().termsVersion == resource.data.termsVersion
         && incoming().signupStep >= resource.data.signupStep
         && incoming().updatedAt == request.time;
-      allow delete: if isSelf(uid);
+      // O administrador apaga o perfil ao excluir o acesso de alguém (Configurações > Usuários)
+      allow delete: if isSelf(uid) || isPlatformAdmin();
 
       // Dados pessoais: só o próprio usuário lê e grava
       match /private/{docId} {
-        allow read, delete: if isSelf(uid);
+        allow read: if isSelf(uid);
+        allow delete: if isSelf(uid) || isPlatformAdmin();
         allow create, update: if isSelf(uid)
           && docId == 'data'
           && incoming().keys().hasOnly(['email', 'phone', 'cpf', 'state', 'updatedAt'])
@@ -390,6 +399,12 @@ service cloud.firestore {
           && incoming().createdAt == resource.data.createdAt;
         allow delete: if isManagerOf(groupData());
       }
+    }
+
+    // Administradores da plataforma: qualquer usuário logado lê (o app decide se mostra
+    // a aba Usuários); ninguém grava pelo app.
+    match /config/admins {
+      allow read: if signedIn();
     }
 
     // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail

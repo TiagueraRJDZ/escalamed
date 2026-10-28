@@ -1,6 +1,6 @@
 // Teste completo do serviço de contas: roda o código do Worker no Node, com um D1
 // de mentira (SQLite do Node), o emulador de Authentication do Firebase e uma
-// leitura de grupo simulada (sem o emulador do Firestore, que usa Java).
+// leitura de grupo e de config/admins simulada (sem o emulador do Firestore, que usa Java).
 // Uso:
 //   firebase emulators:exec --only auth --config firebase.test.json --project demo-escalamed-test "node --no-warnings --test tests/worker/auth-service.test.mjs"
 import { test, before } from 'node:test';
@@ -38,13 +38,17 @@ class D1Falso {
 const D1 = new D1Falso();
 const env = { PROJETO, ORIGENS: ORIGEM, DB: D1, EMULADOR: '1', EMULADOR_AUTH: AUTH, EMULADOR_FIRESTORE: 'firestore.falso' };
 
-// Grupo simulado: a leitura do Firestore feita pelo Worker cai aqui
+// Grupo e administradores simulados: as leituras do Firestore feitas pelo Worker caem aqui
 let grupo = null;
+let admins = [];
 const fetchReal = globalThis.fetch;
 globalThis.fetch = async (url, opcoes) => {
   if (String(url).startsWith('http://firestore.falso/')) {
-    if (!grupo) return new Response('{}', { status: 404 });
     const lista = (ids) => ({ arrayValue: { values: ids.map((id) => ({ stringValue: id })) } });
+    if (String(url).endsWith('/documents/config/admins')) {
+      return new Response(JSON.stringify({ fields: { uids: lista(admins) } }));
+    }
+    if (!grupo) return new Response('{}', { status: 404 });
     return new Response(
       JSON.stringify({
         fields: {
@@ -196,4 +200,59 @@ test('histórico registra senha provisória (com quem gerou), e-mail e usuário'
   const tipos = eventos.map((e) => e.tipo);
   assert.ok(tipos.includes('usuario') && tipos.includes('senha-provisoria') && tipos.includes('email'));
   assert.equal(eventos.find((e) => e.tipo === 'senha-provisoria').por_uid, gestor.localId);
+});
+
+// ---------- Administrador da plataforma ----------
+test('rotas de administrador: só quem está em config/admins', async () => {
+  admins = [];
+  const negada = await chamar('/admin/contas', {}, { token: gestor.idToken });
+  assert.equal(negada.status, 403);
+});
+
+test('administrador lista as contas, com usuário e sem a própria senha', async () => {
+  admins = [gestor.localId];
+  const r = await chamar('/admin/contas', {}, { token: gestor.idToken });
+  assert.equal(r.status, 200, r.erro);
+  const ana = r.contas.find((c) => c.uid === plantonista.localId);
+  assert.equal(ana.email, 'ana.nova@teste.com');
+  assert.equal(ana.usuario, 'ana.maria');
+  assert.equal(ana.inativa, false);
+  assert.ok(!JSON.stringify(r).includes('passwordHash'));
+});
+
+test('administrador gera senha provisória sem grupo; nunca para si', async () => {
+  admins = [gestor.localId];
+  const propria = await chamar('/admin/senha-provisoria', { uid: gestor.localId }, { token: gestor.idToken });
+  assert.equal(propria.status, 400);
+  const r = await chamar('/admin/senha-provisoria', { uid: plantonista.localId }, { token: gestor.idToken });
+  assert.equal(r.status, 200, r.erro);
+  const sessao = await entrarEmail('ana.nova@teste.com', r.senha);
+  assert.equal(claimsDe(sessao.idToken).trocarSenha, true);
+});
+
+test('inativar barra o login (e-mail e usuário); reativar libera', async () => {
+  admins = [gestor.localId];
+  const off = await chamar('/admin/acesso', { uid: plantonista.localId, ativo: false }, { token: gestor.idToken });
+  assert.equal(off.status, 200, off.erro);
+  const provisoria = await chamar('/admin/senha-provisoria', { uid: plantonista.localId }, { token: gestor.idToken });
+  assert.match((await entrarEmail('ana.nova@teste.com', provisoria.senha)).error.message, /USER_DISABLED/);
+  assert.equal((await chamar('/entrar-usuario', { usuario: 'ana.maria', senha: provisoria.senha })).status, 401);
+  const lista = await chamar('/admin/contas', {}, { token: gestor.idToken });
+  assert.equal(lista.contas.find((c) => c.uid === plantonista.localId).inativa, true);
+
+  const on = await chamar('/admin/acesso', { uid: plantonista.localId, ativo: true }, { token: gestor.idToken });
+  assert.equal(on.status, 200, on.erro);
+  assert.ok((await entrarEmail('ana.nova@teste.com', provisoria.senha)).idToken);
+});
+
+test('excluir apaga o login e libera o nome de usuário', async () => {
+  admins = [gestor.localId];
+  assert.equal((await chamar('/admin/excluir', { uid: gestor.localId }, { token: gestor.idToken })).status, 400);
+  const r = await chamar('/admin/excluir', { uid: plantonista.localId }, { token: gestor.idToken });
+  assert.equal(r.status, 200, r.erro);
+  const lista = await chamar('/admin/contas', {}, { token: gestor.idToken });
+  assert.ok(!lista.contas.some((c) => c.uid === plantonista.localId));
+  assert.equal(D1.db.prepare('SELECT COUNT(*) AS n FROM usuarios WHERE uid = ?').get(plantonista.localId).n, 0);
+  const eventos = D1.db.prepare('SELECT tipo FROM eventos').all().map((e) => e.tipo);
+  assert.ok(['inativar', 'reativar', 'excluir'].every((t) => eventos.includes(t)));
 });

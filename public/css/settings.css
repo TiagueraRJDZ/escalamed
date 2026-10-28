@@ -70,3 +70,17 @@
 @media (max-width: 520px) {
   .form-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Usuários (administrador da plataforma) */
+.users-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-3); }
+.users-intro { margin: var(--esp-2) 0; }
+.users-search { margin: var(--esp-4) 0 var(--esp-2); }
+.users-empty { padding: var(--esp-4) 0; text-align: center; }
+#users-list .member-info .badge { margin-left: var(--esp-1); vertical-align: middle; }
+.user-actions { display: flex; flex-shrink: 0; gap: var(--esp-1); }
+.user-actions .btn-icon[data-action='delete'] { color: var(--cor-perigo); }
+.user-actions .btn-icon[data-action='delete']:hover:not(:disabled) { background: var(--cor-perigo-suave); }
+.user-item.is-inactive .avatar,
+.user-item.is-inactive .member-info { opacity: 0.55; }
+.badge-muted { background: var(--cor-superficie-2); color: var(--cor-texto-2); }
+.badge-danger { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
