@@ -1,5 +1,5 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
-// menu da conta, gavetas (Privacidade, Notificações) e modal do Google Agenda.
+// menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
 import { requireAuth, signOutUser } from './auth.js';
 import { icon } from './icons.js';
@@ -7,7 +7,6 @@ import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
-  { id: 'privacy', label: 'Privacidade', icon: 'lock', drawer: 'drawer-privacy' },
   { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html' },
 ];
 
@@ -108,17 +107,6 @@ function shellHtml(user, active, collapsed) {
 function dialogsHtml() {
   const closeButton = `<button type="button" class="btn-icon" data-close aria-label="Fechar">${icon('x')}</button>`;
   return `
-    <dialog class="drawer" id="drawer-privacy" aria-labelledby="drawer-privacy-title">
-      <div class="dialog-header"><h2 id="drawer-privacy-title">Privacidade</h2>${closeButton}</div>
-      <div class="dialog-body">
-        <div class="empty-state">
-          ${icon('lock')}
-          <h3>Controle quem vê seus dados</h3>
-          <p>Em breve você poderá escolher quem vê seu telefone e seu e-mail.</p>
-        </div>
-      </div>
-    </dialog>
-
     <dialog class="drawer" id="drawer-notifications" aria-labelledby="drawer-notifications-title">
       <div class="dialog-header"><h2 id="drawer-notifications-title">Notificações</h2>${closeButton}</div>
       <div class="dialog-body">
