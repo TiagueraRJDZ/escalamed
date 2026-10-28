@@ -20,7 +20,7 @@ ORIGENS = "https://escalamed-hapvida.web.app,https://escalamed-hapvida.firebasea
 [[d1_databases]]
 binding = "DB"
 database_name = "escalamed-contas"
-database_id = "COLE_AQUI_O_ID_DO_D1"
+database_id = "d9fe5ca9-a37d-4cd9-8a72-ba220495c849"
 migrations_dir = "migrations"
 
 [observability]
