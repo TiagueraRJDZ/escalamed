@@ -136,7 +136,7 @@ async function conferirSenhaNoFirebase(env, email, senha, local) {
   if (resposta.ok) return;
   const motivo = (await resposta.json().catch(() => ({}))).error?.message || '';
   if (motivo.startsWith('TOO_MANY_ATTEMPTS')) {
-    throw new Falha(429, 'Muitas tentativas com senha errada. Aguarde alguns minutos ou peça uma senha provisória ao gestor do seu grupo.');
+    throw new Falha(429, 'Acesso bloqueado por muitas tentativas com senha errada. Peça uma senha provisória ao gestor do seu grupo.');
   }
   if (motivo.startsWith('USER_DISABLED')) throw new Falha(403, 'Esta conta foi desativada.');
   if (/INVALID|EMAIL_NOT_FOUND|MISSING_PASSWORD/.test(motivo)) throw new Falha(401, LOGIN_INVALIDO);

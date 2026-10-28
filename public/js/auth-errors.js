@@ -9,7 +9,7 @@ export const ERROR_MESSAGES = {
   'auth/missing-password': 'Informe a senha.',
   'auth/email-already-in-use': 'Este e-mail já possui conta. Entre ou recupere a senha.',
   'auth/weak-password': 'Senha fraca. Use pelo menos 8 caracteres com letras, números e símbolos.',
-  'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos ou redefina a senha.',
+  'auth/too-many-requests': 'Acesso bloqueado por muitas tentativas com senha errada. Peça uma senha provisória ao gestor do seu grupo.',
   'auth/network-request-failed': 'Sem conexão. Verifique sua internet e tente de novo.',
   'auth/user-disabled': 'Esta conta foi desativada.',
   'auth/requires-recent-login': 'Por segurança, confirme sua senha e tente de novo.',
