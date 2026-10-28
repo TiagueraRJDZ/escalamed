@@ -1,15 +1,15 @@
-// Tela de entrada: entrar, criar conta e recuperar senha.
+// Tela de acesso: escolher (entrar ou criar conta), login e recuperar senha.
+// Login só por e-mail: entrar por "nome de usuário" exigiria uma lista pública
+// nome -> e-mail, que exporia os e-mails. Ver resolveLoginIdentifier abaixo.
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-  sendEmailVerification,
   sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { auth, navigate } from '../firebase.js';
-import { currentUser, ensureUserProfile, nextUrl } from '../auth.js';
-import { icon, renderIcons } from '../icons.js';
-import { isValidEmail, isValidName, isStrongPassword, PASSWORD_RULES } from '../validators.js';
+import { currentUser, nextUrl, nextParam } from '../auth.js';
+import { renderIcons } from '../icons.js';
+import { setupCarousel, setupPasswordToggles } from '../auth-ui.js';
+import { isValidEmail } from '../validators.js';
 import {
   setLoading,
   setFieldError,
@@ -19,101 +19,26 @@ import {
   firebaseErrorMessage,
 } from '../ui.js';
 
-// ---------- Já está logado? Vai direto para o app ----------
-const existingUser = await currentUser();
-if (existingUser) {
-  await ensureUserProfile(existingUser);
-  navigate(nextUrl(), { replace: true });
+// ---------- Já está logado? Vai direto para o app (os guards cuidam do resto) ----------
+if (await currentUser()) navigate(nextUrl(), { replace: true });
+
+// Hoje só aceita e-mail. Para aceitar nome de usuário no futuro (plano Blaze),
+// esta função chamaria uma Cloud Function que devolve o e-mail sem expô-lo.
+async function resolveLoginIdentifier(identifier) {
+  return identifier.trim();
 }
 
-async function finishLogin(user, fallbackName) {
-  await ensureUserProfile(user, fallbackName);
-  navigate(nextUrl(), { replace: true });
-}
-
-// ---------- Carrossel de benefícios ----------
-const SLIDES = [
-  {
-    icon: 'calendar',
-    title: 'Escalas prontas em minutos',
-    text: 'Monte os turnos, distribua os plantões e acompanhe tudo em um único calendário.',
-  },
-  {
-    icon: 'arrowRightLeft',
-    title: 'Trocas sem confusão',
-    text: 'Ceda, troque ou assuma plantões com registro e histórico, sem depender de grupo de mensagens.',
-  },
-  {
-    icon: 'mapPin',
-    title: 'Check-in com localização',
-    text: 'Saiba quem chegou, quem atrasou e quem está de plantão agora.',
-  },
-  {
-    icon: 'chart',
-    title: 'Relatórios para fechar o mês',
-    text: 'Horas, valores, atrasos e faltas por plantonista, sem planilha.',
-  },
-];
-
-function setupCarousel() {
-  const track = document.getElementById('carousel-track');
-  const dots = document.getElementById('carousel-dots');
-  const carousel = document.getElementById('carousel');
-  let current = 0;
-  let timer = null;
-
-  track.innerHTML = SLIDES.map(
-    (s, i) => `
-      <div class="slide${i === 0 ? ' is-active' : ''}" aria-hidden="${i !== 0}">
-        <div class="slide-icon">${icon(s.icon)}</div>
-        <h2>${s.title}</h2>
-        <p>${s.text}</p>
-      </div>`,
-  ).join('');
-
-  dots.innerHTML = SLIDES.map(
-    (s, i) =>
-      `<button type="button" class="carousel-dot" aria-label="${s.title}" aria-current="${i === 0}"></button>`,
-  ).join('');
-
-  const slideEls = [...track.children];
-  const dotEls = [...dots.children];
-
-  function show(index) {
-    current = (index + SLIDES.length) % SLIDES.length;
-    slideEls.forEach((el, i) => {
-      el.classList.toggle('is-active', i === current);
-      el.setAttribute('aria-hidden', String(i !== current));
-    });
-    dotEls.forEach((el, i) => el.setAttribute('aria-current', String(i === current)));
-  }
-
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const start = () => {
-    if (!reducedMotion) timer = setInterval(() => show(current + 1), 6000);
-  };
-  const stop = () => clearInterval(timer);
-
-  dotEls.forEach((dot, i) =>
-    dot.addEventListener('click', () => {
-      stop();
-      show(i);
-      start();
-    }),
-  );
-  carousel.addEventListener('mouseenter', stop);
-  carousel.addEventListener('mouseleave', start);
-  carousel.addEventListener('focusin', stop);
-  carousel.addEventListener('focusout', start);
-  start();
-}
-
-// ---------- Troca de tela pelo endereço (#entrar, #cadastro, #recuperar) ----------
-// Sem endereço (ou desconhecido), mostra a tela de entrar.
-const VIEWS = { '#entrar': 'view-login', '#cadastro': 'view-signup', '#recuperar': 'view-forgot' };
+// ---------- Troca de tela pelo endereço (#entrar, #recuperar) ----------
+// Sem endereço (ou desconhecido), mostra a escolha entre entrar e criar conta.
+// "#cadastro" (links antigos) vai para a página de cadastro.
+const VIEWS = { '#entrar': 'view-login', '#recuperar': 'view-forgot' };
 
 function showView({ focus = true } = {}) {
-  const target = VIEWS[location.hash] ?? 'view-login';
+  if (location.hash === '#cadastro') {
+    navigate(`/signup.html${nextParam()}`, { replace: true });
+    return;
+  }
+  const target = VIEWS[location.hash] ?? 'view-choose';
   document.querySelectorAll('.auth-view').forEach((view) => {
     view.hidden = view.id !== target;
   });
@@ -124,46 +49,13 @@ function showView({ focus = true } = {}) {
   }
 }
 
-// ---------- Botões de mostrar/ocultar senha ----------
-function setupPasswordToggles() {
-  document.querySelectorAll('.password-wrap').forEach((wrap) => {
-    const input = wrap.querySelector('input');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn-icon';
-    button.setAttribute('aria-label', 'Mostrar senha');
-    button.innerHTML = icon('eye');
-    button.addEventListener('click', () => {
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      button.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
-      button.innerHTML = icon(show ? 'eyeOff' : 'eye');
-    });
-    wrap.append(button);
-  });
-}
-
-// ---------- Requisitos da senha (atualiza enquanto digita) ----------
-function setupPasswordRules() {
-  const list = document.getElementById('password-rules');
-  const input = document.getElementById('signup-password');
-  const render = () => {
-    list.innerHTML = PASSWORD_RULES.map((rule) => {
-      const ok = rule.test(input.value);
-      return `<li class="${ok ? 'is-ok' : ''}">${icon(ok ? 'checkCircle' : 'clock')}<span>${rule.label}</span></li>`;
-    }).join('');
-  };
-  input.addEventListener('input', render);
-  render();
-}
-
-// ---------- Formulários ----------
+// ---------- Login ----------
 function setupLogin() {
   const form = document.getElementById('login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     clearFormErrors(form);
-    const email = form.email.value.trim();
+    const email = await resolveLoginIdentifier(form.email.value);
     const password = form.password.value;
 
     let valid = true;
@@ -180,8 +72,8 @@ function setupLogin() {
     const button = form.querySelector('[type=submit]');
     setLoading(button, true);
     try {
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
-      await finishLogin(user);
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate(nextUrl(), { replace: true });
     } catch (error) {
       showFormAlert(form, firebaseErrorMessage(error));
       setLoading(button, false);
@@ -189,40 +81,8 @@ function setupLogin() {
   });
 }
 
-function setupSignup() {
-  const form = document.getElementById('signup-form');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearFormErrors(form);
-    const name = form.name.value.trim().replace(/\s+/g, ' ');
-    const email = form.email.value.trim();
-    const password = form.password.value;
-
-    const errors = [];
-    if (!isValidName(name)) errors.push([form.name, 'Informe seu nome completo.']);
-    if (!isValidEmail(email)) errors.push([form.email, 'Informe um e-mail válido.']);
-    if (!isStrongPassword(password)) errors.push([form.password, 'A senha não atende aos requisitos acima.']);
-    if (form.confirm.value !== password) errors.push([form.confirm, 'As senhas não conferem.']);
-    if (errors.length) {
-      errors.forEach(([input, message]) => setFieldError(input, message));
-      errors[0][0].focus();
-      return;
-    }
-
-    const button = form.querySelector('[type=submit]');
-    setLoading(button, true);
-    try {
-      const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(user, { displayName: name });
-      sendEmailVerification(user).catch(() => {}); // falha aqui não impede o cadastro
-      await finishLogin(user, name);
-    } catch (error) {
-      showFormAlert(form, firebaseErrorMessage(error));
-      setLoading(button, false);
-    }
-  });
-}
-
+// ---------- Recuperar senha ----------
+// A mensagem é sempre a mesma, exista ou não a conta (não revela quem tem cadastro).
 function setupForgot() {
   const form = document.getElementById('forgot-form');
   form.addEventListener('submit', async (event) => {
@@ -239,14 +99,14 @@ function setupForgot() {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
-      // "Usuário não encontrado" não é mostrado, para não revelar quem tem conta
-      if (error.code !== 'auth/user-not-found') {
+      const hidden = ['auth/user-not-found', 'auth/invalid-email'];
+      if (!hidden.includes(error.code)) {
         showFormAlert(form, firebaseErrorMessage(error));
         setLoading(button, false);
         return;
       }
     }
-    showFormAlert(form, 'Se houver uma conta com este e-mail, você receberá o link em instantes.', 'success');
+    showFormAlert(form, 'Se existir uma conta com este e-mail, enviaremos um link para redefinir a senha.', 'success');
     setLoading(button, false);
   });
 }
@@ -255,12 +115,11 @@ function setupForgot() {
 renderIcons();
 setupCarousel();
 setupPasswordToggles();
-setupPasswordRules();
 setupLogin();
-setupSignup();
 setupForgot();
+document.getElementById('signup-link').href = `/signup.html${nextParam()}`;
 
-['login-form', 'signup-form', 'forgot-form'].forEach((id) => clearErrorsWhileTyping(document.getElementById(id)));
+['login-form', 'forgot-form'].forEach((id) => clearErrorsWhileTyping(document.getElementById(id)));
 
 window.addEventListener('hashchange', () => showView());
 showView({ focus: false });

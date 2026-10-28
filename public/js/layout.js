@@ -39,16 +39,15 @@ function navItem(item, active) {
   return `<li><button type="button" ${common} data-open="${item.drawer}" aria-haspopup="dialog">${content}</button></li>`;
 }
 
-function avatarHtml(user) {
-  const name = user.displayName || user.email || '';
-  return user.photoURL
-    ? `<span class="avatar"><img src="${escapeHtml(user.photoURL)}" alt="" referrerpolicy="no-referrer" /></span>`
-    : `<span class="avatar">${escapeHtml(initials(name))}</span>`;
+export function avatarHtml({ name, photoURL } = {}, className = 'avatar') {
+  return photoURL
+    ? `<span class="${className}"><img src="${escapeHtml(photoURL)}" alt="" referrerpolicy="no-referrer" /></span>`
+    : `<span class="${className}">${escapeHtml(initials(name))}</span>`;
 }
 
 const toggleLabel = (collapsed) => (collapsed ? 'Expandir menu' : 'Recolher menu');
 
-function shellHtml(user, active, collapsed) {
+function shellHtml(user, profile, active, collapsed) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <a class="sidebar-brand" href="/schedules.html" aria-label="Hapvida EscalaMed">
@@ -88,14 +87,14 @@ function shellHtml(user, active, collapsed) {
           </button>
           <div class="menu-anchor">
             <button type="button" class="avatar-button" id="avatar-button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Menu da conta">
-              ${avatarHtml(user)}
+              ${avatarHtml(profile)}
             </button>
             <div class="menu" id="user-menu" role="menu" aria-label="Conta" hidden>
               <div class="menu-header">
-                <strong>${escapeHtml(user.displayName || 'Minha conta')}</strong>
+                <strong>${escapeHtml(profile.name || 'Minha conta')}</strong>
                 <span>${escapeHtml(user.email || '')}</span>
               </div>
-              <a class="menu-item" role="menuitem" href="/profile.html">${icon('user')}Ver perfil</a>
+              <a class="menu-item" role="menuitem" href="/settings.html">${icon('user')}Minha conta</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -203,13 +202,13 @@ function setupDialogs() {
 }
 
 export async function initLayout({ active } = {}) {
-  const user = await requireAuth();
+  const { user, profile } = await requireAuth();
   const page = document.getElementById('page');
   const collapsed = readCollapsed();
 
   const app = document.createElement('div');
   app.className = `app${collapsed ? ' is-collapsed' : ''}`;
-  app.innerHTML = shellHtml(user, active, collapsed);
+  app.innerHTML = shellHtml(user, profile, active, collapsed);
   app.querySelector('.app-main').append(page);
   document.body.prepend(app);
   document.body.insertAdjacentHTML('beforeend', dialogsHtml());
@@ -224,5 +223,5 @@ export async function initLayout({ active } = {}) {
   });
 
   document.body.classList.remove('is-booting');
-  return { user };
+  return { user, profile };
 }

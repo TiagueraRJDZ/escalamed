@@ -3,12 +3,26 @@ rules_version = '2';
 // Regras de segurança do EscalaMed.
 // Sem servidor próprio (plano gratuito), são estas regras que impedem um usuário
 // de ler ou gravar o que não deve. Toda coleção não listada aqui fica bloqueada.
+// Testes: tests/rules.test.mjs (rodam nos emuladores, veja o README).
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ---------- Funções auxiliares ----------
     function signedIn() {
       return request.auth != null;
+    }
+
+    // Logado e com e-mail confirmado: exigido para tudo, menos para terminar o cadastro
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
     }
 
     function isSelf(uid) {
@@ -33,27 +47,64 @@ service cloud.firestore {
       return incoming().diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
+    // Mesma lista de public/data/categories.js
+    function optCategory(v) {
+      return v == null || v in ['academico', 'administrativo', 'assistente-social', 'auxiliar-enfermagem',
+        'auxiliar-laboratorio', 'auxiliar-saude-bucal', 'biomedico', 'bioquimico', 'bombeiro',
+        'condutor-socorrista', 'cuidador', 'dentista', 'educador-fisico', 'enfermeiro', 'farmaceutico',
+        'fisioterapeuta', 'fonoaudiologo', 'instrumentador-cirurgico', 'maqueiro', 'medico',
+        'medico-residente', 'nutricionista', 'psicologo', 'recepcionista', 'tarm', 'tecnico-enfermagem',
+        'tecnico-laboratorio', 'tecnico-radiologia', 'terapeuta-ocupacional', 'veterinario', 'outro'];
+    }
+
+    // Registro no conselho: { type: "CRM", number: "28890", state: "CE" }
+    function validCouncil(c) {
+      return c == null || (c is map
+        && c.keys().hasOnly(['type', 'number', 'state'])
+        && c.keys().hasAll(['type', 'number', 'state'])
+        && str(c.type, 2, 10)
+        && c.number is string && c.number.matches('^[0-9A-Z./-]{1,20}$')
+        && c.state is string && c.state.matches('^[A-Z]{2}$'));
+    }
+
+    // Foto: imagem pequena embutida (até ~45 KB) ou endereço https
+    function validPhoto(v) {
+      return v == null || (v is string && v.size() <= 60000
+        && (v.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$') || v.matches('^https://.+')));
+    }
+
     // ---------- Usuários (perfil público) ----------
+    // O documento nasce na etapa 3 do cadastro (signupStep 3) e fica completo na 4.
     match /users/{uid} {
       function validUser(d) {
-        return d.keys().hasOnly(['name', 'nameLower', 'photoURL', 'username', 'categoryId',
-                                 'searchKeywords', 'createdAt', 'updatedAt'])
+        return d.keys().hasOnly(['name', 'nameLower', 'photoURL', 'username', 'categoryId', 'specialty',
+                                 'council', 'searchKeywords', 'signupStep', 'termsAcceptedAt',
+                                 'termsVersion', 'createdAt', 'updatedAt'])
           && str(d.name, 2, 80)
           && str(d.nameLower, 2, 80)
-          && optStr(d.photoURL, 2048)
+          && validPhoto(d.photoURL)
           && optStr(d.username, 30)
-          && optStr(d.categoryId, 60)
+          && optCategory(d.categoryId)
+          && optStr(d.specialty, 80)
+          && validCouncil(d.council)
+          && d.signupStep in [3, 4]
+          && str(d.termsVersion, 1, 20)
           && d.searchKeywords is list && d.searchKeywords.size() <= 60;
       }
 
-      allow read: if signedIn();
+      // O próprio usuário lê mesmo antes de confirmar o e-mail (para terminar o cadastro)
+      allow read: if isSelf(uid) || verified();
       allow create: if isSelf(uid)
         && validUser(incoming())
         && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+        && incoming().updatedAt == request.time
+        && incoming().termsAcceptedAt == request.time;
       allow update: if isSelf(uid)
         && validUser(incoming())
         && incoming().createdAt == resource.data.createdAt
+        && incoming().termsAcceptedAt == resource.data.termsAcceptedAt
+        && incoming().termsVersion == resource.data.termsVersion
+        && incoming().signupStep >= resource.data.signupStep
         && incoming().updatedAt == request.time;
       allow delete: if isSelf(uid);
 
@@ -63,16 +114,19 @@ service cloud.firestore {
         allow create, update: if isSelf(uid)
           && docId == 'data'
           && incoming().keys().hasOnly(['email', 'phone', 'cpf', 'state', 'updatedAt'])
-          && optStr(incoming().email, 254)
+          && optStr(incoming().get('email', null), 254)
+          && (incoming().get('phone', null) == null || incoming().phone.matches('^[0-9]{10,11}$'))
+          && (incoming().get('cpf', null) == null || incoming().cpf.matches('^[0-9]{11}$'))
+          && (incoming().get('state', null) == null || incoming().state.matches('^[A-Z]{2}$'))
           && incoming().updatedAt == request.time;
       }
     }
 
     // ---------- Unidades de saúde ----------
-    // Qualquer usuário logado pode cadastrar uma unidade que ainda não existe.
+    // Qualquer usuário confirmado pode cadastrar uma unidade que ainda não existe.
     match /healthUnits/{unitId} {
-      allow read: if signedIn();
-      allow create: if signedIn()
+      allow read: if verified();
+      allow create: if verified()
         && incoming().keys().hasOnly(['name', 'nameLower', 'city', 'cityLower', 'state',
                                       'keywords', 'createdBy', 'createdAt'])
         && str(incoming().name, 3, 120)
@@ -87,6 +141,9 @@ service cloud.firestore {
     }
 
     // ---------- Grupos ----------
+    // Cargos ficam em arrays no próprio grupo (um get() responde "qual o cargo de quem pede"):
+    //   memberIds (todos) · managerIds (exatamente 1) · assistantIds, analystIds, observerIds (até 3 cada)
+    //   Plantonista = está em memberIds e em nenhum dos arrays de cargo.
     match /groups/{groupId} {
       function groupPath() {
         return /databases/$(database)/documents/groups/$(groupId);
@@ -96,18 +153,48 @@ service cloud.firestore {
         return get(groupPath()).data;
       }
 
+      function groupAfter() {
+        return getAfter(groupPath()).data;
+      }
+
       function isMemberOf(g) {
-        return signedIn() && request.auth.uid in g.memberIds;
+        return verified() && me() in g.memberIds;
       }
 
       function isManagerOf(g) {
-        return signedIn() && request.auth.uid in g.managerIds;
+        return verified() && me() in g.managerIds;
+      }
+
+      // Gestor ou auxiliar
+      function isAdminOf(g) {
+        return verified() && (me() in g.managerIds || me() in g.get('assistantIds', []));
+      }
+
+      function unique(list) {
+        return list.toSet().size() == list.size();
+      }
+
+      function rolesValid(d) {
+        return d.memberIds is list && d.managerIds is list && d.assistantIds is list
+          && d.analystIds is list && d.observerIds is list
+          && d.managerIds.size() == 1
+          && d.assistantIds.size() <= 3 && d.analystIds.size() <= 3 && d.observerIds.size() <= 3
+          && d.memberIds.size() <= 300
+          && unique(d.memberIds) && unique(d.assistantIds) && unique(d.analystIds) && unique(d.observerIds)
+          && d.memberIds.hasAll(d.managerIds) && d.memberIds.hasAll(d.assistantIds)
+          && d.memberIds.hasAll(d.analystIds) && d.memberIds.hasAll(d.observerIds)
+          && !d.managerIds.hasAny(d.assistantIds) && !d.managerIds.hasAny(d.analystIds)
+          && !d.managerIds.hasAny(d.observerIds) && !d.assistantIds.hasAny(d.analystIds)
+          && !d.assistantIds.hasAny(d.observerIds) && !d.analystIds.hasAny(d.observerIds)
+          // Escala individual: só o dono, sem cargos extras
+          && (d.type == 'team' || (d.memberIds == d.managerIds && d.assistantIds.size() == 0
+              && d.analystIds.size() == 0 && d.observerIds.size() == 0));
       }
 
       function validGroup(d) {
         return d.keys().hasOnly(['name', 'type', 'color', 'unit', 'categoryId', 'timezone',
-                                 'ownerId', 'managerIds', 'memberIds', 'setupStep',
-                                 'createdAt', 'updatedAt'])
+                                 'ownerId', 'managerIds', 'assistantIds', 'analystIds', 'observerIds',
+                                 'memberIds', 'setupStep', 'createdAt', 'updatedAt'])
           && str(d.name, 3, 60)
           && d.type in ['team', 'personal']
           && d.color is string && d.color.matches('^#[0-9A-Fa-f]{6}$')
@@ -118,43 +205,174 @@ service cloud.firestore {
                   && str(d.unit.name, 3, 120)))
           && optStr(d.categoryId, 60)
           && str(d.timezone, 3, 60)
-          && d.setupStep in ['shifts', 'members', 'done'];
+          && d.setupStep in ['shifts', 'members', 'done']
+          && rolesValid(d);
+      }
+
+      function roleKeys() {
+        return ['memberIds', 'managerIds', 'assistantIds', 'analystIds', 'observerIds', 'updatedAt'];
+      }
+
+      // ----- Convite da própria pessoa (id = e-mail em minúsculas) -----
+      function invitePath() {
+        return /databases/$(database)/documents/groups/$(groupId)/invites/$(myEmail());
+      }
+
+      // O array do cargo do convite ganha a pessoa; os outros ficam iguais
+      function joinsAs(field, role, inviteRole) {
+        return inviteRole == role
+          ? incoming()[field].toSet() == resource.data[field].toSet().union([me()].toSet())
+          : incoming()[field] == resource.data[field];
+      }
+
+      function acceptsInvite(invite) {
+        return invite.expiresAt > request.time
+          && incoming().memberIds.toSet() == resource.data.memberIds.toSet().union([me()].toSet())
+          && incoming().managerIds == resource.data.managerIds
+          && joinsAs('assistantIds', 'assistant', invite.role)
+          && joinsAs('analystIds', 'analyst', invite.role)
+          && joinsAs('observerIds', 'observer', invite.role);
       }
 
       allow read: if isMemberOf(resource.data);
 
       // Quem cria vira dono, gestor e único membro
-      allow create: if signedIn()
+      allow create: if verified()
         && validGroup(incoming())
-        && incoming().ownerId == request.auth.uid
-        && incoming().managerIds == [request.auth.uid]
-        && incoming().memberIds == [request.auth.uid]
+        && incoming().ownerId == me()
+        && incoming().managerIds == [me()]
+        && incoming().memberIds == [me()]
+        && incoming().assistantIds == []
+        && incoming().analystIds == []
+        && incoming().observerIds == []
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
 
-      // Gestor edita os dados do grupo (membros e papéis ficam para a fase 2)
+      // Gestor edita os dados do grupo
       allow update: if isManagerOf(resource.data)
         && validGroup(incoming())
         && changedOnly(['name', 'color', 'unit', 'categoryId', 'timezone', 'setupStep', 'updatedAt'])
         && incoming().updatedAt == request.time;
 
-      allow delete: if signedIn() && request.auth.uid == resource.data.ownerId;
+      // Gestor ou auxiliar: muda cargos e remove membros. Ninguém é adicionado por aqui
+      // (a entrada é só por convite). O auxiliar não mexe no gestor; o gestor pode
+      // transferir a gestão.
+      allow update: if isAdminOf(resource.data)
+        && resource.data.type == 'team'
+        && validGroup(incoming())
+        && changedOnly(roleKeys())
+        && incoming().memberIds.toSet().difference(resource.data.memberIds.toSet()).size() == 0
+        && (isManagerOf(resource.data) || incoming().managerIds == resource.data.managerIds)
+        && incoming().updatedAt == request.time;
 
-      // ----- Membros -----
+      // Aceitar convite: entra só a própria pessoa, só no cargo do convite e antes de vencer
+      allow update: if verified()
+        && resource.data.type == 'team'
+        && !(me() in resource.data.memberIds)
+        && exists(invitePath())
+        && acceptsInvite(get(invitePath()).data)
+        && validGroup(incoming())
+        && changedOnly(roleKeys())
+        && incoming().updatedAt == request.time;
+
+      // Sair do grupo: a pessoa tira só a si mesma de tudo (o gestor transfere antes)
+      allow update: if isMemberOf(resource.data)
+        && !(me() in resource.data.managerIds)
+        && changedOnly(roleKeys())
+        && incoming().memberIds == resource.data.memberIds.removeAll([me()])
+        && incoming().assistantIds == resource.data.assistantIds.removeAll([me()])
+        && incoming().analystIds == resource.data.analystIds.removeAll([me()])
+        && incoming().observerIds == resource.data.observerIds.removeAll([me()])
+        && incoming().managerIds == resource.data.managerIds
+        && incoming().updatedAt == request.time;
+
+      allow delete: if verified() && me() == resource.data.ownerId;
+
+      // ----- Membros (cartão: cargo + dados copiados do perfil) -----
       match /members/{memberId} {
+        // Cargo calculado pelos arrays do grupo; o cartão precisa sempre concordar com eles
+        function roleIn(g, id) {
+          return id in g.managerIds ? 'manager'
+            : id in g.assistantIds ? 'assistant'
+            : id in g.analystIds ? 'analyst'
+            : id in g.observerIds ? 'observer'
+            : 'staff';
+        }
+
+        function validCard(d) {
+          return d.keys().hasOnly(['role', 'name', 'photoURL', 'categoryId', 'specialty', 'council',
+                                   'joinedAt', 'addedBy'])
+            && d.role in ['manager', 'assistant', 'analyst', 'observer', 'staff']
+            && str(d.name, 2, 80)
+            && validPhoto(d.get('photoURL', null))
+            && optCategory(d.get('categoryId', null))
+            && optStr(d.get('specialty', null), 80)
+            && validCouncil(d.get('council', null));
+        }
+
         allow read: if isMemberOf(groupData());
 
-        // Só na criação do grupo (gravação em lote): o dono entra como gestor
-        allow create: if isSelf(memberId)
+        // Criação do grupo (mesmo lote): o dono entra como gestor
+        allow create: if isSelf(memberId) && verified()
           && !exists(groupPath())
           && getAfter(groupPath()).data.ownerId == memberId
-          && incoming().keys().hasOnly(['role', 'name', 'photoURL', 'joinedAt'])
+          && validCard(incoming())
           && incoming().role == 'manager'
-          && str(incoming().name, 2, 80)
-          && optStr(incoming().photoURL, 2048)
           && incoming().joinedAt == request.time;
 
-        allow update, delete: if false;
+        // Aceitando convite (mesmo lote da entrada no grupo)
+        allow create: if isSelf(memberId) && verified()
+          && exists(groupPath())
+          && !(memberId in groupData().memberIds)
+          && memberId in groupAfter().memberIds
+          && validCard(incoming())
+          && incoming().role == roleIn(groupAfter(), memberId)
+          && incoming().joinedAt == request.time;
+
+        // Mudança de cargo (mesmo lote da mudança nos arrays)
+        allow update: if isAdminOf(groupData())
+          && changedOnly(['role'])
+          && incoming().role == roleIn(groupAfter(), memberId);
+
+        // A própria pessoa atualiza o cartão (nome, foto, profissão)
+        allow update: if isSelf(memberId)
+          && isMemberOf(groupData())
+          && changedOnly(['name', 'photoURL', 'categoryId', 'specialty', 'council'])
+          && validCard(incoming());
+
+        // Remover membro, sair do grupo ou excluir o grupo: o cartão sai junto
+        allow delete: if verified()
+          && (isSelf(memberId) || isAdminOf(groupData()))
+          && (!existsAfter(groupPath()) || !(memberId in groupAfter().memberIds));
+      }
+
+      // ----- Convites (id = e-mail convidado, em minúsculas) -----
+      // O convite guarda nome do grupo e da unidade porque quem é convidado
+      // ainda não pode ler o grupo.
+      match /invites/{email} {
+        function validInvite(d) {
+          return d.keys().hasOnly(['email', 'role', 'groupName', 'unitName', 'invitedBy',
+                                   'invitedByName', 'createdAt', 'expiresAt'])
+            && d.email == email
+            && email == email.lower()
+            && email.size() <= 254
+            && email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
+            && d.role in ['staff', 'assistant', 'analyst', 'observer']
+            && str(d.groupName, 3, 60)
+            && optStr(d.unitName, 120)
+            && d.invitedBy == me()
+            && str(d.invitedByName, 1, 80)
+            && d.createdAt == request.time
+            && d.expiresAt is timestamp
+            && d.expiresAt > request.time
+            && d.expiresAt <= request.time + duration.value(31, 'd');
+        }
+
+        allow read: if verified() && (email == myEmail() || isAdminOf(groupData()));
+        allow create, update: if isAdminOf(groupData())
+          && groupData().type == 'team'
+          && validInvite(incoming());
+        allow delete: if verified() && (email == myEmail() || isAdminOf(groupData()));
       }
 
       // ----- Turnos -----
@@ -178,6 +396,11 @@ service cloud.firestore {
           && incoming().createdAt == resource.data.createdAt;
         allow delete: if isManagerOf(groupData());
       }
+    }
+
+    // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail
+    match /{path=**}/invites/{email} {
+      allow read: if verified() && resource.data.email == myEmail();
     }
   }
 }

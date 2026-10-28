@@ -149,30 +149,6 @@ export function confirmDialog({ title, message, confirmText = 'Confirmar', cance
   });
 }
 
-// Traduz os erros do Firebase para mensagens em português.
+// Traduz os erros do Firebase para mensagens em português (lista em auth-errors.js).
 // Devolve null quando o erro não precisa ser mostrado (ex.: usuário fechou a janela).
-export function firebaseErrorMessage(error) {
-  const code = error?.code ?? '';
-  const messages = {
-    'auth/invalid-credential': 'E-mail ou senha incorretos.',
-    'auth/wrong-password': 'E-mail ou senha incorretos.',
-    'auth/user-not-found': 'E-mail ou senha incorretos.',
-    'auth/invalid-email': 'E-mail inválido.',
-    'auth/email-already-in-use': 'Este e-mail já está cadastrado. Tente entrar.',
-    'auth/weak-password': 'Senha fraca. Use pelo menos 8 caracteres com letras, números e símbolos.',
-    'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
-    'auth/network-request-failed': 'Sem conexão. Verifique sua internet e tente de novo.',
-    'auth/user-disabled': 'Esta conta foi desativada.',
-    'auth/account-exists-with-different-credential':
-      'Já existe uma conta com este e-mail. Entre com e-mail e senha.',
-    'auth/operation-not-allowed': 'Este método de login não está ativado no Firebase.',
-    'auth/unauthorized-domain': 'Este endereço não está autorizado no Firebase.',
-    'permission-denied': 'Você não tem permissão para fazer isso.',
-    unavailable: 'Sem conexão com o servidor. Tente de novo em instantes.',
-  };
-  if (['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'].includes(code)) {
-    return null;
-  }
-  if (!messages[code]) console.error(error);
-  return messages[code] ?? 'Não foi possível concluir. Tente novamente.';
-}
+export { errorMessage as firebaseErrorMessage } from './auth-errors.js';

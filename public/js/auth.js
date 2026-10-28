@@ -1,15 +1,12 @@
-// Sessão do usuário: proteção das páginas, criação do perfil e saída.
+// Sessão do usuário: proteção das páginas (guards) e saída.
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import {
-  doc,
-  getDoc,
-  writeBatch,
-  serverTimestamp,
-} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, navigate } from './firebase.js';
-import { normalize, searchKeywords } from './validators.js';
 
-const HOME = '/schedules.html';
+export const HOME = '/schedules.html';
+
+// Páginas do fluxo de entrada: elas repassam o "next" em vez de virar o destino
+const AUTH_PAGES = ['/', '/index.html', '/signup.html', '/verify-email.html'];
 
 // Espera o Firebase dizer se há alguém logado (só a primeira resposta)
 export function currentUser() {
@@ -21,51 +18,57 @@ export function currentUser() {
   });
 }
 
-// Páginas internas: sem login, volta para a tela de entrada
-export async function requireAuth() {
-  const user = await currentUser();
-  if (!user) {
-    const next = encodeURIComponent(location.pathname + location.search);
-    navigate(`/?next=${next}`, { replace: true });
-    return new Promise(() => {}); // a página para aqui enquanto redireciona
-  }
-  return user;
-}
-
 // Para onde ir depois de entrar (só caminhos internos, para evitar redirecionamento malicioso)
 export function nextUrl() {
   const next = new URLSearchParams(location.search).get('next');
   return next && next.startsWith('/') && !next.startsWith('//') ? next : HOME;
 }
 
-// Cria o perfil no Firestore no primeiro acesso (cadastro ou primeiro login)
-export async function ensureUserProfile(user, fallbackName = '') {
-  const userRef = doc(db, 'users', user.uid);
-  const snapshot = await getDoc(userRef);
-  if (snapshot.exists()) return;
+// "?next=..." para levar adiante: a página atual, ou o next que ela já recebeu
+export function nextParam() {
+  const target = AUTH_PAGES.includes(location.pathname) ? nextUrl() : location.pathname + location.search;
+  return target === HOME ? '' : `?next=${encodeURIComponent(target)}`;
+}
 
-  let name = (user.displayName || fallbackName || user.email?.split('@')[0] || '').trim().slice(0, 80);
-  if (name.length < 2) name = 'Usuário';
+export async function loadProfile(uid) {
+  const snapshot = await getDoc(doc(db, 'users', uid));
+  return snapshot.exists() ? snapshot.data() : null;
+}
 
-  const batch = writeBatch(db);
-  batch.set(userRef, {
-    name,
-    nameLower: normalize(name),
-    photoURL: user.photoURL ?? null,
-    username: null,
-    categoryId: null,
-    searchKeywords: searchKeywords(name),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  batch.set(doc(db, 'users', user.uid, 'private', 'data'), {
-    email: user.email ?? null,
-    phone: null,
-    cpf: null,
-    state: null,
-    updatedAt: serverTimestamp(),
-  });
-  await batch.commit();
+// Cadastro completo = passou pelas 4 etapas (signupStep guarda a última concluída)
+export const isProfileComplete = (profile) => (profile?.signupStep ?? 0) >= 4;
+
+const halt = () => new Promise(() => {}); // a página para aqui enquanto redireciona
+
+// Guard das páginas. Ordem: login → e-mail verificado → cadastro completo.
+// Devolve { user, profile } (profile só quando profileComplete = true).
+export async function requireAuth({ verified = true, profileComplete = true } = {}) {
+  const user = await currentUser();
+  if (!user) {
+    navigate(`/${nextParam()}`, { replace: true });
+    return halt();
+  }
+
+  if (verified && !user.emailVerified) {
+    // Pode ter confirmado em outra aba: atualiza antes de mandar para a verificação
+    await user.reload().catch(() => {});
+    if (user.emailVerified) {
+      await user.getIdToken(true); // o banco só enxerga a verificação com um token novo
+    } else {
+      navigate(`/verify-email.html${nextParam()}`, { replace: true });
+      return halt();
+    }
+  }
+
+  let profile = null;
+  if (profileComplete) {
+    profile = await loadProfile(user.uid);
+    if (!isProfileComplete(profile)) {
+      navigate(`/signup.html${nextParam()}`, { replace: true });
+      return halt();
+    }
+  }
+  return { user, profile };
 }
 
 export async function signOutUser() {

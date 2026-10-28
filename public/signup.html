@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar conta | EscalaMed</title>
+  <meta name="description" content="Crie sua conta no EscalaMed." />
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-showcase" aria-label="Benefícios do EscalaMed">
+      <div class="auth-brands">
+        <img class="auth-partner" src="/img/hapvida-logo-negativo.svg" alt="Hapvida" width="178" height="40" />
+        <span class="auth-brands-divider" aria-hidden="true"></span>
+        <a class="auth-brand" href="/"><img src="/img/logo.svg" alt="" />EscalaMed</a>
+      </div>
+      <div class="carousel" id="carousel">
+        <img class="carousel-illustration" src="/img/login-illustration.png" alt="" width="508" height="334" />
+        <div class="carousel-track" id="carousel-track"></div>
+        <div class="carousel-dots" id="carousel-dots" role="group" aria-label="Escolher benefício"></div>
+      </div>
+      <p class="auth-showcase-footer">Escalas, trocas e plantões da sua equipe de saúde em um só lugar.</p>
+    </aside>
+
+    <main class="auth-panel">
+      <div class="auth-box">
+        <a class="auth-brand" href="/"><img src="/img/logo.svg" alt="" />EscalaMed</a>
+
+        <div class="signup-progress" id="signup-progress" hidden>
+          <span class="signup-progress-label" id="progress-label">Etapa 1 de 4</span>
+          <div class="signup-progress-bar" role="progressbar" aria-labelledby="progress-label" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1">
+            <span id="progress-fill"></span>
+          </div>
+        </div>
+
+        <!-- Etapa 1: e-mail e termos -->
+        <section class="auth-view" id="step-1" aria-labelledby="step-1-title" hidden>
+          <a class="btn btn-ghost auth-back" href="/"><span data-icon="arrowLeft"></span>Voltar</a>
+          <header class="auth-header">
+            <h1 id="step-1-title">Criar nova conta</h1>
+            <p class="muted">Este será o e-mail de acesso à plataforma.</p>
+          </header>
+          <form id="form-email" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="signup-email">E-mail</label>
+              <div class="input-icon">
+                <span data-icon="mail"></span>
+                <input class="input" id="signup-email" name="email" type="email" autocomplete="email" placeholder="Seu e-mail" required />
+              </div>
+              <span class="field-error"></span>
+            </div>
+            <div class="field checkbox-field">
+              <label class="checkbox">
+                <input type="checkbox" id="signup-terms" name="terms" required />
+                <span>Confirmo que li e concordo com os <strong>Termos de Uso</strong> e o <strong>Aviso de Privacidade</strong> do EscalaMed.</span>
+              </label>
+              <span class="field-error"></span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Próximo<span data-icon="chevronRight"></span></button>
+          </form>
+          <p class="auth-switch">Já tem conta? <a id="login-link" href="/#entrar">Entrar</a></p>
+        </section>
+
+        <!-- Etapa 2: senha (cria a conta) -->
+        <section class="auth-view" id="step-2" aria-labelledby="step-2-title" hidden>
+          <button type="button" class="btn btn-ghost auth-back" data-go="1"><span data-icon="arrowLeft"></span>Voltar</button>
+          <header class="auth-header">
+            <h1 id="step-2-title">Crie sua senha</h1>
+            <p class="muted" id="step-2-email"></p>
+          </header>
+          <form id="form-password" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <!-- Campo oculto para o gerenciador de senhas salvar junto com o e-mail -->
+            <input type="email" name="username" id="signup-username" autocomplete="username" hidden />
+            <div class="field">
+              <label class="label" for="signup-password">Senha</label>
+              <div class="input-icon password-wrap">
+                <span data-icon="lock"></span>
+                <input class="input" id="signup-password" name="password" type="password" autocomplete="new-password" placeholder="Crie uma senha" aria-describedby="password-rules" required />
+              </div>
+              <div class="strength-meter" id="strength-meter" aria-live="polite"><i></i><i></i><i></i><i></i><span></span></div>
+              <ul class="password-rules" id="password-rules" aria-label="Requisitos da senha"></ul>
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="signup-confirm">Confirmar senha</label>
+              <div class="input-icon password-wrap">
+                <span data-icon="lock"></span>
+                <input class="input" id="signup-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required />
+              </div>
+              <span class="field-error"></span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+          </form>
+        </section>
+
+        <!-- Etapa 3: dados pessoais -->
+        <section class="auth-view" id="step-3" aria-labelledby="step-3-title" hidden>
+          <header class="auth-header">
+            <h1 id="step-3-title">Seus dados</h1>
+            <p class="muted">Conta criada! Agora conte um pouco sobre você.</p>
+          </header>
+          <form id="form-personal" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="signup-name">Nome completo</label>
+              <input class="input" id="signup-name" name="name" type="text" autocomplete="name" maxlength="80" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="field">
+              <label class="label" for="signup-phone">Telefone</label>
+              <input class="input" id="signup-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="(99) 99999-9999" required />
+              <span class="field-error"></span>
+            </div>
+            <div class="auth-row">
+              <div class="field">
+                <label class="label" for="signup-state">Estado</label>
+                <select class="select" id="signup-state" name="state" required>
+                  <option value="">Selecione</option>
+                </select>
+                <span class="field-error"></span>
+              </div>
+              <div class="field">
+                <label class="label" for="signup-cpf">CPF <span class="field-hint">(opcional)</span></label>
+                <input class="input" id="signup-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" />
+                <span class="field-error"></span>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Próximo<span data-icon="chevronRight"></span></button>
+          </form>
+        </section>
+
+        <!-- Etapa 4: dados profissionais -->
+        <section class="auth-view" id="step-4" aria-labelledby="step-4-title" hidden>
+          <button type="button" class="btn btn-ghost auth-back" data-go="3"><span data-icon="arrowLeft"></span>Voltar</button>
+          <header class="auth-header">
+            <h1 id="step-4-title">Dados profissionais</h1>
+            <p class="muted">Aparecem para os gestores dos grupos em que você entrar.</p>
+          </header>
+          <form id="form-professional" novalidate>
+            <div class="alert form-alert" role="alert" hidden></div>
+            <div class="field">
+              <label class="label" for="signup-category">Profissão</label>
+              <select class="select" id="signup-category" name="categoryId" required>
+                <option value="">Selecione</option>
+              </select>
+              <span class="field-error"></span>
+            </div>
+            <div class="field" id="specialty-field" hidden>
+              <label class="label" for="signup-specialty">Especialidade</label>
+              <input class="input" id="signup-specialty" name="specialty" type="text" maxlength="80" list="specialty-options" placeholder="Ex.: Clínico Geral" />
+              <datalist id="specialty-options"></datalist>
+              <span class="field-error"></span>
+            </div>
+            <div class="auth-row" id="council-fields" hidden>
+              <div class="field">
+                <label class="label" for="signup-council-number" id="council-label">Registro no conselho</label>
+                <input class="input" id="signup-council-number" name="councilNumber" type="text" inputmode="numeric" maxlength="20" />
+                <span class="field-error"></span>
+              </div>
+              <div class="field">
+                <label class="label" for="signup-council-state">UF do registro</label>
+                <select class="select" id="signup-council-state" name="councilState">
+                  <option value="">UF</option>
+                </select>
+                <span class="field-error"></span>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Concluir cadastro<span data-icon="check"></span></button>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/js/pages/signup.js"></script>
+</body>
+</html>

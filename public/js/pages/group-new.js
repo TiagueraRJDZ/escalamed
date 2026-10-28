@@ -24,6 +24,7 @@ import { PROFESSIONAL_CATEGORIES } from '/data/categories.js';
 import { GROUP_COLORS, DEFAULT_GROUP_COLOR } from '/data/colors.js';
 import { STATES } from '/data/states.js';
 import { normalize, searchKeywords } from '../validators.js';
+import { memberCard } from '../members.js';
 import { toMinutes, toTime, durationMinutes, endsNextDay, formatDuration, SHIFT_PRESETS } from '../shifts.js';
 import {
   escapeHtml,
@@ -39,7 +40,7 @@ import {
 } from '../ui.js';
 
 renderIcons();
-const { user } = await initLayout({ active: 'schedules' });
+const { user, profile } = await initLayout({ active: 'schedules' });
 
 // ---------- Estado ----------
 const params = new URLSearchParams(location.search);
@@ -409,8 +410,6 @@ infoForm.addEventListener('submit', async (event) => {
 // Cria o grupo e o registro do criador como gestor, juntos
 async function createGroup(data) {
   const ref = doc(collection(db, 'groups'));
-  let memberName = (user.displayName || user.email?.split('@')[0] || '').trim().slice(0, 80);
-  if (memberName.length < 2) memberName = 'Usuário';
 
   const newGroup = {
     ...data,
@@ -418,6 +417,9 @@ async function createGroup(data) {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
     ownerId: user.uid,
     managerIds: [user.uid],
+    assistantIds: [],
+    analystIds: [],
+    observerIds: [],
     memberIds: [user.uid],
     setupStep: 'shifts',
   };
@@ -425,9 +427,8 @@ async function createGroup(data) {
   const batch = writeBatch(db);
   batch.set(ref, { ...newGroup, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   batch.set(doc(db, 'groups', ref.id, 'members', user.uid), {
+    ...memberCard(profile),
     role: 'manager',
-    name: memberName,
-    photoURL: user.photoURL ?? null,
     joinedAt: serverTimestamp(),
   });
   await batch.commit();

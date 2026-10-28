@@ -265,3 +265,134 @@
 
 .password-rules svg { width: 14px; height: 14px; }
 .password-rules li.is-ok { color: var(--cor-sucesso); }
+
+/* ---------- Acesso, cadastro e verificação ---------- */
+.auth-back {
+  align-self: flex-start;
+  margin-left: calc(var(--esp-3) * -1);
+}
+
+.auth-cta { min-height: 52px; font-size: var(--texto-md); }
+
+.auth-switch {
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-2);
+  text-align: center;
+}
+.auth-switch a,
+.auth-forgot a,
+.link-button {
+  color: var(--auth-azul);
+  font-weight: 600;
+}
+
+.auth-forgot {
+  margin: calc(var(--esp-1) * -1) 0 0;
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-2);
+  text-align: right;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.link-button:hover { text-decoration: underline; }
+
+/* Rótulos visíveis acima dos campos */
+.auth-view .field > .label { margin-bottom: var(--esp-1); }
+
+/* Duas colunas (UF + CPF, número do conselho + UF) */
+.auth-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--esp-3);
+}
+
+/* Barra de progresso do cadastro */
+.signup-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-1);
+  margin-bottom: var(--esp-4);
+}
+.signup-progress-label {
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  color: var(--cor-texto-3);
+}
+.signup-progress-bar {
+  height: 6px;
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie-2);
+  overflow: hidden;
+}
+.signup-progress-bar span {
+  display: block;
+  height: 100%;
+  width: 25%;
+  background: var(--auth-azul);
+  transition: width 250ms ease;
+}
+
+/* Caixa de seleção com texto ao lado */
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-2);
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-2);
+  cursor: pointer;
+}
+.checkbox input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--auth-azul);
+}
+.checkbox-field { margin-top: var(--esp-2); }
+
+/* Força da senha: 4 barrinhas que acendem */
+.strength-meter {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto;
+  align-items: center;
+  gap: var(--esp-1);
+  margin-top: var(--esp-2);
+  font-size: var(--texto-xs);
+  color: var(--cor-texto-3);
+}
+.strength-meter i {
+  height: 4px;
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie-2);
+}
+.strength-meter span { min-width: 9ch; text-align: right; }
+.strength-meter[data-level='0'] i:nth-child(-n + 1) { background: var(--cor-perigo); }
+.strength-meter[data-level='1'] i:nth-child(-n + 2) { background: var(--cor-perigo); }
+.strength-meter[data-level='2'] i:nth-child(-n + 2) { background: var(--cor-alerta); }
+.strength-meter[data-level='3'] i:nth-child(-n + 3) { background: var(--cor-sucesso); }
+.strength-meter[data-level='4'] i:nth-child(-n + 4) { background: var(--cor-sucesso); }
+
+/* Página só com o painel (verificação de e-mail) */
+.auth-single {
+  min-height: 100vh;
+  background: var(--cor-superficie);
+}
+.auth-single .auth-box .auth-brand { display: flex; }
+
+.verify-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+  border-radius: 20px;
+  background: var(--cor-primaria-suave);
+  color: var(--auth-azul);
+}
+.verify-icon svg { width: 36px; height: 36px; }
