@@ -37,6 +37,34 @@ export function isValidName(name) {
   return clean.length >= 3 && clean.length <= 80 && /\p{L}/u.test(clean);
 }
 
+// Só os dígitos: "(85) 99999-0000" -> "85999990000"
+export const onlyDigits = (value) => String(value ?? '').replace(/\D/g, '');
+
+// Máscara de telefone enquanto digita: (99) 9999-9999 ou (99) 99999-9999
+export function formatPhone(value) {
+  const d = onlyDigits(value).slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+// Fixo (10 dígitos) ou celular (11 dígitos, começando com 9), com DDD válido
+export function isValidPhone(value) {
+  const d = onlyDigits(value);
+  if (!/^[1-9][1-9]/.test(d)) return false;
+  return d.length === 10 || (d.length === 11 && d[2] === '9');
+}
+
+// Máscara de CPF: 999.999.999-99
+export function formatCPF(value) {
+  const d = onlyDigits(value).slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2');
+}
+
 // CPF com dígitos verificadores
 export function isValidCPF(value) {
   const cpf = String(value).replace(/\D/g, '');
