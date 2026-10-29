@@ -3,11 +3,9 @@ import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, navigate } from './firebase.js';
 import { mustChangePassword } from './auth-api.js';
+import { nextParam } from './redirect.js';
 
-export const HOME = '/schedules.html';
-
-// Páginas do fluxo de entrada: elas repassam o "next" em vez de virar o destino
-const AUTH_PAGES = ['/', '/index.html', '/signup.html', '/new-password.html'];
+export { HOME, nextUrl, nextParam } from './redirect.js';
 
 // Espera o Firebase dizer se há alguém logado (só a primeira resposta)
 export function currentUser() {
@@ -17,18 +15,6 @@ export function currentUser() {
       resolve(user);
     });
   });
-}
-
-// Para onde ir depois de entrar (só caminhos internos, para evitar redirecionamento malicioso)
-export function nextUrl() {
-  const next = new URLSearchParams(location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : HOME;
-}
-
-// "?next=..." para levar adiante: a página atual, ou o next que ela já recebeu
-export function nextParam() {
-  const target = AUTH_PAGES.includes(location.pathname) ? nextUrl() : location.pathname + location.search;
-  return target === HOME ? '' : `?next=${encodeURIComponent(target)}`;
 }
 
 export async function loadProfile(uid) {

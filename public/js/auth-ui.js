@@ -1,10 +1,9 @@
 // Peças comuns das telas de entrada (acesso, cadastro): carrossel, mostrar senha,
 // requisitos da senha e botão "Continuar com Google".
+// Não importa o Firebase direto: assim estas peças aparecem na hora, sem esperar o SDK baixar.
 import { icon } from './icons.js';
 import { PASSWORD_RULES } from './validators.js';
-import { navigate } from './firebase.js';
-import { loadProfile, isProfileComplete, nextUrl, nextParam } from './auth.js';
-import { signInWithGoogle } from './auth-api.js';
+import { nextUrl, nextParam } from './redirect.js';
 import { setLoading, toast, firebaseErrorMessage } from './ui.js';
 
 const SLIDES = [
@@ -137,11 +136,23 @@ const GOOGLE_LOGO = `
 // Botões com data-google-login: entra pelo Google e segue para o app ou, no
 // primeiro acesso, para o cadastro (que continua a partir dos dados pessoais).
 export function setupGoogleButtons() {
-  document.querySelectorAll('[data-google-login]').forEach((button) => {
+  const buttons = document.querySelectorAll('[data-google-login]');
+  if (!buttons.length) return;
+
+  // Firebase baixado em segundo plano. O popup do Google precisa abrir logo após o clique
+  // (senão o navegador bloqueia), então guardamos os módulos prontos para usar sem esperar.
+  let deps = null;
+  const loading = Promise.all([import('./firebase.js'), import('./auth.js'), import('./auth-api.js')]).then(
+    ([{ navigate }, { loadProfile, isProfileComplete }, { signInWithGoogle }]) =>
+      (deps = { navigate, loadProfile, isProfileComplete, signInWithGoogle }),
+  );
+
+  buttons.forEach((button) => {
     button.insertAdjacentHTML('afterbegin', GOOGLE_LOGO);
     button.addEventListener('click', async () => {
       setLoading(button, true);
       try {
+        const { navigate, loadProfile, isProfileComplete, signInWithGoogle } = deps ?? (await loading);
         const { user } = await signInWithGoogle();
         const profile = await loadProfile(user.uid).catch(() => null);
         navigate(isProfileComplete(profile) ? nextUrl() : `/signup.html${nextParam()}`, { replace: true });

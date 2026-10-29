@@ -6,6 +6,10 @@
   <title>Anúncios | EscalaMed</title>
   <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
   <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- SDK do Firebase baixado já no início, em paralelo (sem esperar os imports em cascata) -->
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js" />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/layout.css" />
 </head>

@@ -1,9 +1,8 @@
 // Tela de acesso: escolher (entrar ou criar conta), login e "esqueci a senha".
 // Login por e-mail no Firebase; por nome de usuário, pelo serviço de contas (ver auth-api.js);
 // pela conta Google, no botão "Continuar com Google" (ver auth-ui.js).
-import { navigate } from '../firebase.js';
-import { currentUser, nextUrl, nextParam } from '../auth.js';
-import { signIn } from '../auth-api.js';
+// A tela aparece na hora; o Firebase (SDK grande, vem do gstatic) baixa em segundo plano.
+import { nextUrl, nextParam } from '../redirect.js';
 import { renderIcons } from '../icons.js';
 import { mountCredits } from '../version.js';
 import { setupCarousel, setupPasswordToggles, setupGoogleButtons } from '../auth-ui.js';
@@ -16,8 +15,9 @@ import {
   firebaseErrorMessage,
 } from '../ui.js';
 
-// ---------- Já está logado? Vai direto para o app (os guards cuidam do resto) ----------
-if (await currentUser()) navigate(nextUrl(), { replace: true });
+const firebaseReady = Promise.all([import('../firebase.js'), import('../auth.js'), import('../auth-api.js')]).then(
+  ([{ navigate }, { currentUser }, { signIn }]) => ({ navigate, currentUser, signIn }),
+);
 
 // ---------- Troca de tela pelo endereço (#entrar, #recuperar) ----------
 // Sem endereço (ou desconhecido), mostra a escolha entre entrar e criar conta.
@@ -26,7 +26,7 @@ const VIEWS = { '#entrar': 'view-login', '#recuperar': 'view-forgot' };
 
 function showView({ focus = true } = {}) {
   if (location.hash === '#cadastro') {
-    navigate(`/signup.html${nextParam()}`, { replace: true });
+    location.replace(`/signup.html${nextParam()}`);
     return;
   }
   const target = VIEWS[location.hash] ?? 'view-choose';
@@ -63,6 +63,7 @@ function setupLogin() {
     const button = form.querySelector('[type=submit]');
     setLoading(button, true);
     try {
+      const { signIn, navigate } = await firebaseReady;
       const { mustChangePassword } = await signIn(identifier, password);
       navigate(mustChangePassword ? `/new-password.html${nextParam()}` : nextUrl(), { replace: true });
     } catch (error) {
@@ -85,3 +86,7 @@ clearErrorsWhileTyping(document.getElementById('login-form'));
 
 window.addEventListener('hashchange', () => showView());
 showView({ focus: false });
+
+// ---------- Já está logado? Vai direto para o app (os guards cuidam do resto) ----------
+const { currentUser, navigate } = await firebaseReady;
+if (await currentUser()) navigate(nextUrl(), { replace: true });
