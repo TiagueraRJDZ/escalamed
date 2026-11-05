@@ -45,3 +45,13 @@ test('rótulos de profissão e conselho', () => {
   assert.equal(councilLabel({ type: 'CRM', number: '28890', state: 'CE' }), 'CRM 28890/CE');
   assert.equal(councilLabel(null), '');
 });
+
+test('endereço da web (Lattes)', async () => {
+  const { isValidUrl } = await import('../public/js/validators.js');
+  assert.ok(isValidUrl('http://lattes.cnpq.br/1234567890123456'));
+  assert.ok(isValidUrl('https://lattes.cnpq.br/1234'));
+  assert.ok(!isValidUrl('lattes.cnpq.br/1234'));
+  assert.ok(!isValidUrl('javascript:alert(1)'));
+  assert.ok(!isValidUrl('https://localhost'));
+  assert.ok(!isValidUrl('https://exemplo.com/ com espaço'));
+});

@@ -317,6 +317,44 @@ test('perfil: a própria pessoa cria; profissão inválida e perfil alheio não'
   assert.ok(!(await commit(outsider.token, [w.set(`users/${unverified.uid}`, profile(null))])));
 });
 
+test('perfil: apelido, bio de até 160, Lattes e listas de até 20 itens', async () => {
+  const base = {
+    name: 'Fulano de Tal',
+    nameLower: 'fulano de tal',
+    photoURL: null,
+    username: null,
+    categoryId: 'medico',
+    specialty: null,
+    council: null,
+    searchKeywords: ['fulano', 'de', 'tal'],
+    signupStep: 4,
+    termsAcceptedAt: NOW,
+    termsVersion: '2026-10',
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  await admin([w.set(`users/${staff.uid}`, { ...base, createdAt: new Date(), termsAcceptedAt: new Date(), updatedAt: new Date() })]);
+  const save = (about, actor = staff) => commit(actor.token, [w.update(`users/${staff.uid}`, { about, updatedAt: NOW })]);
+  const item = { title: 'ACLS', place: 'AHA', start: '2024', end: null };
+  const about = {
+    nickname: 'Fulano',
+    bio: 'Plantonista de emergência.',
+    lattesUrl: 'http://lattes.cnpq.br/123',
+    certifications: [item],
+    education: [],
+    experiences: [],
+    academicLeagues: [],
+    cooperatives: [],
+  };
+  assert.ok(await save(about));
+  assert.ok(await save(null));
+  assert.ok(!(await save({ ...about, bio: 'x'.repeat(161) })));
+  assert.ok(!(await save({ ...about, lattesUrl: 'javascript:alert(1)' })));
+  assert.ok(!(await save({ ...about, certifications: Array(21).fill(item) })));
+  assert.ok(!(await save({ ...about, outro: 'campo' })));
+  assert.ok(!(await save(about, outsider)));
+});
+
 // ---------- Administrador da plataforma (config/admins) ----------
 test('config/admins: todos os logados leem; ninguém grava pelo app', async () => {
   await admin([w.set('config/admins', { uids: [manager.uid] })]);

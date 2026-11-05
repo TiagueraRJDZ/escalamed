@@ -78,10 +78,33 @@ service cloud.firestore {
     // ---------- Usuários (perfil público) ----------
     // O documento nasce na etapa 3 do cadastro (signupStep 3) e fica completo na 4.
     match /users/{uid} {
+      // Lista do perfil (certificações, formações...): até 20 itens. As regras não percorrem
+      // listas, então o conteúdo de cada item é conferido no app.
+      function optEntries(v) {
+        return v == null || (v is list && v.size() <= 20);
+      }
+
+      // Configurações > Editar perfil: apelido, mini bio, Lattes e listas
+      function validAbout(a) {
+        return a == null || (a is map
+          && a.keys().hasOnly(['nickname', 'bio', 'lattesUrl', 'certifications', 'education',
+                               'experiences', 'academicLeagues', 'cooperatives'])
+          && optStr(a.get('nickname', null), 40)
+          && optStr(a.get('bio', null), 160)
+          && (a.get('lattesUrl', null) == null
+              || (a.lattesUrl is string && a.lattesUrl.size() <= 200 && a.lattesUrl.matches('^https?://[^ ]+$')))
+          && optEntries(a.get('certifications', null))
+          && optEntries(a.get('education', null))
+          && optEntries(a.get('experiences', null))
+          && optEntries(a.get('academicLeagues', null))
+          && optEntries(a.get('cooperatives', null)));
+      }
+
       function validUser(d) {
         return d.keys().hasOnly(['name', 'nameLower', 'photoURL', 'username', 'categoryId', 'specialty',
-                                 'council', 'searchKeywords', 'signupStep', 'termsAcceptedAt',
+                                 'council', 'about', 'searchKeywords', 'signupStep', 'termsAcceptedAt',
                                  'termsVersion', 'createdAt', 'updatedAt'])
+          && validAbout(d.get('about', null))
           && str(d.name, 2, 80)
           && str(d.nameLower, 2, 80)
           && validPhoto(d.photoURL)

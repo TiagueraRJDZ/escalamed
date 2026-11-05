@@ -25,7 +25,7 @@ escalamed/
 │  ├─ schedule-edit.html editor da escala mensal: grade, vagas, publicar, replicar, imprimir
 │  ├─ invite.html       aceitar ou recusar um convite
 │  ├─ new-password.html troca obrigatória da senha provisória
-│  ├─ settings.html     configurações da conta (dados, profissão, foto, senha, exclusão)
+│  ├─ settings.html     Configurações: conta, profissão, perfil, senha, usuários (admin) e exclusão
 │  ├─ *.html            demais telas (algumas ainda provisórias)
 │  ├─ css/              base.css (cores e componentes), layout.css e um arquivo por tela
 │  ├─ js/
@@ -39,6 +39,7 @@ escalamed/
 │  │  ├─ schedule-math.js escala: horas, conflitos de horário, replicação (sem Firebase, com testes)
 │  │  ├─ schedule-data.js escala no Firestore: ler, alocar, vagas, publicar, replicar
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
+│  │  ├─ settings/      uma seção das Configurações por arquivo; menu.js lista as seções (subitens do menu lateral)
 │  │  └─ pages/         código de cada tela
 │  ├─ fonts/            fonte Pitanga (woff2)
 │  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)

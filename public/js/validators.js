@@ -77,3 +77,14 @@ export function isValidCPF(value) {
   };
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
 }
+
+// Endereço da web (http ou https), ex.: link do Currículo Lattes
+export function isValidUrl(value) {
+  const text = String(value ?? '').trim();
+  if (!/^https?:\/\/\S+$/i.test(text) || text.length > 200) return false;
+  try {
+    return Boolean(new URL(text).hostname.includes('.'));
+  } catch {
+    return false;
+  }
+}

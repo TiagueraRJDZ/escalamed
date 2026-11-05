@@ -10,9 +10,12 @@ import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 import { mountCredits } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
+import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
+  // Abre e fecha; as seções das Configurações ficam como subitens
+  { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html', children: SETTINGS_SECTIONS },
 ];
 
 const COLLAPSED_KEY = 'escalamed:menu-recolhido';
@@ -33,7 +36,29 @@ function saveCollapsed(collapsed) {
   }
 }
 
-function navItem(item, active) {
+// Item com subitens (Configurações): clicar abre e fecha a lista. Começa aberto na
+// própria página. Com o menu recolhido (só ícones), o clique leva direto para a página.
+function navGroup(item, active, { admin }) {
+  const open = item.id === active;
+  const subitems = item.children
+    .map(
+      (child) => `<li${child.adminOnly && !admin ? ' hidden' : ''} data-admin-only="${Boolean(child.adminOnly)}">
+        <a class="nav-subitem" href="${item.href}#${child.hash}" data-hash="${child.hash}" title="${child.title}">
+          ${icon(child.icon)}<span>${child.title}</span>
+        </a></li>`,
+    )
+    .join('');
+  return `<li class="nav-group">
+    <button type="button" class="nav-item nav-parent${open ? ' is-active' : ''}" data-href="${item.href}"
+      aria-expanded="${open}" aria-controls="nav-sub-${item.id}" title="${item.label}">
+      ${icon(item.icon)}<span class="nav-label">${item.label}</span>${icon('chevronDown', 'nav-chevron')}
+    </button>
+    <ul class="nav-sub" id="nav-sub-${item.id}"${open ? '' : ' hidden'}>${subitems}</ul>
+  </li>`;
+}
+
+function navItem(item, active, options) {
+  if (item.children) return navGroup(item, active, options);
   const badge = item.badge ? `<span class="badge badge-new">${item.badge}</span>` : '';
   const content = `${icon(item.icon)}<span class="nav-label">${item.label}</span>${badge}`;
   const common = `class="nav-item" title="${item.label}" aria-label="${item.label}"`;
@@ -83,6 +108,16 @@ async function showAdminRole(app, uid, profile) {
     // sem armazenamento: só pergunta de novo na próxima página
   }
   app.querySelector('#account-role').textContent = isAdmin ? ADMIN_LABEL : categoryName(profile.categoryId);
+  // Subitens só de administrador (Configurações > Usuários)
+  app.querySelectorAll('.nav-sub [data-admin-only="true"]').forEach((li) => (li.hidden = !isAdmin));
+}
+
+// Marca no menu lateral a seção das Configurações aberta (chamado pela página)
+export function setActiveSettingsSection(hash = DEFAULT_SECTION) {
+  document.querySelectorAll('.nav-subitem').forEach((a) => {
+    if (a.dataset.hash === hash) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
 }
 
 // Busca de pessoas no topo (fica de fora em páginas como Configurações)
@@ -102,7 +137,7 @@ function shellHtml(user, profile, active, collapsed, search) {
         <img src="/img/logo.svg" alt="" /><span class="sidebar-brand-name">EscalaMed</span>
       </a>
       <nav aria-label="Navegação principal">
-        <ul class="nav">${NAV.map((item) => navItem(item, active)).join('')}</ul>
+        <ul class="nav">${NAV.map((item) => navItem(item, active, { admin: cachedAdmin(user.uid) })).join('')}</ul>
       </nav>
     </aside>
     <!-- Botão redondo na borda do menu: recolhe e expande -->
@@ -140,8 +175,8 @@ ${search ? searchHtml() : ''}
               <div class="menu-header">
                 <span id="account-menu-email">${escapeHtml(user.email || '')}</span>
               </div>
-              <button type="button" class="menu-item" role="menuitem" id="open-account" aria-haspopup="dialog">${icon('user')}Minha conta</button>
-              <a class="menu-item" role="menuitem" href="/settings.html"${active === 'settings' ? ' aria-current="page"' : ''}>${icon('settings')}Configurações</a>
+              <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('user')}Minha conta</a>
+              <a class="menu-item" role="menuitem" href="/settings.html#perfil">${icon('edit')}Editar perfil</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -205,6 +240,24 @@ function setupSidebar(app) {
   openButton.addEventListener('click', () => setMenuOpen(true));
   app.querySelector('#sidebar-backdrop').addEventListener('click', () => setMenuOpen(false));
   app.querySelectorAll('.sidebar [data-open]').forEach((el) => el.addEventListener('click', () => setMenuOpen(false)));
+  // Subitem na mesma página (ex.: outra seção das Configurações): fecha a gaveta
+  app.querySelectorAll('.nav-subitem').forEach((el) => el.addEventListener('click', () => setMenuOpen(false)));
+
+  // Item com subitens: abre e fecha a lista. Com o menu recolhido no computador
+  // (só ícones, sem espaço para os subitens), leva direto para a página.
+  const mobile = window.matchMedia('(max-width: 899px)');
+  app.querySelectorAll('.nav-parent').forEach((parent) => {
+    parent.addEventListener('click', () => {
+      if (app.classList.contains('is-collapsed') && !mobile.matches) {
+        location.href = parent.dataset.href;
+        return;
+      }
+      const open = parent.getAttribute('aria-expanded') !== 'true';
+      parent.setAttribute('aria-expanded', String(open));
+      document.getElementById(parent.getAttribute('aria-controls')).hidden = !open;
+    });
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && app.classList.contains('is-menu-open')) {
       setMenuOpen(false);
@@ -213,28 +266,22 @@ function setupSidebar(app) {
   });
 }
 
-// Pílula e menu da conta com o nome, a foto e o e-mail atuais (depois de salvar em Minha conta)
-function refreshAccountButton(app, user, profile) {
+// Pílula e menu da conta com o nome, a foto e o e-mail atuais. As Configurações chamam
+// depois de salvar nome, foto, profissão ou e-mail (atualiza sem recarregar a página).
+let shell = null;
+
+export function refreshAccountButton() {
+  if (!shell) return;
+  const { app, user, profile } = shell;
   app.querySelector('.account-avatar').outerHTML = avatarHtml(profile, 'avatar account-avatar');
   app.querySelector('.account-text strong').textContent = shortName(profile.name);
   app.querySelector('#account-menu-email').textContent = auth.currentUser?.email ?? user.email ?? '';
   showAdminRole(app, user.uid, profile);
 }
 
-// Minha conta abre num modal, em qualquer página. O código do modal só é baixado na primeira vez.
-async function openAccount(app, user, profile) {
-  try {
-    const { openAccountModal } = await import('./account-modal.js');
-    openAccountModal({ user, profile, onChange: () => refreshAccountButton(app, user, profile) });
-  } catch {
-    toast('Não foi possível abrir Minha conta. Confira a conexão e tente de novo.', 'error');
-  }
-}
-
-function setupUserMenu(app, user, profile) {
+function setupUserMenu(app) {
   const menu = app.querySelector('#user-menu');
   setupMenu(app.querySelector('#avatar-button'), menu);
-  menu.querySelector('#open-account').addEventListener('click', () => openAccount(app, user, profile));
   menu.querySelector('#logout').addEventListener('click', signOutUser);
 }
 
@@ -305,7 +352,8 @@ export async function initLayout({ active, search = true } = {}) {
   document.body.insertAdjacentHTML('beforeend', dialogsHtml() + personModalHtml());
 
   setupSidebar(app);
-  setupUserMenu(app, user, profile);
+  setupUserMenu(app);
+  shell = { app, user, profile };
   setupDialogs();
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);

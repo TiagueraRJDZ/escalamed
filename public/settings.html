@@ -22,103 +22,17 @@
     <!-- Vai para a faixa branca do topo (no lugar da busca) -->
     <h1 class="topbar-title" id="settings-title" data-topbar-title>Configurações</h1>
 
-    <div class="settings-layout">
-      <div class="tabs settings-tabs" role="tablist" aria-labelledby="settings-title" aria-orientation="vertical" id="settings-tabs">
-        <button type="button" class="tab" role="tab" id="tab-password" data-hash="senha" aria-controls="panel-password"><span data-icon="lock"></span><span data-password-title>Alterar senha</span></button>
-        <button type="button" class="tab" role="tab" id="tab-users" data-hash="usuarios" data-off aria-controls="panel-users"><span data-icon="users"></span>Usuários</button>
-        <button type="button" class="tab is-danger" role="tab" id="tab-delete" data-hash="excluir" aria-controls="panel-delete"><span data-icon="trash"></span>Excluir minha conta</button>
-      </div>
-
-      <div class="settings-panels">
-        <!-- Alterar senha -->
-        <section class="card tab-panel" role="tabpanel" id="panel-password" aria-labelledby="tab-password" hidden>
-          <h2 data-password-title>Alterar senha</h2>
-          <form id="form-password" novalidate>
-            <div class="alert form-alert" role="alert" hidden></div>
-            <p class="muted" id="password-google-hint" hidden>Você entra com a conta Google. Crie uma senha para entrar também com e-mail ou nome de usuário. Vamos pedir para confirmar pelo Google.</p>
-            <input type="email" name="username" id="password-username" autocomplete="username" hidden />
-            <div class="field" id="password-current-field">
-              <label class="label" for="password-current">Senha atual</label>
-              <div class="password-wrap"><input class="input" id="password-current" name="current" type="password" autocomplete="current-password" required /></div>
-              <span class="field-error"></span>
-            </div>
-            <div class="field">
-              <label class="label" for="password-new">Nova senha</label>
-              <div class="password-wrap"><input class="input" id="password-new" name="password" type="password" autocomplete="new-password" aria-describedby="password-rules" required /></div>
-              <div class="strength-meter" id="strength-meter" aria-live="polite"><i></i><i></i><i></i><i></i><span></span></div>
-              <ul class="password-rules" id="password-rules" aria-label="Requisitos da senha"></ul>
-              <span class="field-error"></span>
-            </div>
-            <div class="field">
-              <label class="label" for="password-confirm">Confirmar nova senha</label>
-              <div class="password-wrap"><input class="input" id="password-confirm" name="confirm" type="password" autocomplete="new-password" required /></div>
-              <span class="field-error"></span>
-            </div>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" data-password-title>Alterar senha</button></div>
-          </form>
-        </section>
-
-        <!-- Usuários: só para administradores da plataforma (config/admins no Firestore) -->
-        <section class="card tab-panel" role="tabpanel" id="panel-users" aria-labelledby="tab-users" hidden>
-          <div class="users-header">
-            <h2>Usuários</h2>
-            <span class="muted text-sm" id="users-count"></span>
-          </div>
-          <p class="muted users-intro">Todas as contas da plataforma. Ao fim de cada linha: redefinir senha, inativar acesso e excluir acesso.</p>
-          <div class="alert alert-warning" id="users-alert" hidden></div>
-          <div class="input-icon users-search">
-            <span data-icon="search"></span>
-            <input class="input" id="users-search" type="search" placeholder="Procurar por nome, usuário ou e-mail" aria-label="Procurar usuário" autocomplete="off" />
-          </div>
-          <ul class="member-list" id="users-list" aria-live="polite"></ul>
-          <p class="muted users-empty" id="users-empty" hidden></p>
-        </section>
-
-        <!-- Excluir conta -->
-        <section class="card tab-panel" role="tabpanel" id="panel-delete" aria-labelledby="tab-delete" hidden>
-          <h2>Excluir minha conta</h2>
-          <div class="alert alert-error">
-            Esta ação não pode ser desfeita. Seu perfil e seus dados pessoais são apagados, você sai de todos os grupos
-            e suas escalas individuais são excluídas. Plantões em escalas passadas continuam com o seu nome no histórico.
-          </div>
-          <div id="delete-blockers"></div>
-          <form id="form-delete" novalidate>
-            <div class="alert form-alert" role="alert" hidden></div>
-            <input type="email" name="username" id="delete-username" autocomplete="username" hidden />
-            <div class="field">
-              <label class="label" for="delete-confirm">Digite <strong>EXCLUIR</strong> para confirmar</label>
-              <input class="input" id="delete-confirm" name="confirmText" type="text" autocomplete="off" required />
-              <span class="field-error"></span>
-            </div>
-            <div class="field" id="delete-password-field">
-              <label class="label" for="delete-password">Sua senha</label>
-              <div class="password-wrap"><input class="input" id="delete-password" name="password" type="password" autocomplete="current-password" required /></div>
-              <span class="field-error"></span>
-            </div>
-            <div class="form-actions"><button type="submit" class="btn btn-danger">Excluir minha conta</button></div>
-          </form>
-        </section>
-      </div>
+    <!-- Painel da seção. As seções vêm pelos subitens de "Configurações" no menu lateral
+         e são montadas por js/settings/*.js -->
+    <div class="settings-layout" id="settings-layout">
+      <section class="settings-panel" aria-labelledby="settings-section-title">
+        <header class="settings-panel-header">
+          <h2 id="settings-section-title"></h2>
+        </header>
+        <div class="settings-panel-body" id="settings-sections"></div>
+      </section>
     </div>
   </main>
-
-  <!-- Modal: senha provisória gerada -->
-  <dialog class="modal" id="modal-temp-password" aria-labelledby="modal-temp-password-title">
-    <div class="dialog-header">
-      <h2 id="modal-temp-password-title">Senha provisória</h2>
-      <button type="button" class="btn-icon" data-close aria-label="Fechar"><span data-icon="x"></span></button>
-    </div>
-    <div class="dialog-body">
-      <p class="muted" id="temp-password-text"></p>
-      <div class="copy-field">
-        <input class="input temp-password" id="temp-password" type="text" readonly aria-label="Senha provisória" />
-        <button type="button" class="btn btn-secondary" id="copy-temp-password">Copiar</button>
-      </div>
-    </div>
-    <div class="dialog-footer">
-      <button type="button" class="btn btn-primary" data-close>Pronto</button>
-    </div>
-  </dialog>
 
   <script type="module" src="/js/pages/settings.js"></script>
 </body>
