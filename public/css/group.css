@@ -19,7 +19,7 @@
 }
 
 .group-title { flex: 1; min-width: 200px; }
-.group-title h1 { font-size: var(--texto-2xl); line-height: 1.2; }
+.group-title h1 { font-size: 2rem; line-height: 1.2; }
 .group-title p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); margin-top: var(--esp-1); }
 
 .group-header-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
@@ -45,7 +45,7 @@
   background: none;
   color: var(--cor-texto-2);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -130,7 +130,7 @@
   background: none;
   color: var(--cor-texto);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
@@ -164,7 +164,7 @@
   gap: var(--esp-3);
   padding: var(--esp-4);
   border: 1px solid var(--cor-primaria-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-primaria-suave);
 }
 .invite-card + .invite-card { margin-top: var(--esp-2); }
@@ -193,7 +193,7 @@
   gap: var(--esp-3);
   padding: var(--esp-2) var(--esp-3);
   border: 1px solid var(--cor-primaria-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-primaria-suave);
 }
 
@@ -220,7 +220,7 @@
   width: 100%;
   padding: var(--esp-2) var(--esp-3);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-superficie);
   font: inherit;
   text-align: left;
@@ -239,7 +239,7 @@
   gap: 2px;
   padding: var(--esp-1) 0;
   border: 2px solid transparent;
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) 14px var(--raio);
   background: none;
   font: inherit;
   color: var(--cor-texto);
@@ -250,10 +250,10 @@
 .week-day.has-shift { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
 .week-day.has-shift span { color: rgb(255 255 255 / 0.8); }
 .week-day[aria-pressed='true'] { border-color: var(--cor-primaria-hover); box-shadow: 0 0 0 2px var(--cor-primaria-suave); }
-.day-title { margin-bottom: var(--esp-3); font-weight: 700; }
+.day-title { margin-bottom: var(--esp-3); font-weight: 500; }
 
 
-.day-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-radius: var(--raio); }
+.day-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio); }
 .day-shift + .day-shift { margin-top: var(--esp-2); }
 .day-shift header { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-bottom: var(--esp-2); }
 .day-shift ul { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
@@ -274,7 +274,7 @@
 .day-person:hover { background: var(--cor-primaria-suave); }
 .day-person-name { flex: 1; }
 .day-person > svg { width: 16px; height: 16px; color: var(--cor-texto-3); }
-.day-person.is-me { font-weight: 700; }
+.day-person.is-me { font-weight: 500; }
 .day-avatar { width: 28px; height: 28px; font-size: 0.625rem; }
 
 /* ---------- Editar escala: meses do ano ---------- */
@@ -299,13 +299,13 @@
 .detail-group,
 .detail-person,
 .detail-shift { display: flex; align-items: center; gap: var(--esp-3); }
-.detail-group { padding: var(--esp-3); border-radius: var(--raio); background: var(--cor-superficie-2); }
+.detail-group { padding: var(--esp-3); border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio); background: var(--cor-superficie-2); }
 .detail-group > div,
 .detail-person > div,
 .detail-shift > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .detail-person { margin-top: var(--esp-4); }
 .detail-avatar { width: 56px; height: 56px; font-size: var(--texto-md); }
-.detail-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-left: 4px solid var(--cor-primaria); border-radius: var(--raio); }
+.detail-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-left: 4px solid var(--cor-primaria); border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio); }
 .detail-shift > svg { width: 22px; height: 22px; color: var(--cor-primaria); }
 .detail-others { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
 .detail-others li { display: flex; align-items: center; gap: var(--esp-2); }

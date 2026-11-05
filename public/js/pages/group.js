@@ -4,6 +4,7 @@ import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout, avatarHtml } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
+import { groupColor } from '/data/colors.js';
 import { normalize, isValidEmail } from '../validators.js';
 import {
   ROLES,
@@ -82,7 +83,7 @@ function goAway(message) {
 // ---------- Cabeçalho ----------
 function renderHeader() {
   document.title = `${group.name} | EscalaMed`;
-  $('group-avatar').style.background = group.color;
+  $('group-avatar').style.background = groupColor(group.color);
   $('group-avatar').textContent = initials(group.name);
   $('group-name').textContent = group.name;
   const unit = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
@@ -775,7 +776,7 @@ async function openShiftDetail(uid, shiftId) {
 
   $('shift-detail').innerHTML = `
     <div class="detail-group">
-      <span class="group-avatar" style="background:${escapeHtml(group.color)}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
+      <span class="group-avatar" style="background:${escapeHtml(groupColor(group.color))}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
       <div><strong>${escapeHtml(group.name)}</strong><span class="muted">${escapeHtml(unit)}</span></div>
     </div>
     <div class="detail-person">

@@ -20,37 +20,70 @@
   font-display: swap;
 }
 
-/* ---------- Cores e medidas (troque aqui para mudar o visual) ---------- */
+/* Pitanga do Guia de Marca: só Light, Regular e Medium. Usada no app todo (menos na
+   tela de entrada, que tem a arte própria). Pedidos de 600/700 viram 500 (Medium). */
+@font-face {
+  font-family: 'Pitanga Marca';
+  src: url('/fonts/PitangaVariable.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pitanga Marca';
+  src: url('/fonts/PitangaVariable.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ---------- Cores e medidas (troque aqui para mudar o visual) ----------
+   Visual do Guia de Marca Hapvida (Brandbook V6):
+   - azul Pantone 293 C como cor principal; vermelho, laranjas e amarelo só como acento
+   - fundo "off-white" quente, como as páginas do guia
+   - sem negrito e sem CAPS nos títulos
+   - canto "folha": o canto de baixo à direita mais arredondado (--folha) */
 :root {
+  /* Paleta do Guia de Marca */
+  --hap-azul: #1539aa;
+  --hap-azul-escuro: #0f2c8c;
+  --hap-vermelho: #ff222b;
+  --hap-laranja: #ff4e05;
+  --hap-laranja-claro: #ff8800;
+  --hap-amarelo: #ffcc23;
+  --hap-offwhite: #efede6;
+
   /* Marca */
-  --cor-primaria: #2563eb;
-  --cor-primaria-hover: #1d4ed8;
-  --cor-primaria-suave: #eff6ff;
-  --cor-primaria-borda: #bfdbfe;
+  --cor-primaria: var(--hap-azul);
+  --cor-primaria-hover: var(--hap-azul-escuro);
+  --cor-primaria-suave: #edf0fa;
+  --cor-primaria-borda: #c3cdee;
   --cor-sobre-primaria: #ffffff;
 
-  /* Superfícies e texto */
-  --cor-fundo: #f3f5f9;
+  /* Superfícies e texto (tons quentes, como o papel do guia) */
+  --cor-fundo: var(--hap-offwhite);
   --cor-superficie: #ffffff;
-  --cor-superficie-2: #eef1f6;
-  --cor-borda: #e2e6ee;
-  --cor-borda-forte: #cbd2de;
-  --cor-texto: #1f2937;
-  --cor-texto-2: #4b5563;
-  --cor-texto-3: #6b7280;
+  --cor-superficie-2: #f6f5f0;
+  --cor-borda: #e6e3da;
+  --cor-borda-forte: #d2cec2;
+  --cor-texto: #141b3a;
+  --cor-texto-2: #464c66;
+  --cor-texto-3: #62667a;
 
-  /* Estados */
+  /* Estados (tons da paleta escurecidos o bastante para passar no contraste AA) */
   --cor-sucesso: #15803d;
   --cor-sucesso-suave: #ecfdf3;
-  --cor-alerta: #b45309;
-  --cor-alerta-suave: #fffbeb;
-  --cor-perigo: #dc2626;
-  --cor-perigo-hover: #b91c1c;
-  --cor-perigo-suave: #fef2f2;
-  --cor-destaque: #e0b04b; /* selo "NOVO!" */
+  --cor-alerta: #b83a00;
+  --cor-alerta-suave: #fff1e8;
+  --cor-perigo: #d3121b;
+  --cor-perigo-hover: #b00e16;
+  --cor-perigo-suave: #ffeeee;
+  --cor-destaque: var(--hap-amarelo); /* selo "NOVO!" */
 
   /* Tipografia */
-  --fonte: 'Pitanga', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte: 'Pitanga Marca', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte-entrada: 'Pitanga', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --texto-xs: 0.75rem;
   --texto-sm: 0.875rem;
   --texto-md: 1rem;
@@ -69,11 +102,14 @@
   --raio: 10px;
   --raio-lg: 16px;
   --raio-total: 999px;
-  --sombra-sm: 0 1px 2px rgb(16 24 40 / 0.06);
-  --sombra: 0 4px 12px rgb(16 24 40 / 0.08);
-  --sombra-lg: 0 16px 40px rgb(16 24 40 / 0.18);
+  --folha: 30px; /* o canto mais arredondado (cartões, modais) */
+  --folha-sm: 18px; /* o mesmo canto em peças menores (botões, avisos) */
+  --sombra-sm: 0 1px 2px rgb(20 27 58 / 0.05);
+  --sombra: 0 6px 16px rgb(20 27 58 / 0.08);
+  --sombra-lg: 0 18px 44px rgb(20 27 58 / 0.18);
+  --fundo-escurecido: rgb(10 22 70 / 0.5); /* atrás de gavetas e modais */
   --transicao: 150ms ease;
-  --foco: 0 0 0 3px rgb(37 99 235 / 0.35);
+  --foco: 0 0 0 3px rgb(21 57 170 / 0.3);
 }
 
 /* ---------- Reset ---------- */
@@ -96,6 +132,7 @@ body {
   color: var(--cor-texto);
   background: var(--cor-fundo);
   -webkit-font-smoothing: antialiased;
+  font-synthesis: none; /* nunca "inventa" negrito */
 }
 
 img,
@@ -173,8 +210,8 @@ a:hover {
   min-height: 42px;
   padding: 0 var(--esp-4);
   border: 1px solid transparent;
-  border-radius: var(--raio);
-  font-weight: 600;
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  font-weight: 500;
   font-size: var(--texto-sm);
   cursor: pointer;
   text-decoration: none;
@@ -269,7 +306,7 @@ a:hover {
 
 .label {
   font-size: var(--texto-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--cor-texto-2);
 }
 
@@ -326,18 +363,18 @@ a:hover {
 /* Mensagem de erro/sucesso no topo de um formulário */
 .alert {
   padding: var(--esp-3) var(--esp-4);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   font-size: var(--texto-sm);
   border: 1px solid transparent;
 }
-.alert-error { background: var(--cor-perigo-suave); color: var(--cor-perigo-hover); border-color: #fecaca; }
+.alert-error { background: var(--cor-perigo-suave); color: var(--cor-perigo-hover); border-color: #ffc9cb; }
 .alert-success { background: var(--cor-sucesso-suave); color: var(--cor-sucesso); border-color: #bbf7d0; }
 
 /* ---------- Cartões, selos e separadores ---------- */
 .card {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-lg);
+  border-radius: var(--raio-lg) var(--raio-lg) var(--folha) var(--raio-lg);
   box-shadow: var(--sombra-sm);
 }
 
@@ -348,12 +385,12 @@ a:hover {
   padding: 2px var(--esp-2);
   border-radius: var(--raio-total);
   font-size: var(--texto-xs);
-  font-weight: 700;
+  font-weight: 500;
   background: var(--cor-superficie-2);
   color: var(--cor-texto-2);
 }
-.badge-primary { background: var(--cor-primaria-suave); color: var(--cor-primaria-hover); }
-.badge-new { background: var(--cor-destaque); color: #fff; }
+.badge-primary { background: var(--cor-primaria-suave); color: var(--cor-primaria); }
+.badge-new { background: var(--cor-destaque); color: var(--hap-azul); } /* amarelo + azul: contraste AAA */
 .badge-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
 .badge-muted { background: var(--cor-superficie-2); color: var(--cor-texto-2); }
 .badge-danger { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
@@ -384,8 +421,17 @@ a:hover {
   text-align: center;
   color: var(--cor-texto-3);
 }
-.empty-state > svg { width: 48px; height: 48px; color: var(--cor-texto-2); }
-.empty-state h3 { color: var(--cor-texto); }
+/* Ícone dentro de um bloco azul-claro com o canto folha */
+.empty-state > svg {
+  box-sizing: content-box;
+  width: 30px;
+  height: 30px;
+  padding: 15px;
+  border-radius: 14px 14px 24px 14px;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+.empty-state h3 { color: var(--cor-primaria); }
 .empty-state p { max-width: 32ch; font-size: var(--texto-sm); }
 
 /* ---------- Carregando ---------- */
@@ -446,7 +492,7 @@ a:hover {
 }
 .toast {
   padding: var(--esp-3) var(--esp-4);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-texto);
   color: #fff;
   font-size: var(--texto-sm);
@@ -541,7 +587,7 @@ a:hover {
 }
 .checkbox-field { margin-top: var(--esp-2); }
 
-.alert-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); border-color: #fde68a; }
+.alert-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); border-color: #ffd2b8; }
 
 /* Rodapé "Desenvolvido por Tiago Martins · v1.0.X" (login e app) */
 .app-credits {

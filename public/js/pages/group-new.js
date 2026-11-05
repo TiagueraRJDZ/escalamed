@@ -21,7 +21,7 @@ import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { PROFESSIONAL_CATEGORIES } from '/data/categories.js';
-import { GROUP_COLORS, DEFAULT_GROUP_COLOR } from '/data/colors.js';
+import { GROUP_COLORS, DEFAULT_GROUP_COLOR, groupColor } from '/data/colors.js';
 import { STATES } from '/data/states.js';
 import { normalize, searchKeywords } from '../validators.js';
 import { memberCard } from '../members.js';
@@ -145,7 +145,7 @@ $('swatches').innerHTML = GROUP_COLORS.map(
 // Preenche com os dados atuais (quando volta para editar)
 infoForm.name.value = group?.name ?? '';
 infoForm.categoryId.value = group?.categoryId ?? '';
-const initialColor = group?.color ?? DEFAULT_GROUP_COLOR;
+const initialColor = groupColor(group?.color);
 (infoForm.querySelector(`input[name=color][value="${initialColor}"]`) ?? infoForm.color[0]).checked = true;
 
 function currentColor() {
@@ -488,7 +488,7 @@ function setShiftsHtml(html) {
 }
 
 function renderShifts() {
-  shiftList.style.setProperty('--shift-color', group?.color ?? DEFAULT_GROUP_COLOR);
+  shiftList.style.setProperty('--shift-color', groupColor(group?.color));
   if (!shiftsLoaded) {
     setShiftsHtml('<li class="skeleton" style="height:64px"></li><li class="skeleton" style="height:64px"></li>');
     return;

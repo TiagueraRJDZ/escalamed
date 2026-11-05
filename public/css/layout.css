@@ -41,7 +41,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   .app.is-collapsed .app-footer { margin-left: calc(var(--sidebar-w-collapsed) * -1); }
 }
 
-/* ---------- Menu lateral ---------- */
+/* ---------- Menu lateral (azul Hapvida, como o painel da tela de entrada) ---------- */
 .sidebar {
   position: sticky;
   top: 0;
@@ -49,9 +49,27 @@ body:not(.is-booting) .boot-spinner { display: none; }
   flex-direction: column;
   height: 100vh;
   padding: var(--esp-4) var(--esp-3);
-  background: var(--cor-superficie);
-  border-right: 1px solid var(--cor-borda);
+  background: var(--hap-azul);
+  color: #fff;
   overflow: hidden auto;
+}
+
+/* Rodapé do menu: símbolo da Hapvida + faixa vermelho/laranja/amarelo do Guia de Marca */
+.sidebar::after {
+  content: '';
+  flex-shrink: 0;
+  margin: auto calc(var(--esp-3) * -1) calc(var(--esp-4) * -1);
+  height: 104px;
+  background:
+    url('/img/hapvida-simbolo.svg') no-repeat left 22px top 18px / 30px auto,
+    linear-gradient(
+      to bottom,
+      transparent 0 80px,
+      var(--hap-vermelho) 80px 86px,
+      var(--hap-laranja) 86px 92px,
+      var(--hap-laranja-claro) 92px 98px,
+      var(--hap-amarelo) 98px 104px
+    );
 }
 
 .sidebar-brand {
@@ -61,15 +79,21 @@ body:not(.is-booting) .boot-spinner { display: none; }
   height: 44px;
   padding: 0 var(--esp-1);
   margin-bottom: var(--esp-5);
-  color: var(--cor-texto);
+  color: #fff;
   font-size: var(--texto-lg);
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 .sidebar-brand:hover { text-decoration: none; }
 .sidebar-brand img { width: 32px; height: 32px; flex-shrink: 0; }
 
-/* Logo oficial da Hapvida (versão para fundo branco) */
+/* Ícone do EscalaMed com contorno branco, como na tela de entrada */
+.sidebar-brand img:not(.sidebar-partner) {
+  border-radius: 9px;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
+}
+
+/* Logo oficial da Hapvida (versão para fundo azul) */
 .sidebar-brand .sidebar-partner {
   display: block;
   width: auto;
@@ -82,7 +106,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   width: 1px;
   height: 26px;
   margin: 0 var(--esp-1);
-  background: var(--cor-borda-forte);
+  background: rgb(255 255 255 / 0.3);
 }
 
 .nav {
@@ -103,22 +127,23 @@ body:not(.is-booting) .boot-spinner { display: none; }
   min-height: 48px;
   padding: 0 var(--esp-3);
   border: 0;
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: none;
-  color: var(--cor-texto-2);
+  color: rgb(255 255 255 / 0.85);
   font-size: var(--texto-md);
-  font-weight: 500;
+  font-weight: 400;
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--transicao), color var(--transicao);
 }
-.nav-item:hover { background: var(--cor-superficie-2); color: var(--cor-texto); text-decoration: none; }
+.nav-item:hover { background: rgb(255 255 255 / 0.12); color: #fff; text-decoration: none; }
+.nav-item:focus-visible { box-shadow: 0 0 0 3px rgb(255 255 255 / 0.6); }
 .nav-item svg { width: 22px; height: 22px; flex-shrink: 0; }
 .nav-item[aria-current='page'] {
-  background: var(--cor-primaria-suave);
-  color: var(--cor-primaria);
-  font-weight: 600;
+  background: #fff;
+  color: var(--hap-azul);
+  font-weight: 500;
 }
 
 /* Selo "NOVO!" no canto do item */
@@ -144,7 +169,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   border: 1px solid var(--cor-borda-forte);
   border-radius: var(--raio-total);
   background: var(--cor-superficie);
-  color: var(--cor-texto-2);
+  color: var(--hap-azul);
   box-shadow: var(--sombra-sm);
   cursor: pointer;
   transition: left 200ms ease, color var(--transicao), background var(--transicao), border-color var(--transicao);
@@ -173,6 +198,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   font-size: 0;
 }
 .app.is-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+.app.is-collapsed .sidebar::after { background-position: center top 18px, 0 0; }
 
 /* ---------- Barra superior ---------- */
 .topbar {
@@ -197,9 +223,9 @@ body:not(.is-booting) .boot-spinner { display: none; }
 .topbar-search .input {
   min-height: 42px;
   background: var(--cor-superficie-2);
-  border-color: transparent;
+  border-color: var(--cor-borda);
 }
-.topbar-search .input:focus { background: var(--cor-superficie); }
+.topbar-search .input:focus { background: var(--cor-superficie); border-color: var(--cor-primaria); }
 
 /* Sugestões da busca de pessoas */
 .search-results {
@@ -216,7 +242,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   list-style: none;
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   box-shadow: var(--sombra-lg);
 }
 .search-option {
@@ -268,7 +294,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   border-radius: var(--raio-sm);
   background: var(--cor-superficie-2);
   color: var(--cor-texto);
-  font-weight: 600;
+  font-weight: 500;
 }
 .person-groups a:hover { background: var(--cor-primaria-suave); text-decoration: none; }
 .person-groups a svg { width: 18px; height: 18px; color: var(--cor-primaria); }
@@ -292,7 +318,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   height: 9px;
   border: 2px solid var(--cor-superficie);
   border-radius: 50%;
-  background: var(--cor-perigo);
+  background: var(--hap-vermelho);
 }
 
 .gcal-icon { color: var(--cor-primaria); }
@@ -306,19 +332,78 @@ body:not(.is-booting) .boot-spinner { display: none; }
   height: 40px;
   border-radius: 50%;
   background: var(--cor-primaria-suave);
-  color: var(--cor-primaria-hover);
+  color: var(--cor-primaria);
   font-size: var(--texto-sm);
-  font-weight: 700;
+  font-weight: 500;
   overflow: hidden;
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-.avatar-button {
-  padding: 2px;
-  border: 0;
-  border-radius: 50%;
-  background: none;
+/* ---------- Pílula da conta (canto superior direito) ---------- */
+.account-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  max-width: 260px;
+  min-height: 48px;
+  padding: 4px var(--esp-3) 4px 4px;
+  border: 1px solid var(--cor-primaria-borda);
+  border-radius: var(--raio-total);
+  background: var(--cor-superficie);
+  color: var(--cor-primaria);
+  text-align: left;
   cursor: pointer;
+  transition: background var(--transicao), border-color var(--transicao);
+}
+.account-button:hover,
+.account-button[aria-expanded='true'] { background: var(--cor-primaria-suave); border-color: var(--cor-primaria); }
+
+/* Iniciais em branco sobre o azul (a foto, quando há, cobre o círculo) */
+.account-avatar {
+  width: 38px;
+  height: 38px;
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+}
+
+.account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.account-text strong,
+.account-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-text strong { font-size: var(--texto-sm); font-weight: 500; }
+.account-text small { font-size: var(--texto-xs); color: var(--cor-texto-3); }
+.account-text small:empty { display: none; }
+
+.account-chevron {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-left: var(--esp-1);
+  transition: transform var(--transicao);
+}
+.account-button[aria-expanded='true'] .account-chevron { transform: rotate(180deg); }
+
+/* Menu da conta: e-mail em cima, opções em azul e "Sair" em vermelho */
+.account-menu { min-width: 260px; }
+.account-menu .menu-header { padding-top: var(--esp-3); }
+.account-menu .menu-header span { font-size: var(--texto-md); color: var(--cor-texto-2); }
+.account-menu .menu-item { font-size: var(--texto-md); color: var(--cor-primaria); }
+.account-menu .menu-item svg { width: 20px; height: 20px; color: currentColor; }
+.account-menu .menu-item.is-danger { color: var(--cor-perigo); }
+
+/* Celular: só a foto, para sobrar espaço para a busca */
+@media (max-width: 640px) {
+  .account-button { min-height: 0; padding: 2px; border-color: transparent; }
+  .account-text,
+  .account-chevron { display: none; }
 }
 
 .menu-anchor { position: relative; }
@@ -332,7 +417,7 @@ body:not(.is-booting) .boot-spinner { display: none; }
   padding: var(--esp-2);
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-lg);
+  border-radius: var(--raio-lg) var(--raio-lg) var(--folha) var(--raio-lg);
   box-shadow: var(--sombra-lg);
 }
 
@@ -373,6 +458,13 @@ body:not(.is-booting) .boot-spinner { display: none; }
   padding: var(--esp-5);
 }
 
+/* Títulos das páginas em azul e no peso Regular, como no Guia de Marca */
+.page h1 {
+  color: var(--cor-primaria);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
 /* ---------- Gaveta lateral e modal (elemento <dialog>) ---------- */
 dialog {
   padding: 0;
@@ -380,7 +472,7 @@ dialog {
   color: inherit;
   background: var(--cor-superficie);
 }
-dialog::backdrop { background: rgb(15 23 42 / 0.45); }
+dialog::backdrop { background: var(--fundo-escurecido); }
 
 .drawer {
   position: fixed;
@@ -390,6 +482,7 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
   height: 100vh;
   max-height: 100vh;
   margin: 0;
+  border-radius: var(--folha) 0 0 0;
   box-shadow: var(--sombra-lg);
 }
 .drawer[open] {
@@ -424,7 +517,7 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
 
 .modal {
   width: min(480px, calc(100vw - 2rem));
-  border-radius: var(--raio-lg);
+  border-radius: var(--raio-lg) var(--raio-lg) var(--folha) var(--raio-lg);
   box-shadow: var(--sombra-lg);
 }
 .modal[open] { animation: aparecer 180ms ease; }
@@ -438,9 +531,9 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
   width: 64px;
   height: 64px;
   margin: 0 auto var(--esp-4);
-  border-radius: 18px;
-  background: var(--cor-primaria-suave);
-  color: var(--cor-primaria);
+  border-radius: 16px 16px 26px 16px;
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
 }
 .modal-hero svg { width: 32px; height: 32px; }
 .modal-center { text-align: center; }
@@ -473,13 +566,12 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
   color: var(--cor-primaria-hover);
 }
 
+/* Título de seção: azul, frase normal (o Guia de Marca não usa CAPS) */
 .section-title {
   margin: var(--esp-5) 0 var(--esp-2);
   font-size: var(--texto-sm);
-  font-weight: 700;
-  color: var(--cor-texto-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  color: var(--cor-primaria);
 }
 
 /* ---------- Celular e tablet ---------- */
@@ -505,7 +597,7 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
     position: fixed;
     inset: 0;
     z-index: 35;
-    background: rgb(15 23 42 / 0.45);
+    background: var(--fundo-escurecido);
   }
 
   /* No celular o menu sempre aparece completo */
@@ -550,7 +642,7 @@ dialog::backdrop { background: rgb(15 23 42 / 0.45); }
   background: none;
   font: inherit;
   font-size: var(--texto-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--cor-texto-2);
   cursor: pointer;
 }

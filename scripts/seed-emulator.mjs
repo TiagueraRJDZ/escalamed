@@ -163,7 +163,7 @@ async function main() {
   await setDoc(`groups/${GROUP_ID}`, {
     name: 'TELEAUDITORIA HAPVIDA',
     type: 'team',
-    color: '#2563EB',
+    color: '#1539AA',
     unit: { id: 'hapvida-antonio-prudente-ce', name: 'HAPVIDA ANTONIO PRUDENTE', city: 'Fortaleza', state: 'CE' },
     categoryId: 'medico',
     timezone: 'America/Sao_Paulo',

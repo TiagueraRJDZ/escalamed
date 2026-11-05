@@ -28,7 +28,7 @@
   border-bottom: 1px solid var(--cor-borda);
 }
 
-.groups-header h1 { font-size: var(--texto-2xl); }
+.groups-header h1 { font-size: 2rem; }
 
 .groups-toolbar {
   display: flex;
@@ -67,10 +67,10 @@
   flex-shrink: 0;
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: 12px 12px 22px 12px; /* canto folha */
   color: #fff;
   font-size: var(--texto-md);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .group-info {
@@ -97,7 +97,7 @@
   gap: var(--esp-3);
   padding: var(--esp-3);
 }
-.group-skeleton .skeleton:first-child { width: 52px; height: 52px; border-radius: 14px; }
+.group-skeleton .skeleton:first-child { width: 52px; height: 52px; border-radius: 12px 12px 22px 12px; }
 .group-skeleton div { flex: 1; display: grid; gap: var(--esp-2); }
 
 .empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--esp-2); margin-top: var(--esp-2); }
@@ -136,7 +136,7 @@
 }
 
 .cal-title { font-size: var(--texto-lg); }
-.cal-title span { color: var(--cor-texto-3); font-weight: 600; }
+.cal-title span { color: var(--cor-texto-3); font-weight: 500; }
 
 .cal-grid {
   display: grid;
@@ -156,7 +156,7 @@
   display: grid;
   place-items: center;
   border: 2px solid transparent;
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) 14px var(--raio);
   background: none;
   font-size: var(--texto-md);
   font-weight: 500;
@@ -165,15 +165,16 @@
 }
 .cal-day:hover { background: var(--cor-superficie-2); }
 .cal-day.is-past { color: var(--cor-texto-3); font-weight: 400; }
-.cal-day[aria-current='date'] { border-color: var(--cor-primaria); font-weight: 700; }
+/* Hoje: contorno laranja (cor de acento do Guia de Marca) */
+.cal-day[aria-current='date'] { border-color: var(--hap-laranja); font-weight: 500; }
 .cal-day[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
 
 /* Dia com plantão: fundo suave e um ponto embaixo do número */
 .cal-day.is-marked {
   position: relative;
   background: var(--cor-primaria-suave);
-  color: var(--cor-primaria-hover);
-  font-weight: 700;
+  color: var(--cor-primaria);
+  font-weight: 500;
 }
 .cal-day.is-marked::after {
   content: '';
@@ -186,13 +187,12 @@
 }
 .cal-day.is-marked[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
 
-/* Seções da lista: cargo do usuário em cada grupo */
+/* Seções da lista: cargo do usuário em cada grupo (azul, sem CAPS) */
 .group-section h2 {
   margin: var(--esp-4) var(--esp-2) var(--esp-1);
-  font-size: var(--texto-lg);
-  font-weight: 700;
-  color: var(--cor-texto-3);
-  text-transform: uppercase;
+  font-size: var(--texto-md);
+  font-weight: 500;
+  color: var(--cor-primaria);
 }
 .group-section:first-child h2 { margin-top: var(--esp-1); }
 

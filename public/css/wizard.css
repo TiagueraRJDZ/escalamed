@@ -32,7 +32,7 @@
   flex: 1;
   color: var(--cor-texto-3);
   font-size: var(--texto-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .step::after {
@@ -110,7 +110,7 @@
   list-style: none;
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   box-shadow: var(--sombra-lg);
 }
 
@@ -129,7 +129,7 @@
   align-items: center;
   gap: var(--esp-2);
   color: var(--cor-primaria);
-  font-weight: 600;
+  font-weight: 500;
 }
 .combobox-option.is-create svg { width: 18px; height: 18px; }
 .combobox-status { padding: var(--esp-2) var(--esp-3); font-size: var(--texto-sm); color: var(--cor-texto-3); }
@@ -142,7 +142,7 @@
   min-height: 44px;
   padding: var(--esp-2) var(--esp-2) var(--esp-2) var(--esp-3);
   border: 1px solid var(--cor-primaria-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-primaria-suave);
 }
 .selected-unit > svg { width: 18px; height: 18px; color: var(--cor-primaria); flex-shrink: 0; }
@@ -192,16 +192,16 @@
   gap: var(--esp-3);
   padding: var(--esp-3);
   border: 1px dashed var(--cor-borda-forte);
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
 }
 .group-preview .group-avatar {
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 10px 10px 18px 10px; /* canto folha */
   color: #fff;
-  font-weight: 700;
+  font-weight: 500;
   font-size: var(--texto-sm);
 }
 .group-preview div { display: flex; flex-direction: column; min-width: 0; }
@@ -233,7 +233,7 @@
   padding: var(--esp-3) var(--esp-3) var(--esp-3) var(--esp-4);
   border: 1px solid var(--cor-borda);
   border-left: 4px solid var(--shift-color, var(--cor-primaria));
-  border-radius: var(--raio);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-superficie);
 }
 .shift-item > div { flex: 1; min-width: 0; }

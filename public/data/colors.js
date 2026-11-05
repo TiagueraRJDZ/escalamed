@@ -1,7 +1,8 @@
 // Paleta de cores dos grupos. Todas têm contraste suficiente com texto branco,
 // porque a cor aparece como fundo das iniciais do grupo.
+// A primeira é o azul do Guia de Marca Hapvida (Pantone 293 C), cor padrão dos grupos novos.
 export const GROUP_COLORS = [
-  { hex: '#2563EB', name: 'Azul' },
+  { hex: '#1539AA', name: 'Azul Hapvida' },
   { hex: '#1E3A8A', name: 'Azul-marinho' },
   { hex: '#0369A1', name: 'Céu' },
   { hex: '#0E7490', name: 'Ciano' },
@@ -21,3 +22,15 @@ export const GROUP_COLORS = [
 ];
 
 export const DEFAULT_GROUP_COLOR = GROUP_COLORS[0].hex;
+
+// Cores que saíram da paleta → cor que as substitui.
+// Grupos criados antes continuam salvos com a cor antiga; aparecem com a nova.
+const RENAMED_COLORS = {
+  '#2563EB': '#1539AA', // "Azul" antigo → Azul Hapvida
+};
+
+// Cor para mostrar na tela (e para marcar a opção certa ao editar o grupo)
+export const groupColor = (hex) => {
+  if (!hex) return DEFAULT_GROUP_COLOR;
+  return RENAMED_COLORS[hex.toUpperCase()] ?? hex;
+};

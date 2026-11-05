@@ -11,6 +11,7 @@ import { icon, renderIcons } from '../icons.js';
 import { createCalendar } from '../calendar.js';
 import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessage } from '../ui.js';
 import { normalize } from '../validators.js';
+import { groupColor } from '/data/colors.js';
 import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
 import { myInvites, acceptInvite, cancelInvite, inviteKey } from '../members.js';
 import { monthKey, userDays } from '../schedule-math.js';
@@ -78,7 +79,7 @@ function groupItem(group) {
 
   return `<li>
     <a class="group-item" href="${href}">
-      <span class="group-avatar" style="background:${escapeHtml(group.color)}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
+      <span class="group-avatar" style="background:${escapeHtml(groupColor(group.color))}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
       <span class="group-info">
         <strong>${escapeHtml(group.name)}</strong>
         <span>${escapeHtml(groupSubtitle(group))}</span>

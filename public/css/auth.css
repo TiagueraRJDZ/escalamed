@@ -8,6 +8,17 @@
   --auth-azul-hover: #0d37b5;
 }
 
+/* A tela de entrada mantém a arte própria: Pitanga com todos os pesos e cantos iguais
+   (o resto do app usa a versão do Guia de Marca, definida em base.css) */
+.auth,
+.auth-panel {
+  font-family: var(--fonte-entrada);
+}
+:where(.auth, .auth-panel) .btn,
+:where(.auth, .auth-panel) .alert { border-radius: var(--raio); }
+:where(.auth, .auth-panel) .btn,
+:where(.auth, .auth-panel) .label { font-weight: 600; }
+
 .auth {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

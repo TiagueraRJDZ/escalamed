@@ -1,7 +1,10 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { db } from './firebase.js';
 import { requireAuth, signOutUser } from './auth.js';
+import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
 import { mountCredits } from './version.js';
@@ -49,11 +52,44 @@ export function avatarHtml({ name, photoURL } = {}, className = 'avatar') {
 
 const toggleLabel = (collapsed) => (collapsed ? 'Expandir menu' : 'Recolher menu');
 
+// "Tiago da Silva Martins" → "Tiago Martins" (cabe na pílula da conta)
+function shortName(name) {
+  const parts = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Minha conta';
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
+}
+
+// ---------- Cargo embaixo do nome: "Administrador" ou a profissão ----------
+// Administrador da plataforma = uid em config/admins. A resposta fica guardada na
+// sessão, para o cargo não piscar a cada troca de página.
+const ADMIN_LABEL = 'Administrador';
+const adminKey = (uid) => `escalamed:admin:${uid}`;
+
+function cachedAdmin(uid) {
+  try {
+    return sessionStorage.getItem(adminKey(uid)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function showAdminRole(app, uid, profile) {
+  const snapshot = await getDoc(doc(db, 'config', 'admins')).catch(() => null);
+  if (!snapshot) return; // sem resposta: mantém o que já está na tela
+  const isAdmin = (snapshot.data()?.uids ?? []).includes(uid);
+  try {
+    sessionStorage.setItem(adminKey(uid), isAdmin ? '1' : '0');
+  } catch {
+    // sem armazenamento: só pergunta de novo na próxima página
+  }
+  app.querySelector('#account-role').textContent = isAdmin ? ADMIN_LABEL : categoryName(profile.categoryId);
+}
+
 function shellHtml(user, profile, active, collapsed) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <a class="sidebar-brand" href="/schedules.html" aria-label="Hapvida EscalaMed">
-        <img class="sidebar-partner" src="/img/hapvida-logo.svg" alt="" width="98" height="22" />
+        <img class="sidebar-partner" src="/img/hapvida-logo-negativo.svg" alt="" width="98" height="22" />
         <span class="sidebar-brand-divider" aria-hidden="true"></span>
         <img src="/img/logo.svg" alt="" /><span class="sidebar-brand-name">EscalaMed</span>
       </a>
@@ -88,16 +124,20 @@ function shellHtml(user, profile, active, collapsed) {
             ${icon('bell')}
           </button>
           <div class="menu-anchor">
-            <button type="button" class="avatar-button" id="avatar-button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Menu da conta">
-              ${avatarHtml(profile)}
+            <!-- Pílula da conta: foto, nome, cargo e setinha (no celular, só a foto) -->
+            <button type="button" class="account-button" id="avatar-button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Menu da conta">
+              ${avatarHtml(profile, 'avatar account-avatar')}
+              <span class="account-text">
+                <strong>${escapeHtml(shortName(profile.name))}</strong>
+                <small id="account-role">${escapeHtml(cachedAdmin(user.uid) ? ADMIN_LABEL : categoryName(profile.categoryId))}</small>
+              </span>
+              ${icon('chevronDown', 'account-chevron')}
             </button>
-            <div class="menu" id="user-menu" role="menu" aria-label="Conta" hidden>
+            <div class="menu account-menu" id="user-menu" role="menu" aria-label="Conta" hidden>
               <div class="menu-header">
-                <strong>${escapeHtml(profile.name || 'Minha conta')}</strong>
                 <span>${escapeHtml(user.email || '')}</span>
               </div>
-              <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('user')}Minha conta</a>
-              <a class="menu-item" role="menuitem" href="/settings.html#senha">${icon('settings')}Configurações</a>
+              <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('settings')}Configurações</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -244,6 +284,7 @@ export async function initLayout({ active } = {}) {
 
   setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);
+  showAdminRole(app, user.uid, profile);
 
   mountCredits(app);
   document.body.classList.remove('is-booting');
