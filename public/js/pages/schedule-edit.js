@@ -33,6 +33,7 @@ import {
   writeReplica,
 } from '../schedule-data.js';
 import { normalize } from '../validators.js';
+import { shiftFields } from '../movements.js';
 import { escapeHtml, initials, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 
 renderIcons();
@@ -243,7 +244,14 @@ $('schedule-grid').addEventListener('click', async (event) => {
     }
   }
   try {
-    await write((exists) => setAssignment(groupId, month, key, uid, !on, exists));
+    // Histórico: na escala publicada todos veem; em rascunho, só a gestão
+    const movement = {
+      type: on ? 'unassigned' : 'assigned',
+      targetUid: uid,
+      public: schedule?.status === 'published',
+      ...shiftFields(month, day, shiftId, shifts[shiftId]),
+    };
+    await write((exists) => setAssignment(groupId, month, key, uid, !on, exists, movement));
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
   }
@@ -269,7 +277,15 @@ $('vacancy-form').addEventListener('submit', async (event) => {
   const button = event.target.querySelector('[type=submit]');
   setLoading(button, true);
   try {
-    await write((exists) => setVacancies(groupId, month, vacancyKey, count, exists));
+    const movement = {
+      type: count > 0 ? 'vacant_open' : 'vacant_closed',
+      count,
+      public: schedule?.status === 'published',
+      ...shiftFields(month, Number(vacancyKey.slice(0, 2)), vacancyKey.slice(3), shifts[vacancyKey.slice(3)]),
+    };
+    // Sem mudança no número de vagas, não registra
+    const same = (schedule?.vacancies?.[vacancyKey] ?? 0) === count;
+    await write((exists) => setVacancies(groupId, month, vacancyKey, count, exists, same ? null : movement));
     $('modal-vacancy').close();
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
@@ -347,7 +363,9 @@ $('publish-button').addEventListener('click', async (event) => {
   if (!ok) return;
   setLoading(button, true);
   try {
-    await write(() => publishSchedule(groupId, month, schedule, shifts));
+    await write(() =>
+      publishSchedule(groupId, month, schedule, shifts, { type: 'published', scheduleMonth: month, public: true }),
+    );
     toast(`Escala de ${monthName(month)} publicada.`, 'success');
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
@@ -391,7 +409,12 @@ $('replicate-form').addEventListener('submit', async (event) => {
       if (!ok) return;
     }
     const replica = replicate(schedule, month, nextMonth, mode, Object.keys(shifts));
-    await writeReplica(groupId, nextMonth, replica, Boolean(target));
+    await writeReplica(groupId, nextMonth, replica, Boolean(target), {
+      type: 'replicated',
+      scheduleMonth: nextMonth,
+      fromMonth: month,
+      public: false,
+    });
     $('modal-replicate').close();
     toast(`Escala replicada para ${monthName(nextMonth)}.`, 'success');
     navigate(monthUrl(nextMonth));

@@ -516,3 +516,49 @@ test('escala: rascunho só gestor, auxiliar e analista leem; publicada todos os 
   // Mês sem escala: membro consegue perguntar (e recebe "não existe")
   assert.ok(await canRead(staff.token, `${G}/schedules/2026-11`));
 });
+
+// ---------- Histórico de movimentações ----------
+function movement(actor, type, extra = {}) {
+  return {
+    type,
+    groupId: 'g1',
+    actorUid: actor.uid,
+    targetUid: null,
+    memberUids: [actor.uid],
+    public: true,
+    shiftId: 'm',
+    shiftTitle: 'M',
+    shiftDate: '2026-11-07',
+    shiftStart: '07:00',
+    shiftEnd: '13:00',
+    monthKey: '2026-11',
+    createdAt: NOW,
+    ...extra,
+  };
+}
+
+test('histórico: gestão grava as ações do editor; plantonista só troca, cessão e vaga assumida', async () => {
+  const add = (actor, data, id = 'mv') => commit(actor.token, [w.set(`${G}/movements/${id}`, data)]);
+  assert.ok(await add(manager, movement(manager, 'assigned', { targetUid: staff.uid, memberUids: [manager.uid, staff.uid] })));
+  assert.ok(await add(assistant, movement(assistant, 'vacant_open', { count: 2 }), 'mv2'));
+  assert.ok(!(await add(staff, movement(staff, 'assigned'), 'mv3')));
+  assert.ok(await add(staff, movement(staff, 'swap', { targetUid: observer.uid, memberUids: [staff.uid, observer.uid] }), 'mv4'));
+  // Não grava no nome de outra pessoa, com tipo inválido, em outro grupo ou sendo de fora
+  assert.ok(!(await add(staff, { ...movement(staff, 'swap'), actorUid: manager.uid, memberUids: [manager.uid] }, 'mv5')));
+  assert.ok(!(await add(staff, movement(staff, 'hackear'), 'mv6')));
+  assert.ok(!(await add(staff, movement(staff, 'swap', { groupId: 'outro' }), 'mv7')));
+  assert.ok(!(await add(outsider, movement(outsider, 'swap'), 'mv8')));
+});
+
+test('histórico: ninguém altera nem apaga; rascunho só para a gestão', async () => {
+  await admin([
+    w.set(`${G}/movements/pub`, { ...movement(manager, 'published'), createdAt: new Date() }),
+    w.set(`${G}/movements/priv`, { ...movement(manager, 'assigned'), public: false, createdAt: new Date() }),
+  ]);
+  assert.ok(!(await commit(manager.token, [w.update(`${G}/movements/pub`, { type: 'unpublished' })])));
+  assert.ok(!(await commit(manager.token, [w.delete(`${G}/movements/pub`)])));
+  assert.ok(await canRead(staff.token, `${G}/movements/pub`));
+  assert.ok(!(await canRead(staff.token, `${G}/movements/priv`)));
+  assert.ok(await canRead(analyst.token, `${G}/movements/priv`));
+  assert.ok(!(await canRead(outsider.token, `${G}/movements/pub`)));
+});

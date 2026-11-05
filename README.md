@@ -24,6 +24,8 @@ escalamed/
 │  ├─ group.html        tela do grupo: calendário (plantões do dia), meses da escala e membros
 │  ├─ schedule-edit.html editor da escala mensal: grade, vagas, publicar, replicar, imprimir
 │  ├─ invite.html       aceitar ou recusar um convite
+│  ├─ relatorios.html   Relatório de Plantões por período (só gestor): resumo, por membro, Excel e PDF
+│  ├─ historico.html    Histórico: trocas, cessões, vagas e alterações na escala, por mês
 │  ├─ new-password.html troca obrigatória da senha provisória
 │  ├─ settings.html     Configurações: conta, profissão, perfil, senha, usuários (admin) e exclusão
 │  ├─ *.html            demais telas (algumas ainda provisórias)
@@ -38,6 +40,11 @@ escalamed/
 │  │  ├─ members.js     mudar cargo, remover, convites
 │  │  ├─ schedule-math.js escala: horas, conflitos de horário, replicação (sem Firebase, com testes)
 │  │  ├─ schedule-data.js escala no Firestore: ler, alocar, vagas, publicar, replicar
+│  │  ├─ movements.js   histórico (groups/{g}/movements): gravar no mesmo lote da ação e consultar
+│  │  ├─ shift-report.js relatório de plantões: junta e agrupa por membro (sem Firebase, com testes)
+│  │  ├─ report-export.js exportar o relatório: Excel (SheetJS do CDN) e PDF (impressão)
+│  │  ├─ my-groups.js   meus grupos com o cargo em cada um e membros de um grupo
+│  │  ├─ dates.js       datas em português e períodos (sem Firebase, com testes)
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
 │  │  ├─ settings/      uma seção das Configurações por arquivo; menu.js lista as seções (subitens do menu lateral)
 │  │  └─ pages/         código de cada tela

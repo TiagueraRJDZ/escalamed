@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histórico | EscalaMed</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- SDK do Firebase baixado já no início, em paralelo (sem esperar os imports em cascata) -->
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/reports.css" />
+</head>
+<body class="is-booting">
+  <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
+
+  <main id="page" class="page report-page">
+    <section class="card report-card" aria-labelledby="history-title">
+      <header class="report-header">
+        <h1 id="history-title">Histórico</h1>
+        <div class="report-filters" role="group" aria-label="Filtros">
+          <div class="field filter-group">
+            <label class="label" for="history-group">Grupo</label>
+            <select class="select" id="history-group"></select>
+          </div>
+          <div class="field filter-month">
+            <span class="label" id="history-month-label">Mês</span>
+            <div class="month-nav" role="group" aria-labelledby="history-month-label">
+              <button type="button" class="btn-icon" id="month-prev" aria-label="Mês anterior"><span data-icon="chevronLeft"></span></button>
+              <span class="month-name" id="month-name" aria-live="polite"></span>
+              <button type="button" class="btn-icon" id="month-next" aria-label="Próximo mês"><span data-icon="chevronRight"></span></button>
+            </div>
+          </div>
+          <div class="field filter-member">
+            <label class="label" for="history-member">Membro</label>
+            <select class="select" id="history-member"><option value="">Todos os membros</option></select>
+          </div>
+          <div class="filter-type menu-anchor">
+            <button type="button" class="btn-icon btn-boxed type-button" id="type-button" aria-haspopup="menu"
+              aria-expanded="false" aria-controls="type-menu" aria-label="Tipo de movimentação" title="Tipo de movimentação">
+              <span data-icon="menu"></span><span class="filter-dot" id="type-dot" hidden></span>
+            </button>
+            <div class="menu type-menu" id="type-menu" role="menu" aria-label="Tipo de movimentação" hidden></div>
+          </div>
+        </div>
+      </header>
+      <div class="report-body" id="history-list" aria-live="polite" aria-busy="true"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/pages/historico.js"></script>
+</body>
+</html>

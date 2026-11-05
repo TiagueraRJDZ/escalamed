@@ -1,18 +1,18 @@
 // Escala mensal no Firestore: leitura dos turnos e do mês, alocação, vagas, publicação
-// e replicação. Os cálculos ficam em schedule-math.js (sem Firebase).
+// e replicação (cada gravação registra o histórico no mesmo lote). Os cálculos ficam em schedule-math.js (sem Firebase).
 import {
   collection,
   doc,
   getDoc,
   getDocs,
-  setDoc,
-  updateDoc,
   onSnapshot,
+  writeBatch,
   arrayUnion,
   arrayRemove,
   serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db } from './firebase.js';
+import { logMovement } from './movements.js';
 
 export const scheduleRef = (groupId, month) => doc(db, 'groups', groupId, 'schedules', month);
 
@@ -53,34 +53,53 @@ export function watchSchedule(groupId, month, callback, onError) {
   );
 }
 
-// Cria o mês em rascunho (primeira alocação ou vaga)
-function createSchedule(groupId, month, fields) {
-  return setDoc(scheduleRef(groupId, month), {
-    status: 'draft',
-    assignments: {},
-    vacancies: {},
-    createdAt: serverTimestamp(),
-    ...stamp(),
-    ...fields,
-  });
+// Cada gravação vai num lote junto com o registro do histórico (movement: dados do log,
+// ver movements.js). Sem movement, grava só a escala.
+function commitWithLog(groupId, write, movement) {
+  const batch = writeBatch(db);
+  write(batch);
+  if (movement) logMovement(batch, groupId, movement);
+  return batch.commit();
 }
+
+// Campos de um mês novo, em rascunho (primeira alocação ou vaga)
+const newSchedule = (fields) => ({
+  status: 'draft',
+  assignments: {},
+  vacancies: {},
+  createdAt: serverTimestamp(),
+  ...stamp(),
+  ...fields,
+});
 
 // Aloca (add = true) ou desaloca a pessoa na célula. exists: o mês já tem documento?
-export function setAssignment(groupId, month, key, uid, add, exists) {
-  if (!exists) return createSchedule(groupId, month, { assignments: add ? { [key]: [uid] } : {} });
-  return updateDoc(scheduleRef(groupId, month), {
-    [`assignments.${key}`]: add ? arrayUnion(uid) : arrayRemove(uid),
-    ...stamp(),
-  });
+export function setAssignment(groupId, month, key, uid, add, exists, movement) {
+  const ref = scheduleRef(groupId, month);
+  return commitWithLog(
+    groupId,
+    (batch) =>
+      exists
+        ? batch.update(ref, { [`assignments.${key}`]: add ? arrayUnion(uid) : arrayRemove(uid), ...stamp() })
+        : batch.set(ref, newSchedule({ assignments: add ? { [key]: [uid] } : {} })),
+    movement,
+  );
 }
 
-export function setVacancies(groupId, month, key, count, exists) {
-  if (!exists) return createSchedule(groupId, month, { vacancies: count ? { [key]: count } : {} });
-  return updateDoc(scheduleRef(groupId, month), { [`vacancies.${key}`]: count, ...stamp() });
+export function setVacancies(groupId, month, key, count, exists, movement) {
+  const ref = scheduleRef(groupId, month);
+  return commitWithLog(
+    groupId,
+    (batch) =>
+      exists
+        ? batch.update(ref, { [`vacancies.${key}`]: count, ...stamp() })
+        : batch.set(ref, newSchedule({ vacancies: count ? { [key]: count } : {} })),
+    movement,
+  );
 }
 
 // Publica: grava a escala fixa (cópia da dinâmica) e congela os turnos
-export function publishSchedule(groupId, month, schedule, shifts) {
+export function publishSchedule(groupId, month, schedule, shifts, movement) {
+  const ref = scheduleRef(groupId, month);
   const fields = {
     status: 'published',
     fixed: schedule?.assignments ?? {},
@@ -88,16 +107,26 @@ export function publishSchedule(groupId, month, schedule, shifts) {
     publishedAt: serverTimestamp(),
     publishedBy: auth.currentUser.uid,
   };
-  if (!schedule) return createSchedule(groupId, month, fields);
-  return updateDoc(scheduleRef(groupId, month), { ...fields, ...stamp() });
+  return commitWithLog(
+    groupId,
+    (batch) => (schedule ? batch.update(ref, { ...fields, ...stamp() }) : batch.set(ref, newSchedule(fields))),
+    movement,
+  );
 }
 
 // Volta para rascunho (some para plantonistas e observadores até publicar de novo)
-export const unpublishSchedule = (groupId, month) =>
-  updateDoc(scheduleRef(groupId, month), { status: 'draft', ...stamp() });
+export const unpublishSchedule = (groupId, month, movement) =>
+  commitWithLog(groupId, (batch) => batch.update(scheduleRef(groupId, month), { status: 'draft', ...stamp() }), movement);
 
 // Grava o resultado de uma replicação no mês de destino, em rascunho
-export function writeReplica(groupId, month, { assignments, vacancies }, targetExists) {
-  if (!targetExists) return createSchedule(groupId, month, { assignments, vacancies });
-  return updateDoc(scheduleRef(groupId, month), { status: 'draft', assignments, vacancies, ...stamp() });
+export function writeReplica(groupId, month, { assignments, vacancies }, targetExists, movement) {
+  const ref = scheduleRef(groupId, month);
+  return commitWithLog(
+    groupId,
+    (batch) =>
+      targetExists
+        ? batch.update(ref, { status: 'draft', assignments, vacancies, ...stamp() })
+        : batch.set(ref, newSchedule({ assignments, vacancies })),
+    movement,
+  );
 }

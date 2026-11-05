@@ -6,7 +6,7 @@ import {
   onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, isLeaving } from '../firebase.js';
-import { initLayout } from '../layout.js';
+import { initLayout, setManagerFromGroups } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { createCalendar } from '../calendar.js';
 import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessage } from '../ui.js';
@@ -54,6 +54,11 @@ async function markMyDays() {
 const params = new URLSearchParams(location.search);
 if (params.has('created')) {
   toast('Grupo criado com sucesso!', 'success');
+  history.replaceState(null, '', location.pathname);
+}
+// Veio de Relatórios sem ser gestor de nenhum grupo
+if (params.get('aviso') === 'relatorios') {
+  toast('Relatórios é só para gestores de grupo.', 'error', 6000);
   history.replaceState(null, '', location.pathname);
 }
 
@@ -157,6 +162,7 @@ onSnapshot(
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
     loaded = true;
+    setManagerFromGroups(user.uid, groups); // mostra "Relatórios" no menu se for gestor
     render();
     markMyDays();
   },

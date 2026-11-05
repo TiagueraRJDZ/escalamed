@@ -250,6 +250,37 @@ async function main() {
     updatedBy: ids[manager.email],
   });
   console.log(`✔ escalas: ${monthId(current)} publicada e ${monthId(next)} em rascunho`);
+
+  // Histórico de exemplo no mês atual (inclui troca e cessão, que o app ainda não grava)
+  const managerId = ids[manager.email];
+  const [s1, s2] = staffIds;
+  const today = now.getDate();
+  const at = (day, hour) => new Date(now.getFullYear(), now.getMonth(), Math.min(day, today), hour, 15);
+  const date = (day) => `${monthId(current)}-${String(day).padStart(2, '0')}`;
+  const shiftOf = (id) => SHIFTS.find((s) => s.id === id);
+  const shift = (id, day) => ({ shiftId: id, shiftTitle: shiftOf(id).title, shiftDate: date(day), shiftStart: shiftOf(id).start, shiftEnd: shiftOf(id).end });
+  const movements = [
+    { type: 'published', actorUid: managerId, scheduleMonth: monthId(current), when: at(1, 9) },
+    { type: 'assigned', actorUid: managerId, targetUid: s1, ...shift('m', 3), when: at(2, 10) },
+    { type: 'unassigned', actorUid: managerId, targetUid: s2, ...shift('t', 4), when: at(2, 11) },
+    { type: 'vacant_open', actorUid: managerId, count: 1, ...shift('n', 7), when: at(3, 8) },
+    { type: 'swap', actorUid: s1, targetUid: s2, ...shift('m', 11), counterShiftId: 't', counterShiftDate: date(15), counterShiftStart: '13:00', counterShiftEnd: '19:00', when: at(4, 14) },
+    { type: 'cession', actorUid: s2, targetUid: s1, ...shift('n', 12), when: at(4, 16) },
+    { type: 'vacant_taken', actorUid: s1, ...shift('n', 7), when: at(5, 7) },
+  ];
+  for (const [i, { when, actorUid, targetUid = null, ...fields }] of movements.entries()) {
+    await setDoc(`groups/${GROUP_ID}/movements/seed-${i + 1}`, {
+      ...fields,
+      groupId: GROUP_ID,
+      actorUid,
+      targetUid,
+      memberUids: [...new Set([actorUid, targetUid].filter(Boolean))],
+      public: true,
+      monthKey: monthId(when),
+      createdAt: when,
+    });
+  }
+  console.log(`✔ histórico: ${movements.length} movimentações de exemplo`);
 }
 
 main().catch((err) => {

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relatórios | EscalaMed</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preload" href="/fonts/PitangaVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- SDK do Firebase baixado já no início, em paralelo (sem esperar os imports em cascata) -->
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/reports.css" />
+</head>
+<body class="is-booting">
+  <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>
+
+  <main id="page" class="page report-page">
+    <section class="card report-card" aria-labelledby="reports-title">
+      <!-- Cabeçalho só da impressão (PDF) -->
+      <div class="print-header" aria-hidden="true">
+        <img src="/img/logo.svg" alt="" width="32" height="32" /><strong>EscalaMed</strong>
+        <span id="print-info"></span>
+      </div>
+
+      <header class="report-header">
+        <h1 id="reports-title">Relatório de Plantões</h1>
+        <form class="report-filters" id="report-form" novalidate>
+          <div class="field filter-group">
+            <label class="label" for="report-group">Grupo</label>
+            <select class="select" id="report-group" name="group"></select>
+          </div>
+          <div class="field filter-date">
+            <label class="label" for="report-start">Data inicial</label>
+            <input class="input" id="report-start" name="start" type="date" required />
+          </div>
+          <div class="field filter-date">
+            <label class="label" for="report-end">Data final</label>
+            <input class="input" id="report-end" name="end" type="date" required />
+          </div>
+          <div class="field filter-member">
+            <label class="label" for="report-member">Membro</label>
+            <select class="select" id="report-member" name="member"><option value="">Todos os membros</option></select>
+          </div>
+          <div class="filter-submit">
+            <button type="submit" class="btn btn-primary" id="report-submit">Gerar relatório</button>
+          </div>
+          <div class="report-chips chips" role="group" aria-label="Atalhos de período">
+            <button type="button" class="chip" data-range="0">Este mês</button>
+            <button type="button" class="chip" data-range="-1">Mês passado</button>
+          </div>
+          <p class="field-error report-range-error" id="range-error" role="alert"></p>
+        </form>
+      </header>
+
+      <div class="report-body" id="report-body" aria-live="polite"></div>
+
+      <!-- Exportar: aparece depois de gerar; fica preso no canto de baixo do cartão -->
+      <div class="export-bar menu-anchor" id="export-bar" hidden>
+        <button type="button" class="btn btn-primary" id="export-button" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu">
+          <span data-icon="download"></span>Exportar relatório
+        </button>
+        <div class="menu export-menu" id="export-menu" role="menu" aria-label="Exportar" hidden>
+          <button type="button" class="menu-item" role="menuitem" data-export="xlsx"><span data-icon="fileText"></span>Excel (.xlsx)</button>
+          <button type="button" class="menu-item" role="menuitem" data-export="pdf"><span data-icon="printer"></span>PDF</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/pages/relatorios.js"></script>
+</body>
+</html>

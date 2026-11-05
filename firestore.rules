@@ -196,6 +196,11 @@ service cloud.firestore {
         return signedIn() && (me() in g.managerIds || me() in g.get('assistantIds', []));
       }
 
+      // Quem vê escalas em rascunho (e o histórico delas): gestor, auxiliar e analista
+      function seesDraftsOf(g) {
+        return isAdminOf(g) || me() in g.get('analystIds', []);
+      }
+
       function unique(list) {
         return list.toSet().size() == list.size();
       }
@@ -463,6 +468,70 @@ service cloud.firestore {
           && validShift(incoming())
           && incoming().createdAt == resource.data.createdAt;
         allow delete: if isManagerOf(groupData());
+      }
+
+      // ----- Histórico de movimentações (log imutável: sem update; delete só junto com o grupo) -----
+      // public == false: ação da gestão numa escala em rascunho; só gestor, auxiliar e
+      // analista veem (quem não vê rascunho consulta com where("public", "==", true)).
+      // Trocas, cessões e assumir plantão vago (quando existirem) podem ser gravadas por
+      // qualquer membro; as ações do editor, só por gestor ou auxiliar.
+      match /movements/{movementId} {
+        function memberTypes() {
+          return ['swap', 'cession', 'vacant_taken'];
+        }
+
+        function editorTypes() {
+          return ['vacant_open', 'vacant_closed', 'assigned', 'unassigned', 'published', 'unpublished', 'replicated'];
+        }
+
+        function optMonth(v) {
+          return v == null || (v is string && v.matches('^[0-9]{4}-(0[1-9]|1[0-2])$'));
+        }
+
+        function optDate(v) {
+          return v == null || (v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+        }
+
+        function optClock(v) {
+          return v == null || (v is string && v.matches('^[0-2][0-9]:[0-5][0-9]$'));
+        }
+
+        function validMovement(d) {
+          return d.keys().hasOnly(['type', 'groupId', 'actorUid', 'targetUid', 'memberUids', 'public',
+                                   'shiftId', 'shiftTitle', 'shiftDate', 'shiftStart', 'shiftEnd',
+                                   'counterShiftId', 'counterShiftDate', 'counterShiftStart', 'counterShiftEnd',
+                                   'count', 'scheduleMonth', 'fromMonth', 'monthKey', 'createdAt'])
+            && d.type in memberTypes().concat(editorTypes())
+            && d.groupId == groupId
+            && d.actorUid == me()
+            && optStr(d.get('targetUid', null), 128)
+            && d.memberUids is list && d.memberUids.size() >= 1 && d.memberUids.size() <= 2
+            && me() in d.memberUids
+            && d.public is bool
+            && optStr(d.get('shiftId', null), 128)
+            && optStr(d.get('shiftTitle', null), 40)
+            && optDate(d.get('shiftDate', null))
+            && optClock(d.get('shiftStart', null))
+            && optClock(d.get('shiftEnd', null))
+            && optStr(d.get('counterShiftId', null), 128)
+            && optDate(d.get('counterShiftDate', null))
+            && optClock(d.get('counterShiftStart', null))
+            && optClock(d.get('counterShiftEnd', null))
+            && (d.get('count', null) == null || (d.count is int && d.count >= 0 && d.count <= 20))
+            && optMonth(d.get('scheduleMonth', null))
+            && optMonth(d.get('fromMonth', null))
+            && d.monthKey is string && d.monthKey.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+            && d.createdAt == request.time;
+        }
+
+        allow read: if isMemberOf(groupData())
+          && (resource.data.public == true || seesDraftsOf(groupData()));
+        allow create: if isMemberOf(groupData())
+          && validMovement(incoming())
+          && (incoming().type in memberTypes() || isAdminOf(groupData()));
+        allow update: if false;
+        // Excluir o grupo (dono, no mesmo lote) leva o histórico junto
+        allow delete: if signedIn() && me() == groupData().ownerId && !existsAfter(groupPath());
       }
 
       // ----- Escala mensal (id = "YYYY-MM") -----

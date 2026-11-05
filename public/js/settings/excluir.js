@@ -173,7 +173,7 @@ export default {
     // Apaga um grupo inteiro (escala individual, ou equipe em que só sobrou a pessoa)
     async function deleteWholeGroup(group) {
       const batch = writeBatch(db);
-      for (const sub of ['shifts', 'schedules', 'invites', 'members']) {
+      for (const sub of ['shifts', 'schedules', 'movements', 'invites', 'members']) {
         const snapshot = await getDocs(collection(db, 'groups', group.id, sub));
         snapshot.docs.forEach((d) => batch.delete(d.ref));
       }
