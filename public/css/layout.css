@@ -17,6 +17,25 @@ body.is-booting #page { visibility: hidden; }
   place-items: center;
 }
 body:not(.is-booting) .boot-spinner { display: none; }
+/* Com o menu já desenhado (resumo da sessão), o carregando vira um esqueleto no conteúdo */
+body.has-shell .boot-spinner { display: none; }
+body.is-booting #page { position: absolute; }
+.page-skeleton { display: none; }
+body.is-booting.has-shell .page-skeleton {
+  display: block;
+  flex: 1;
+  width: 100%;
+  padding: var(--esp-5);
+}
+.page-skeleton .card {
+  display: grid;
+  gap: var(--esp-4);
+  padding: var(--esp-6);
+}
+.page-skeleton .skeleton { height: 18px; border-radius: var(--raio-sm); }
+.page-skeleton .skeleton:first-child { width: 30%; height: 32px; }
+.page-skeleton .skeleton:nth-child(2) { width: 70%; }
+.page-skeleton .skeleton:nth-child(3) { width: 50%; }
 
 .app {
   display: grid;

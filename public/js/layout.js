@@ -3,7 +3,7 @@
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
 import { collection, doc, getDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db } from './firebase.js';
-import { requireAuth, signOutUser } from './auth.js';
+import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, toast, setupMenu } from './ui.js';
@@ -308,13 +308,17 @@ function setupSidebar(app) {
 // depois de salvar nome, foto, profissão ou e-mail (atualiza sem recarregar a página).
 let shell = null;
 
-export function refreshAccountButton() {
-  if (!shell) return;
-  const { app, user, profile } = shell;
+function paintAccount({ app, user, profile }) {
   app.querySelector('.account-avatar').outerHTML = avatarHtml(profile, 'avatar account-avatar');
   app.querySelector('.account-text strong').textContent = shortName(profile.name);
   app.querySelector('#account-menu-email').textContent = auth.currentUser?.email ?? user.email ?? '';
-  showAdminRole(app, user.uid, profile);
+}
+
+export function refreshAccountButton() {
+  if (!shell) return;
+  paintAccount(shell);
+  saveSummary(shell.user, shell.profile);
+  showAdminRole(shell.app, shell.user.uid, shell.profile);
 }
 
 function setupUserMenu(app) {
@@ -373,8 +377,9 @@ function syncCardEmail(user, profile) {
     .catch(() => {});
 }
 
-export async function initLayout({ active, search = true } = {}) {
-  const { user, profile } = await requireAuth();
+// Desenha menu lateral, barra do topo e modais. Enquanto a página não carrega, um
+// esqueleto ocupa o lugar do conteúdo.
+function mountShell(user, profile, active, search) {
   const page = document.getElementById('page');
   const collapsed = readCollapsed();
 
@@ -385,14 +390,37 @@ export async function initLayout({ active, search = true } = {}) {
   // Página sem busca: o título dela (data-topbar-title) fica na faixa branca do topo
   const topbarTitle = !search && page.querySelector('[data-topbar-title]');
   if (topbarTitle) app.querySelector('#menu-open').after(topbarTitle);
+  page.insertAdjacentHTML('beforebegin', PAGE_SKELETON);
   app.querySelector('.app-main').insertAdjacentHTML('beforeend', '<footer class="app-footer app-credits" data-credits></footer>');
   document.body.prepend(app);
   document.body.insertAdjacentHTML('beforeend', dialogsHtml() + personModalHtml());
+  document.body.classList.add('has-shell');
 
   setupSidebar(app);
   setupUserMenu(app);
-  shell = { app, user, profile };
   setupDialogs();
+  return app;
+}
+
+// Esqueleto leve no lugar do conteúdo (some quando a página fica pronta)
+const PAGE_SKELETON = `<div class="page-skeleton" aria-hidden="true">
+  <div class="card"><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span></div>
+</div>`;
+
+export async function initLayout({ active, search = true } = {}) {
+  // Com o resumo da sessão, o layout aparece na hora; o login é conferido em seguida
+  const cached = readSessionSummary();
+  let app = cached ? mountShell(cached, cached.profile, active, search) : null;
+
+  const { user, profile } = await requireAuth();
+  if (app && cached.uid !== user.uid) {
+    // Outra conta entrou nesta aba: recarrega para montar tudo com a conta certa
+    location.reload();
+    return new Promise(() => {});
+  }
+  if (!app) app = mountShell(user, profile, active, search);
+  shell = { app, user, profile };
+  if (cached) paintAccount(shell); // nome ou foto podem ter mudado em outra aba
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);
@@ -400,6 +428,7 @@ export async function initLayout({ active, search = true } = {}) {
   showManagerItems(user.uid);
 
   mountCredits(app);
+  app.querySelector('.page-skeleton')?.remove();
   document.body.classList.remove('is-booting');
   return { user, profile };
 }
