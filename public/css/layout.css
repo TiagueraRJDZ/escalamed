@@ -4,7 +4,7 @@
 
 :root {
   --sidebar-w: 300px;
-  --sidebar-w-collapsed: 76px;
+  --sidebar-w-collapsed: 104px;
   --topbar-h: 68px;
 }
 
@@ -54,22 +54,15 @@ body:not(.is-booting) .boot-spinner { display: none; }
   overflow: hidden auto;
 }
 
-/* Rodapé do menu: símbolo da Hapvida + faixa vermelho/laranja/amarelo do Guia de Marca */
+/* Rodapé do menu: marca d'água discreta (calendário, batimento e relógio), só em azul */
 .sidebar::after {
   content: '';
   flex-shrink: 0;
-  margin: auto calc(var(--esp-3) * -1) calc(var(--esp-4) * -1);
-  height: 104px;
-  background:
-    url('/img/hapvida-simbolo.svg') no-repeat left 22px top 18px / 30px auto,
-    linear-gradient(
-      to bottom,
-      transparent 0 80px,
-      var(--hap-vermelho) 80px 86px,
-      var(--hap-laranja) 86px 92px,
-      var(--hap-laranja-claro) 92px 98px,
-      var(--hap-amarelo) 98px 104px
-    );
+  margin: auto calc(var(--esp-3) * -1) 0;
+  height: 230px;
+  background: url('/img/marca-dagua-menu.svg') no-repeat center bottom 20px / 190px auto;
+  opacity: 0.09;
+  pointer-events: none;
 }
 
 .sidebar-brand {
@@ -218,9 +211,25 @@ body:not(.is-booting) .boot-spinner { display: none; }
 /* Menu recolhido: só os ícones */
 .app.is-collapsed .sidebar-partner,
 .app.is-collapsed .sidebar-brand-divider,
-.app.is-collapsed .sidebar-brand-name,
-.app.is-collapsed .nav-label { display: none; }
-.app.is-collapsed .nav-item { justify-content: center; padding: 0; }
+.app.is-collapsed .sidebar-brand-name { display: none; }
+/* Menu recolhido: ícone com o nome embaixo, em letra pequena */
+.app.is-collapsed .sidebar { padding-inline: 6px; }
+.app.is-collapsed .nav-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: var(--esp-2) 2px;
+}
+.app.is-collapsed .nav-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .app.is-collapsed .nav-chevron,
 .app.is-collapsed .nav-sub { display: none; }
 .app.is-collapsed .sidebar-brand { justify-content: center; padding: 0; }
@@ -233,7 +242,8 @@ body:not(.is-booting) .boot-spinner { display: none; }
   font-size: 0;
 }
 .app.is-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
-.app.is-collapsed .sidebar::after { background-position: center top 18px, 0 0; }
+/* Menu recolhido: a marca d'água encolhe para caber na faixa estreita */
+.app.is-collapsed .sidebar::after { height: 90px; background-size: 52px auto; }
 
 /* ---------- Barra superior ---------- */
 .topbar {
@@ -669,7 +679,10 @@ dialog::backdrop { background: var(--fundo-escurecido); }
   .app.is-collapsed .sidebar-brand-name { display: inline; }
   .app.is-collapsed .sidebar-partner,
   .app.is-collapsed .sidebar-brand-divider { display: block; }
-  .app.is-collapsed .nav-item { justify-content: flex-start; padding: 0 var(--esp-3); }
+  .app.is-collapsed .nav-item { flex-direction: row; gap: var(--esp-3); min-height: 48px; justify-content: flex-start; padding: 0 var(--esp-3); }
+  .app.is-collapsed .nav-label { font-size: inherit; text-align: left; }
+  .app.is-collapsed .sidebar { padding-inline: var(--esp-3); }
+  .app.is-collapsed .sidebar::after { height: 230px; background-size: 190px auto; }
   .app.is-collapsed .nav-chevron { display: block; }
   .app.is-collapsed .nav-sub { display: flex; }
   .app.is-collapsed .nav-sub[hidden] { display: none; }

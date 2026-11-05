@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Marca d'água do menu lateral: calendário da escala, batimento cardíaco e relógio do plantão -->
+  <!-- Calendário -->
+  <rect x="24" y="36" width="168" height="160" rx="22"/>
+  <path d="M24 78h168"/>
+  <path d="M68 20v32M148 20v32"/>
+  <!-- Dias -->
+  <g stroke-width="0" fill="#fff">
+    <circle cx="56" cy="100" r="4"/><circle cx="84" cy="100" r="4"/><circle cx="112" cy="100" r="4"/><circle cx="140" cy="100" r="4"/><circle cx="168" cy="100" r="4"/>
+    <circle cx="56" cy="172" r="4"/><circle cx="84" cy="172" r="4"/>
+  </g>
+  <!-- Batimento cardíaco atravessando o calendário -->
+  <path d="M6 136h52l12-22 16 46 18-62 14 50 10-12h34"/>
+  <!-- Relógio do plantão -->
+  <!-- Fundo azul do menu: esconde as linhas do calendário atrás do relógio -->
+  <circle cx="186" cy="182" r="40" fill="#1539AA"/>
+  <path d="M186 160v22l15 10"/>
+</svg>
