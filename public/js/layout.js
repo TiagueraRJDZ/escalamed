@@ -1,7 +1,7 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
-import { collection, doc, getDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, getDocsFromCache, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { categoryName } from '/data/categories.js';
@@ -132,7 +132,11 @@ export function setManagerFromGroups(uid, groups) {
 // Sem resposta guardada: consulta os grupos (pela lista de membros, que é o que as regras permitem)
 async function showManagerItems(uid) {
   if (cachedManager(uid) !== null) return;
-  const snapshot = await getDocs(query(collection(db, 'groups'), where('memberIds', 'array-contains', uid))).catch(() => null);
+  const mine = query(collection(db, 'groups'), where('memberIds', 'array-contains', uid));
+  // Primeiro o cache local (na hora), depois o servidor
+  const cached = await getDocsFromCache(mine).catch(() => null);
+  if (cached && !cached.empty) setManagerFromGroups(uid, cached.docs.map((d) => d.data()));
+  const snapshot = await getDocs(mine).catch(() => null);
   if (snapshot) setManagerFromGroups(uid, snapshot.docs.map((d) => d.data()));
 }
 
@@ -421,6 +425,8 @@ export async function initLayout({ active, search = true } = {}) {
   if (!app) app = mountShell(user, profile, active, search);
   shell = { app, user, profile };
   if (cached) paintAccount(shell); // nome ou foto podem ter mudado em outra aba
+  // Perfil do servidor chegou depois do cache (ver requireAuth): atualiza a pílula
+  window.addEventListener('escalamed:perfil', () => paintAccount(shell));
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);

@@ -2,7 +2,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   connectFirestoreEmulator,
   terminate,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -22,7 +24,12 @@ if (!useEmulators && appCheckSiteKey) {
   });
 }
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Cache local (IndexedDB), compartilhado entre as abas: as listas em tempo real mostram
+// primeiro o que já está no aparelho e atualizam quando o servidor responde.
+// É apagado ao sair da conta (signOutUser, em auth.js).
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
 
 // E-mails do Firebase (verificação, recuperar senha) em português.
 auth.languageCode = 'pt-BR';
@@ -55,6 +62,7 @@ let leaving = false;
 // true enquanto a página está sendo trocada: as listas em tempo real recebem um
 // erro "Firestore shutting down" nesse momento, que deve ser ignorado.
 export const isLeaving = () => leaving;
+export const markLeaving = () => (leaving = true);
 
 export async function navigate(url, { replace = false } = {}) {
   leaving = true;
