@@ -498,10 +498,10 @@ body:not(.is-booting) .boot-spinner { display: none; }
 .menu-item.is-danger svg { color: var(--cor-perigo); }
 
 /* ---------- Conteúdo da página ---------- */
+/* As páginas usam toda a largura ao lado do menu (formulários longos limitam a própria largura) */
 .page {
   flex: 1;
   width: 100%;
-  max-width: 1400px;
   padding: var(--esp-5);
 }
 
@@ -714,3 +714,16 @@ dialog::backdrop { background: var(--fundo-escurecido); }
   cursor: pointer;
 }
 .segmented button[aria-pressed='true'] { background: var(--cor-superficie); color: var(--cor-primaria); box-shadow: var(--sombra-sm); }
+
+/* ---------- Texto um passo maior ----------
+   Em todas as telas internas e nos modais, a mesma escala de texto das Configurações
+   (que têm o ajuste próprio em settings.css): cada tamanho sobe um degrau
+   (ex.: dica 12 → 14px, texto secundário 14 → 16px). */
+.page:not(.settings-page),
+dialog {
+  --texto-xs: 0.875rem;
+  --texto-sm: 1rem;
+  --texto-md: 1.0625rem;
+  --texto-lg: 1.25rem;
+  --texto-xl: 1.5rem;
+}
