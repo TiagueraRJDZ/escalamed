@@ -92,9 +92,15 @@ export async function myInvites(user) {
   const invites = collectionGroup(db, 'invites');
   const queries = [query(invites, where('uid', '==', user.uid))];
   if (user.email) queries.push(query(invites, where('email', '==', user.email.toLowerCase())));
-  const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
-  return snapshots
-    .flatMap((s) => s.docs)
+  // Cada consulta vale sozinha: se uma falhar (ex.: índice ainda sendo criado),
+  // os convites da outra continuam aparecendo
+  const results = await Promise.allSettled(queries.map((q) => getDocs(q)));
+  results
+    .filter((r) => r.status === 'rejected')
+    .forEach((r) => console.warn('Convites: uma das consultas falhou.', r.reason?.message ?? r.reason));
+  return results
+    .filter((r) => r.status === 'fulfilled')
+    .flatMap((r) => r.value.docs)
     .map((d) => ({ groupId: d.ref.parent.parent.id, ...d.data() }))
     .filter((invite) => invite.expiresAt?.toMillis() > Date.now());
 }
