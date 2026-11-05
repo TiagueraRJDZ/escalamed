@@ -1,8 +1,7 @@
-/* Configurações da conta: abas verticais à esquerda e formulário à direita */
+/* Configurações: abas verticais à esquerda e formulário à direita */
 
 .settings-page { max-width: 1100px; }
 
-.settings-title { font-size: 2rem; margin-bottom: var(--esp-5); }
 
 .settings-layout {
   display: grid;
@@ -38,38 +37,6 @@
 .settings-panels .field > .label { margin-bottom: var(--esp-1); }
 .settings-panels .alert { margin-bottom: var(--esp-3); }
 .settings-panels .alert ul { margin: var(--esp-2) 0 0; padding-left: var(--esp-5); }
-
-.form-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--esp-3);
-}
-
-.form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--esp-2);
-  margin-top: var(--esp-3);
-}
-
-/* Foto */
-.photo-editor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--esp-5);
-}
-.photo-avatar {
-  width: 120px;
-  height: 120px;
-  font-size: var(--texto-2xl);
-}
-.photo-actions { flex: 1; min-width: 220px; }
-
-@media (max-width: 520px) {
-  .form-row { grid-template-columns: minmax(0, 1fr); }
-}
 
 /* Usuários (administrador da plataforma) */
 .users-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-3); }

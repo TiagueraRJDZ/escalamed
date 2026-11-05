@@ -241,6 +241,8 @@ a:hover {
   color: var(--cor-texto-2);
 }
 .btn-ghost:hover:not(:disabled) { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.btn-ghost.is-danger { color: var(--cor-perigo); }
+.btn-ghost.is-danger:hover:not(:disabled) { background: var(--cor-perigo-suave); color: var(--cor-perigo-hover); }
 
 .btn-danger {
   background: var(--cor-perigo);

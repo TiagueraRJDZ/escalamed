@@ -24,8 +24,6 @@
 
 .group-header-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
 
-.btn-ghost.is-danger { color: var(--cor-perigo); }
-.btn-ghost.is-danger:hover:not(:disabled) { background: var(--cor-perigo-suave); color: var(--cor-perigo-hover); }
 
 /* ---------- Abas ---------- */
 .tabs {

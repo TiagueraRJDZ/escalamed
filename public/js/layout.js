@@ -2,7 +2,7 @@
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user } = await initLayout({ active: 'schedules' });
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { db } from './firebase.js';
+import { auth, db } from './firebase.js';
 import { requireAuth, signOutUser } from './auth.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
@@ -85,7 +85,15 @@ async function showAdminRole(app, uid, profile) {
   app.querySelector('#account-role').textContent = isAdmin ? ADMIN_LABEL : categoryName(profile.categoryId);
 }
 
-function shellHtml(user, profile, active, collapsed) {
+// Busca de pessoas no topo (fica de fora em páginas como Configurações)
+const searchHtml = () => `
+        <form class="topbar-search input-icon" role="search" id="global-search">
+          ${icon('search')}
+          <label class="sr-only" for="global-search-input">Buscar pessoas</label>
+          <input class="input" id="global-search-input" type="search" placeholder="Quem gostaria de encontrar?" autocomplete="off" />
+        </form>`;
+
+function shellHtml(user, profile, active, collapsed, search) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <a class="sidebar-brand" href="/schedules.html" aria-label="Hapvida EscalaMed">
@@ -109,12 +117,7 @@ function shellHtml(user, profile, active, collapsed) {
         <button type="button" class="btn-icon topbar-menu" id="menu-open" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">
           ${icon('menu')}
         </button>
-
-        <form class="topbar-search input-icon" role="search" id="global-search">
-          ${icon('search')}
-          <label class="sr-only" for="global-search-input">Buscar pessoas</label>
-          <input class="input" id="global-search-input" type="search" placeholder="Quem gostaria de encontrar?" autocomplete="off" />
-        </form>
+${search ? searchHtml() : ''}
 
         <div class="topbar-actions">
           <button type="button" class="btn-icon gcal-button" data-open="modal-gcal" aria-haspopup="dialog" aria-label="Conectar Google Agenda" title="Google Agenda">
@@ -135,9 +138,10 @@ function shellHtml(user, profile, active, collapsed) {
             </button>
             <div class="menu account-menu" id="user-menu" role="menu" aria-label="Conta" hidden>
               <div class="menu-header">
-                <span>${escapeHtml(user.email || '')}</span>
+                <span id="account-menu-email">${escapeHtml(user.email || '')}</span>
               </div>
-              <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('settings')}Configurações</a>
+              <button type="button" class="menu-item" role="menuitem" id="open-account" aria-haspopup="dialog">${icon('user')}Minha conta</button>
+              <a class="menu-item" role="menuitem" href="/settings.html"${active === 'settings' ? ' aria-current="page"' : ''}>${icon('settings')}Configurações</a>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -209,9 +213,28 @@ function setupSidebar(app) {
   });
 }
 
-function setupUserMenu(app) {
+// Pílula e menu da conta com o nome, a foto e o e-mail atuais (depois de salvar em Minha conta)
+function refreshAccountButton(app, user, profile) {
+  app.querySelector('.account-avatar').outerHTML = avatarHtml(profile, 'avatar account-avatar');
+  app.querySelector('.account-text strong').textContent = shortName(profile.name);
+  app.querySelector('#account-menu-email').textContent = auth.currentUser?.email ?? user.email ?? '';
+  showAdminRole(app, user.uid, profile);
+}
+
+// Minha conta abre num modal, em qualquer página. O código do modal só é baixado na primeira vez.
+async function openAccount(app, user, profile) {
+  try {
+    const { openAccountModal } = await import('./account-modal.js');
+    openAccountModal({ user, profile, onChange: () => refreshAccountButton(app, user, profile) });
+  } catch {
+    toast('Não foi possível abrir Minha conta. Confira a conexão e tente de novo.', 'error');
+  }
+}
+
+function setupUserMenu(app, user, profile) {
   const menu = app.querySelector('#user-menu');
   setupMenu(app.querySelector('#avatar-button'), menu);
+  menu.querySelector('#open-account').addEventListener('click', () => openAccount(app, user, profile));
   menu.querySelector('#logout').addEventListener('click', signOutUser);
 }
 
@@ -265,24 +288,27 @@ function syncCardEmail(user, profile) {
     .catch(() => {});
 }
 
-export async function initLayout({ active } = {}) {
+export async function initLayout({ active, search = true } = {}) {
   const { user, profile } = await requireAuth();
   const page = document.getElementById('page');
   const collapsed = readCollapsed();
 
   const app = document.createElement('div');
   app.className = `app${collapsed ? ' is-collapsed' : ''}`;
-  app.innerHTML = shellHtml(user, profile, active, collapsed);
+  app.innerHTML = shellHtml(user, profile, active, collapsed, search);
   app.querySelector('.app-main').append(page);
+  // Página sem busca: o título dela (data-topbar-title) fica na faixa branca do topo
+  const topbarTitle = !search && page.querySelector('[data-topbar-title]');
+  if (topbarTitle) app.querySelector('#menu-open').after(topbarTitle);
   app.querySelector('.app-main').insertAdjacentHTML('beforeend', '<footer class="app-footer app-credits" data-credits></footer>');
   document.body.prepend(app);
   document.body.insertAdjacentHTML('beforeend', dialogsHtml() + personModalHtml());
 
   setupSidebar(app);
-  setupUserMenu(app);
+  setupUserMenu(app, user, profile);
   setupDialogs();
 
-  setupPeopleSearch(app.querySelector('#global-search'), user.uid);
+  if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);
   showAdminRole(app, user.uid, profile);
 

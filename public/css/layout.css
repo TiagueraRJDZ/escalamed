@@ -216,6 +216,18 @@ body:not(.is-booting) .boot-spinner { display: none; }
 
 .topbar-menu { display: none; }
 
+/* Título da página na faixa branca (páginas sem a busca, ex.: Configurações) */
+.topbar-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--texto-xl);
+  font-weight: 400;
+  color: var(--cor-primaria);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .topbar-search {
   flex: 1;
   max-width: 420px;
@@ -538,6 +550,146 @@ dialog::backdrop { background: var(--fundo-escurecido); }
 .modal-hero svg { width: 32px; height: 32px; }
 .modal-center { text-align: center; }
 .modal-center .dialog-footer { justify-content: center; }
+
+/* ---------- Formulários (páginas e modais) ---------- */
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--esp-3);
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  margin-top: var(--esp-3);
+}
+@media (max-width: 520px) {
+  .form-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Modal Minha conta: abas à esquerda, formulário à direita ---------- */
+.account-modal {
+  width: min(860px, calc(100vw - 2rem));
+  height: min(640px, calc(100dvh - 2rem));
+  max-height: calc(100dvh - 2rem);
+}
+.account-modal[open] { display: flex; flex-direction: column; }
+
+.account-modal-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+  padding: var(--esp-4) var(--esp-3);
+  border-right: 1px solid var(--cor-borda);
+  background: var(--cor-superficie-2);
+  overflow-y: auto;
+}
+
+/* Quem está logado, no topo das abas */
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: 0 var(--esp-2);
+}
+.account-identity-avatar { width: 44px; height: 44px; flex-shrink: 0; }
+.account-identity > span { display: flex; flex-direction: column; min-width: 0; }
+.account-identity strong,
+.account-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-identity strong { font-weight: 500; }
+.account-identity small { font-size: var(--texto-xs); color: var(--cor-texto-3); }
+
+.account-tabs { display: flex; flex-direction: column; gap: var(--esp-1); }
+.account-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  width: 100%;
+  padding: var(--esp-2) var(--esp-3);
+  border: 0;
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: none;
+  color: var(--cor-texto-2);
+  font: inherit;
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.account-tab svg { width: 18px; height: 18px; flex-shrink: 0; }
+.account-tab:hover { background: var(--cor-superficie); color: var(--cor-texto); }
+.account-tab[aria-selected='true'] { background: var(--cor-primaria-suave); color: var(--cor-primaria); }
+.account-tab:focus-visible { outline: none; box-shadow: var(--foco); }
+
+.account-panel { display: flex; flex-direction: column; min-height: 0; }
+.account-panel[hidden] { display: none; }
+.account-panel > form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.account-panel-body { flex: 1; padding: var(--esp-5); overflow-y: auto; }
+.account-panel-body .alert { margin-bottom: var(--esp-3); }
+.account-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-5);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.email-row { display: flex; gap: var(--esp-2); }
+.email-row .input { flex: 1; min-width: 0; }
+
+.account-privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  margin-top: var(--esp-4);
+}
+.account-privacy svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* Foto do perfil */
+.photo-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-5);
+}
+.photo-avatar {
+  width: 120px;
+  height: 120px;
+  font-size: var(--texto-2xl);
+}
+.photo-actions { flex: 1; min-width: 220px; }
+
+/* Celular: o modal ocupa a tela e as abas ficam em linha, em cima */
+@media (max-width: 640px) {
+  .account-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+  .account-modal-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .account-nav {
+    padding: var(--esp-2) var(--esp-3);
+    border-right: 0;
+    border-bottom: 1px solid var(--cor-borda);
+    overflow: visible;
+  }
+  .account-identity { display: none; }
+  .account-tabs { flex-direction: row; overflow-x: auto; }
+  .account-tab { width: auto; white-space: nowrap; }
+  .account-panel-body { padding: var(--esp-4); }
+  .account-panel-footer { padding: var(--esp-3) var(--esp-4); }
+}
 
 @keyframes entrar-direita {
   from { transform: translateX(40px); opacity: 0; }
