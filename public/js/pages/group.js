@@ -510,10 +510,13 @@ function renderInvites() {
   $('invite-list').innerHTML = invites
     .sort((a, b) => inviteLabel(a).localeCompare(inviteLabel(b), 'pt-BR'))
     .map((invite) => {
+      const declined = invite.status === 'declined';
       const expired = invite.expiresAt?.toMillis() < Date.now();
-      const status = expired
-        ? '<span class="badge badge-warning">Vencido</span>'
-        : `<span class="muted">vence em ${formatDate(invite.expiresAt)}</span>`;
+      const status = declined
+        ? `<span class="badge badge-danger">Recusado</span>${invite.respondedByName ? ` <span class="muted">por ${escapeHtml(invite.respondedByName)}</span>` : ''}`
+        : expired
+          ? '<span class="badge badge-warning">Vencido</span>'
+          : `<span class="muted">vence em ${formatDate(invite.expiresAt)}</span>`;
       const key = escapeHtml(inviteKey(invite));
       const kind = invite.uid ? 'Usuário do EscalaMed · ' : '';
       return `<li class="invite-item">
@@ -522,8 +525,8 @@ function renderInvites() {
           <span>${kind}${ROLES[invite.role]} · ${status}</span>
         </div>
         <div class="invite-actions">
-          <button type="button" class="btn btn-ghost" data-copy="${key}">${icon('arrowRightLeft')}Link</button>
-          <button type="button" class="btn btn-ghost is-danger" data-cancel="${key}">${icon('x')}Cancelar</button>
+          ${declined ? '' : `<button type="button" class="btn btn-ghost" data-copy="${key}">${icon('arrowRightLeft')}Link</button>`}
+          <button type="button" class="btn btn-ghost is-danger" data-cancel="${key}">${icon('x')}${declined ? 'Remover' : 'Cancelar'}</button>
         </div>
       </li>`;
     })
@@ -540,17 +543,20 @@ $('invite-list').addEventListener('click', async (event) => {
     showInviteLink(invite);
     return;
   }
+  const declined = invite.status === 'declined';
   const ok = await confirmDialog({
-    title: 'Cancelar convite?',
-    message: `O convite de ${inviteLabel(invite)} deixa de valer.`,
-    confirmText: 'Cancelar convite',
+    title: declined ? 'Remover convite recusado?' : 'Cancelar convite?',
+    message: declined
+      ? `O convite recusado por ${invite.respondedByName ?? inviteLabel(invite)} sai da lista.`
+      : `O convite de ${inviteLabel(invite)} deixa de valer.`,
+    confirmText: declined ? 'Remover' : 'Cancelar convite',
     cancelText: 'Voltar',
     danger: true,
   });
   if (!ok) return;
   try {
     await cancelInvite(group.id, key);
-    toast('Convite cancelado.', 'success');
+    toast(declined ? 'Convite removido.' : 'Convite cancelado.', 'success');
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
   }

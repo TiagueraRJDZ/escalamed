@@ -562,3 +562,23 @@ test('histórico: ninguém altera nem apaga; rascunho só para a gestão', async
   assert.ok(await canRead(analyst.token, `${G}/movements/priv`));
   assert.ok(!(await canRead(outsider.token, `${G}/movements/pub`)));
 });
+
+// ---------- Recusa de convite ----------
+test('convite recusado: só a pessoa convidada marca; não dá para aceitar depois; quem convidou acompanha', async () => {
+  await admin([w.set(`${G}/invites/${invited.email}`, invite(invited.email))]);
+  const decline = (actor, extra = {}) =>
+    commit(actor.token, [
+      w.update(`${G}/invites/${invited.email}`, { status: 'declined', respondedAt: NOW, respondedByName: 'Convidado Silva', ...extra }),
+    ]);
+  // Outra pessoa não recusa por ela; e ao recusar não dá para mudar o cargo do convite
+  assert.ok(!(await decline(staff)));
+  assert.ok(!(await decline(invited, { role: 'assistant' })));
+  assert.ok(await decline(invited));
+  // Recusado não volta a valer para entrar no grupo
+  assert.ok(!(await join(invited, {}, 'staff')));
+  // Quem convidou vê os convites que mandou; quem não convidou, não
+  assert.ok(await canQueryGroup(manager.token, 'invites', 'invitedBy', manager.uid));
+  assert.ok(!(await canQueryGroup(outsider.token, 'invites', 'invitedBy', manager.uid)));
+  // A gestão pode dispensar (apagar) o convite recusado
+  assert.ok(await commit(manager.token, [w.delete(`${G}/invites/${invited.email}`)]));
+});

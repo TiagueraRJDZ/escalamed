@@ -55,7 +55,9 @@ if (useEmulators) {
 // cache do botão Voltar com as conexões em tempo real do Firestore ainda abertas.
 // Em HTTP/1.1 (emuladores, alguns proxies corporativos) o limite é de 6 conexões
 // por servidor: depois de algumas trocas de página, leituras e gravações travam.
-// Por isso, antes de navegar, encerramos o Firestore da página atual.
+// Por isso, ao sair, encerramos o Firestore da página atual. Nos links, a navegação
+// continua sendo a nativa do <a> (é ela que ativa a página pré-carregada pelas
+// speculation rules); só começamos a encerrar o Firestore no clique.
 
 let leaving = false;
 
@@ -72,7 +74,7 @@ export async function navigate(url, { replace = false } = {}) {
   else location.assign(url);
 }
 
-// Links internos passam pelo navigate()
+// Clique em link interno: começa a encerrar o Firestore e deixa o navegador navegar
 document.addEventListener('click', (event) => {
   const link = event.target.closest('a[href]');
   if (
@@ -92,8 +94,8 @@ document.addEventListener('click', (event) => {
   if (url.origin !== location.origin) return;
   // Âncoras na mesma página (ex.: #entrar, #cadastro) continuam normais
   if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
-  event.preventDefault();
-  navigate(url.href);
+  leaving = true;
+  terminate(db).catch(() => {});
 });
 
 // Botão Voltar/Avançar: melhor esforço para fechar as conexões ao sair...
@@ -101,16 +103,6 @@ window.addEventListener('pagehide', () => {
   leaving = true;
   terminate(db).catch(() => {});
 });
-
-// Transição entre páginas (@view-transition em base.css): se um redirecionamento
-// interromper a transição, o navegador rejeita as promessas dela. Não é erro do app.
-for (const type of ['pageswap', 'pagereveal']) {
-  window.addEventListener(type, (event) => {
-    event.viewTransition?.ready?.catch(() => {});
-    event.viewTransition?.finished?.catch(() => {});
-    event.viewTransition?.updateCallbackDone?.catch(() => {});
-  });
-}
 
 // ...e, se o navegador restaurar a página do cache, recarrega para reconectar.
 window.addEventListener('pageshow', (event) => {

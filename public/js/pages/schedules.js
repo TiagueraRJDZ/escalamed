@@ -13,7 +13,7 @@ import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessag
 import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
 import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
-import { myInvites, acceptInvite, cancelInvite, inviteKey } from '../members.js';
+import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays } from '../schedule-math.js';
 import { loadSchedule } from '../schedule-data.js';
 
@@ -176,7 +176,8 @@ onSnapshot(
   },
 );
 
-// ---------- Convites pendentes (para o e-mail de quem está logado) ----------
+// ---------- Convites pendentes (por pessoa ou pelo e-mail de quem está logado) ----------
+// Em tempo real: a mesma lista do sininho (notifications.js)
 const invitesEl = document.getElementById('my-invites');
 let pendingInvites = [];
 
@@ -188,9 +189,7 @@ function renderInvites() {
         <span class="group-avatar" style="background:var(--cor-primaria)" aria-hidden="true">${icon('mail')}</span>
         <div class="group-info" style="flex:1;min-width:200px">
           <strong>Convite para ${escapeHtml(invite.groupName)}</strong>
-          <span>${escapeHtml(invite.invitedByName)} convidou você como ${ROLES[invite.role]}${
-            invite.unitName ? ` · ${escapeHtml(invite.unitName)}` : ''
-          }</span>
+          <span>${inviteText(invite)}</span>
         </div>
         <div class="empty-actions" style="margin:0">
           <button type="button" class="btn btn-secondary" data-decline="${i}">Recusar</button>
@@ -202,36 +201,16 @@ function renderInvites() {
 }
 
 invitesEl.addEventListener('click', async (event) => {
-  const accept = event.target.closest('[data-accept]');
-  const decline = event.target.closest('[data-decline]');
-  const button = accept ?? decline;
+  const button = event.target.closest('[data-accept], [data-decline]');
   if (!button) return;
   const invite = pendingInvites[Number(button.dataset.accept ?? button.dataset.decline)];
+  if (!invite) return;
   setLoading(button, true);
-  try {
-    if (accept) {
-      await acceptInvite(invite.groupId, invite, user, profile);
-      toast(`Você entrou no grupo ${invite.groupName}.`, 'success');
-    } else {
-      await cancelInvite(invite.groupId, inviteKey(invite));
-      toast('Convite recusado.');
-    }
-    pendingInvites = pendingInvites.filter((i) => i !== invite);
-    renderInvites();
-  } catch (error) {
-    setLoading(button, false);
-    toast(
-      accept && error.code === 'permission-denied'
-        ? 'Não foi possível entrar: o cargo do convite pode ter atingido o limite. Peça um novo convite.'
-        : firebaseErrorMessage(error),
-      'error',
-    );
-  }
+  const ok = await respondInvite(invite, button.hasAttribute('data-accept'));
+  if (!ok && button.isConnected) setLoading(button, false);
 });
 
-myInvites(user)
-  .then((list) => {
-    pendingInvites = list;
-    renderInvites();
-  })
-  .catch((error) => console.error(error));
+onInvitesChange((list) => {
+  pendingInvites = list;
+  renderInvites();
+});

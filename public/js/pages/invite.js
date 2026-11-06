@@ -5,7 +5,7 @@ import { db, navigate } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { ROLES } from '../permissions.js';
-import { acceptInvite, cancelInvite, myInviteFor, inviteKey } from '../members.js';
+import { acceptInvite, declineInvite, myInviteFor } from '../members.js';
 import { escapeHtml, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 import { signOutUser } from '../auth.js';
 
@@ -89,8 +89,8 @@ async function load() {
     });
     if (!ok) return;
     try {
-      await cancelInvite(groupId, inviteKey(invite));
-      toast('Convite recusado.');
+      await declineInvite(groupId, invite, profile?.name); // quem convidou é avisado
+      toast('Convite recusado. Quem convidou vai ser avisado.');
       navigate('/schedules.html', { replace: true });
     } catch (error) {
       toast(firebaseErrorMessage(error), 'error');

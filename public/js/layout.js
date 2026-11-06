@@ -12,6 +12,7 @@ import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 import { whenActivated } from './prerender.js';
+import { setupNotifications } from './notifications.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
@@ -239,12 +240,8 @@ function dialogsHtml() {
           <button type="button" class="chip" data-filter="shifts" aria-pressed="false">Plantões</button>
           <button type="button" class="chip" data-filter="groups" aria-pressed="false">Grupos</button>
         </div>
-        <h3 class="section-title">Não lidas</h3>
-        <div class="empty-state">
-          ${icon('bell')}
-          <h3>Tudo em dia</h3>
-          <p>Você não tem notificações novas. Avisaremos aqui sobre trocas, cessões e plantões vagos.</p>
-        </div>
+        <!-- Convites e demais avisos, em tempo real (notifications.js) -->
+        <div id="notifications-list" aria-live="polite"></div>
       </div>
     </dialog>
 
@@ -437,6 +434,7 @@ export async function initLayout({ active, search = true } = {}) {
   syncCardEmail(user, profile);
   showAdminRole(app, user.uid, profile);
   showManagerItems(user.uid);
+  setupNotifications(app, user, profile);
 
   mountCredits(app);
   app.querySelector('.page-skeleton')?.remove();

@@ -204,6 +204,17 @@ firebase deploy --project prod                         # site + regras + índice
 firebase deploy --project prod --only firestore        # só regras e índices
 ```
 
+### Versões dos arquivos (cache)
+
+Os `.js` e `.css` ficam no navegador por 1 ano (`immutable`, em `firebase.json`). Para a versão
+nova chegar a todos, cada HTML aponta para os arquivos com `?v=<hash do conteúdo>`: o import map
+(módulos), os `modulepreload`, o script de entrada e os `<link rel="stylesheet">`. Quem escreve
+isso é `node scripts/write-preloads.mjs`, que roda sozinho antes de publicar.
+
+**Mexeu em algum `.js` ou `.css`? Rode `node scripts/write-preloads.mjs`** (o teste
+`tests/preloads.test.mjs` acusa quando esqueceram). Sem isso, nos emuladores o navegador continua
+com o arquivo antigo; se acontecer, use Ctrl+F5.
+
 ## Commits
 
 Cada commit começa com a versão seguida de um resumo curto:

@@ -270,6 +270,7 @@ service cloud.firestore {
 
       function acceptsInvite(invite) {
         return invite.expiresAt > request.time
+          && invite.get('status', 'pending') != 'declined'
           && incoming().memberIds.toSet() == resource.data.memberIds.toSet().union([me()].toSet())
           && incoming().managerIds == resource.data.managerIds
           && joinsAs('assistantIds', 'assistant', invite.role)
@@ -446,6 +447,15 @@ service cloud.firestore {
           && (emailInvite(incoming()) || personInvite(incoming()))
           && inviteCommon(incoming());
         allow delete: if signedIn() && (isMine() || isAdminOf(groupData()));
+
+        // Recusar: a própria pessoa marca o convite como recusado (em vez de apagar), para
+        // quem convidou ficar sabendo. Só esses três campos mudam; o resto fica igual.
+        allow update: if signedIn() && isMine()
+          && resource.data.get('status', 'pending') != 'declined'
+          && changedOnly(['status', 'respondedAt', 'respondedByName'])
+          && incoming().status == 'declined'
+          && incoming().respondedAt == request.time
+          && str(incoming().respondedByName, 1, 80);
       }
 
       // ----- Turnos -----
@@ -576,9 +586,11 @@ service cloud.firestore {
     }
 
     // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail
+    // e quem convidou acompanha os convites que mandou (ex.: saber que foi recusado)
     match /{path=**}/invites/{key} {
       allow read: if signedIn()
-        && (resource.data.get('uid', null) == me() || resource.data.get('email', null) == myEmail());
+        && (resource.data.get('uid', null) == me() || resource.data.get('email', null) == myEmail()
+            || resource.data.get('invitedBy', null) == me());
     }
   }
 }

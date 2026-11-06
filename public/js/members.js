@@ -6,16 +6,18 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   where,
   writeBatch,
   setDoc,
+  updateDoc,
   deleteDoc,
   arrayUnion,
   serverTimestamp,
   Timestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { auth, db } from './firebase.js';
+import { auth, db, isLeaving } from './firebase.js';
 import { ROLE_ARRAY, roleOf, changeRolePatch, removeMemberPatch } from './permissions.js';
 
 export const INVITE_DAYS = 7;
@@ -82,6 +84,17 @@ export async function createInvite(group, target, role, inviter) {
 
 export const cancelInvite = (groupId, key) => deleteDoc(inviteRef(groupId, key));
 
+// Recusado pela pessoa convidada (fica guardado para quem convidou ver; ver watchSentInvites)
+export const isDeclined = (invite) => invite?.status === 'declined';
+
+// Recusar: marca o convite como recusado (não apaga), com o nome de quem recusou
+export const declineInvite = (groupId, invite, name) =>
+  updateDoc(inviteRef(groupId, inviteKey(invite)), {
+    status: 'declined',
+    respondedAt: serverTimestamp(),
+    respondedByName: String(name || 'Convidado').slice(0, 80),
+  });
+
 export async function listInvites(groupId) {
   const snapshot = await getDocs(collection(db, 'groups', groupId, 'invites'));
   return snapshot.docs.map((d) => d.data());
@@ -102,7 +115,86 @@ export async function myInvites(user) {
     .filter((r) => r.status === 'fulfilled')
     .flatMap((r) => r.value.docs)
     .map((d) => ({ groupId: d.ref.parent.parent.id, ...d.data() }))
-    .filter((invite) => invite.expiresAt?.toMillis() > Date.now());
+    .filter((invite) => !isDeclined(invite) && invite.expiresAt?.toMillis() > Date.now());
+}
+
+// Escuta uma consulta em tempo real e, se ela falhar (ex.: índice ainda sendo criado logo
+// depois de publicar, conexão caindo), tenta de novo sozinha a cada 30 s. Enquanto isso,
+// fica a última lista que chegou. Devolve a função que para de escutar.
+const RETRY_MS = 30000;
+
+function listenWithRetry(q, onNext, label) {
+  let stop = () => {};
+  let timer = null;
+  let stopped = false;
+  const start = () => {
+    stop = onSnapshot(
+      q,
+      // includeMetadataChanges: avisa também quando o servidor só confirma o que o cache já tinha
+      { includeMetadataChanges: true },
+      onNext,
+      (error) => {
+        if (stopped || isLeaving()) return;
+        console.warn(`${label}: a consulta falhou; tentando de novo em 30 s.`, error.message);
+        timer = setTimeout(start, RETRY_MS);
+      },
+    );
+  };
+  start();
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+    stop();
+  };
+}
+
+// Convites pendentes em tempo real (as mesmas duas consultas de myInvites).
+// onChange(lista, { synced }) a cada mudança; synced = as duas consultas já responderam
+// pelo servidor (não só pelo cache local). Devolve a função que para de escutar.
+export function watchMyInvites(user, onChange) {
+  const invites = collectionGroup(db, 'invites');
+  const queries = [query(invites, where('uid', '==', user.uid))];
+  if (user.email) queries.push(query(invites, where('email', '==', user.email.toLowerCase())));
+  const results = queries.map(() => null); // { docs, fromCache } de cada consulta
+
+  const emit = () => {
+    const byPath = new Map();
+    results.forEach((r) => r?.docs.forEach((d) => byPath.set(d.ref.path, d)));
+    const list = [...byPath.values()]
+      .map((d) => ({ id: d.ref.path, groupId: d.ref.parent.parent.id, ...d.data() }))
+      .filter((invite) => !isDeclined(invite) && invite.expiresAt?.toMillis() > Date.now())
+      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+    // Uma consulta falhando não esconde os convites da outra (ela tenta de novo sozinha)
+    onChange(list, { synced: results.every((r) => r && !r.fromCache) });
+  };
+
+  const stops = queries.map((q, i) =>
+    listenWithRetry(
+      q,
+      (snapshot) => {
+        results[i] = { docs: snapshot.docs, fromCache: snapshot.metadata.fromCache };
+        emit();
+      },
+      'Convites',
+    ),
+  );
+  return () => stops.forEach((stop) => stop());
+}
+
+// Convites recusados que quem está logado mandou, em tempo real (para o sininho).
+// onChange(lista, { synced }). Devolve a função que para de escutar.
+export function watchDeclinedInvites(uid, onChange) {
+  return listenWithRetry(
+    query(collectionGroup(db, 'invites'), where('invitedBy', '==', uid)),
+    (snapshot) => {
+      const list = snapshot.docs
+        .map((d) => ({ id: d.ref.path, groupId: d.ref.parent.parent.id, ...d.data() }))
+        .filter(isDeclined)
+        .sort((a, b) => (b.respondedAt?.toMillis?.() ?? 0) - (a.respondedAt?.toMillis?.() ?? 0));
+      onChange(list, { synced: !snapshot.metadata.fromCache });
+    },
+    'Convites recusados',
+  );
 }
 
 // Convite de quem está logado para um grupo (por pessoa ou por e-mail), ou null
@@ -110,7 +202,7 @@ export async function myInviteFor(groupId, user) {
   const keys = [user.uid, user.email?.toLowerCase()].filter(Boolean);
   for (const key of keys) {
     const snapshot = await getDoc(inviteRef(groupId, key)).catch(() => null);
-    if (snapshot?.exists()) return snapshot.data();
+    if (snapshot?.exists() && !isDeclined(snapshot.data())) return snapshot.data();
   }
   return null;
 }

@@ -8,10 +8,6 @@
   --topbar-h: 68px;
 }
 
-/* Na transição entre páginas, menu e barra do topo ficam parados (só o conteúdo troca) */
-.sidebar { view-transition-name: menu-lateral; }
-.topbar { view-transition-name: barra-topo; }
-
 /* Enquanto confere o login, mostra só um carregando */
 body.is-booting #page { visibility: hidden; }
 .boot-spinner {
@@ -386,6 +382,58 @@ body.is-booting.has-shell .page-skeleton {
   gap: var(--esp-1);
   margin-left: auto;
 }
+
+/* Número de notificações no sininho */
+#notifications-button { position: relative; }
+.bell-count {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--cor-superficie);
+  border-radius: var(--raio-total);
+  background: var(--hap-vermelho);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.bell-count[hidden] { display: none; }
+
+/* Lista de notificações na gaveta */
+.notification-list { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
+.notification-item {
+  display: flex;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-primaria-borda);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: var(--cor-primaria-suave);
+}
+.notification-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px 10px 16px 10px;
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+}
+.notification-icon svg { width: 20px; height: 20px; }
+.notification-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.notification-text strong { font-weight: 500; }
+.notification-text span { color: var(--cor-texto-2); font-size: var(--texto-sm); }
+.notification-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-2); margin-top: var(--esp-2); }
+.notification-text small { color: var(--cor-texto-3); font-size: var(--texto-xs); }
+.notification-sentence strong { font-weight: 500; }
+/* Convite recusado: aviso neutro, ícone vermelho */
+.notification-item.is-declined { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
+.notification-item.is-declined .notification-icon { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
 
 /* Bolinha de "tem notificação nova" */
 .has-dot { position: relative; }
