@@ -3,40 +3,8 @@
    Cores, tipografia e componentes reutilizados em todas as telas.
    ========================================================= */
 
-/* ---------- Fonte da marca Hapvida (Pitanga, versão variável: pesos de 100 a 800 e itálico no mesmo arquivo) ---------- */
-@font-face {
-  font-family: 'Pitanga';
-  src: url('/fonts/PitangaVariable.woff2') format('woff2');
-  font-weight: 100 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Pitanga';
-  src: url('/fonts/PitangaVariable.woff2') format('woff2');
-  font-weight: 100 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-/* Pitanga do Guia de Marca: só Light, Regular e Medium. Usada no app todo (menos na
-   tela de entrada, que tem a arte própria). Pedidos de 600/700 viram 500 (Medium). */
-@font-face {
-  font-family: 'Pitanga Marca';
-  src: url('/fonts/PitangaVariable.woff2') format('woff2');
-  font-weight: 300 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Pitanga Marca';
-  src: url('/fonts/PitangaVariable.woff2') format('woff2');
-  font-weight: 300 500;
-  font-style: italic;
-  font-display: swap;
-}
+/* ---------- Fonte: Plus Jakarta Sans (Google Fonts, pesos 400 a 700) ----------
+   Carregada no <head> de cada página (link para fonts.googleapis.com). */
 
 /* ---------- Cores e medidas (troque aqui para mudar o visual) ----------
    Visual do Guia de Marca Hapvida (Brandbook V6):
@@ -45,6 +13,15 @@
    - sem negrito e sem CAPS nos títulos
    - canto "folha": o canto de baixo à direita mais arredondado (--folha) */
 :root {
+  /* Marca EscalaMed (logo "Grade": menu lateral, ícone e favicon) */
+  --brand-sidebar: #1B3BA8;
+  --brand-white: #FFFFFF;
+  --brand-teal: #2FD3B5;
+  --brand-teal-dark: #0B4F45;
+  --brand-teal-light: #7FE8D4;
+  --brand-tagline: #A9BCF5;
+  --brand-tagline-light: #5B6280; /* tagline em fundo claro */
+
   /* Paleta do Guia de Marca */
   --hap-azul: #1539aa;
   --hap-azul-escuro: #0f2c8c;
@@ -82,8 +59,8 @@
   --cor-destaque: var(--hap-amarelo); /* selo "NOVO!" */
 
   /* Tipografia */
-  --fonte: 'Pitanga Marca', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --fonte-entrada: 'Pitanga', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fonte-entrada: var(--fonte);
   --texto-xs: 0.75rem;
   --texto-sm: 0.875rem;
   --texto-md: 1rem;
@@ -597,3 +574,42 @@ a:hover {
   color: var(--cor-texto-3);
   text-align: center;
 }
+
+/* ---------- Marca EscalaMed ----------
+   Ícone de 4 blocos + "Escala" (700) "Med" (400) + "PLANTÕES · EQUIPES".
+   Marcação direto no HTML das telas de entrada (index, signup, new-password, termos)
+   e no cabeçalho da impressão do Relatório. O menu lateral usa uma imagem (layout.css).
+   .brand--light: versão para fundo claro (login, cadastro, impressão). */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--fonte);
+}
+.brand-icon { flex: none; display: block; width: 40px; height: 40px; }
+.brand-text { display: flex; flex-direction: column; min-width: 0; }
+.brand-name {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+.brand-escala { font-weight: 700; color: var(--brand-white); }
+.brand-med { font-weight: 400; color: var(--brand-teal-light); }
+.brand-tagline {
+  margin-top: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--brand-tagline);
+}
+
+.brand--light .brand-escala { color: var(--brand-sidebar); }
+.brand--light .brand-tagline { color: var(--brand-tagline-light); }
+/* Blocos do ícone: cheio em azul, vazios em azul 25% (o bloco com a cruz não muda) */
+.brand--light .brand-icon rect:nth-of-type(1) { fill: var(--brand-sidebar); }
+.brand--light .brand-icon rect:nth-of-type(2),
+.brand--light .brand-icon rect:nth-of-type(3) { fill: var(--brand-sidebar); fill-opacity: 0.25; }

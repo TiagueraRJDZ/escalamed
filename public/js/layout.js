@@ -175,10 +175,9 @@ const searchHtml = () => `
 function shellHtml(user, profile, active, collapsed, search) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
-      <a class="sidebar-brand" href="/schedules.html" aria-label="Hapvida EscalaMed">
-        <img class="sidebar-partner" src="/img/hapvida-logo-negativo.svg" alt="" width="98" height="22" />
-        <span class="sidebar-brand-divider" aria-hidden="true"></span>
-        <img src="/img/logo.svg" alt="" /><span class="sidebar-brand-name">EscalaMed</span>
+      <a class="sidebar-brand" href="/schedules.html">
+        <img class="sidebar-brand-full" src="/assets/img/escalamed-hapvida-lado-a-lado.png" alt="EscalaMed - Hapvida" />
+        <img class="sidebar-brand-icon" src="/img/escalamed-icon.svg" alt="EscalaMed" width="32" height="32" />
       </a>
       <nav aria-label="Navegação principal">
         <ul class="nav">${NAV.map((item) => navItem(item, active, { admin: cachedAdmin(user.uid), manager: cachedManager(user.uid) === '1' })).join('')}</ul>

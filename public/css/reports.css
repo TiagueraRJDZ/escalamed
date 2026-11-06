@@ -263,5 +263,5 @@
     gap: var(--esp-2);
     margin-bottom: var(--esp-3);
   }
-  .print-header span { margin-left: auto; color: var(--cor-texto-2); }
+  #print-info { margin-left: auto; color: var(--cor-texto-2); }
 }

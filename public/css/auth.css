@@ -8,8 +8,8 @@
   --auth-azul-hover: #0d37b5;
 }
 
-/* A tela de entrada mantém a arte própria: Pitanga com todos os pesos e cantos iguais
-   (o resto do app usa a versão do Guia de Marca, definida em base.css) */
+/* A tela de entrada mantém a arte própria: cantos iguais e botões/rótulos em 600
+   (a fonte é a mesma do app, Plus Jakarta Sans: --fonte-entrada em base.css) */
 .auth,
 .auth-panel {
   font-family: var(--fonte-entrada);
@@ -81,12 +81,6 @@
 
 .auth-brand:hover { text-decoration: none; }
 
-.auth-brand img { width: 40px; height: 40px; }
-
-.auth-showcase .auth-brand img {
-  border-radius: 12px;
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
-}
 
 .carousel {
   max-width: 508px;
