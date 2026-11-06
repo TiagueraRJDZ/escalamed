@@ -177,7 +177,7 @@ function shellHtml(user, profile, active, collapsed, search) {
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <a class="sidebar-brand" href="/schedules.html">
         <img class="sidebar-brand-full" src="/assets/img/escalamed-hapvida-lado-a-lado.png" alt="EscalaMed - Hapvida" />
-        <img class="sidebar-brand-icon" src="/img/escalamed-icon.svg" alt="EscalaMed" width="32" height="32" />
+        <img class="sidebar-brand-icon" src="/img/escalamed-grade.svg" alt="EscalaMed" width="32" height="32" />
         <span class="sidebar-brand-divider" aria-hidden="true"></span>
         <img class="sidebar-brand-hapvida" src="/img/hapvida-flor.svg" alt="Hapvida" width="26" height="26" />
       </a>
