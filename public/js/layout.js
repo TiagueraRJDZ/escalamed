@@ -11,6 +11,7 @@ import { mountCredits } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
+import { whenActivated } from './prerender.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
@@ -415,6 +416,10 @@ export async function initLayout({ active, search = true } = {}) {
   // Com o resumo da sessão, o layout aparece na hora; o login é conferido em seguida
   const cached = readSessionSummary();
   let app = cached ? mountShell(cached, cached.profile, active, search) : null;
+
+  // Página pré-carregada: para aqui até a pessoa abrir. Assim login, leituras,
+  // gravações e avisos da página só acontecem quando ela está de fato na tela.
+  await whenActivated();
 
   const { user, profile } = await requireAuth();
   if (app && cached.uid !== user.uid) {

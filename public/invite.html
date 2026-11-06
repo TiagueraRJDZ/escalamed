@@ -23,6 +23,7 @@
   <link rel="modulepreload" href="/js/version.js" />
   <link rel="modulepreload" href="/js/people-search.js" />
   <link rel="modulepreload" href="/js/settings/menu.js" />
+  <link rel="modulepreload" href="/js/prerender.js" />
   <link rel="modulepreload" href="/js/auth-errors.js" />
   <link rel="modulepreload" href="/js/auth-api.js" />
   <link rel="modulepreload" href="/js/redirect.js" />
@@ -31,6 +32,10 @@
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/layout.css" />
   <link rel="stylesheet" href="/css/group.css" />
+  <!-- Pré-carrega a página do link quando o mouse para em cima (ver js/prerender.js) -->
+  <script type="speculationrules">
+    {"prerender":[{"where":{"and":[{"href_matches":"/*.html"},{"not":{"href_matches":["/index.html","/signup.html","/new-password.html","/invite.html"]}}]},"eagerness":"moderate"}]}
+  </script>
 </head>
 <body class="is-booting">
   <div class="boot-spinner"><div class="spinner" role="status" aria-label="Carregando"></div></div>

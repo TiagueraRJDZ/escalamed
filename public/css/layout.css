@@ -8,6 +8,10 @@
   --topbar-h: 68px;
 }
 
+/* Na transição entre páginas, menu e barra do topo ficam parados (só o conteúdo troca) */
+.sidebar { view-transition-name: menu-lateral; }
+.topbar { view-transition-name: barra-topo; }
+
 /* Enquanto confere o login, mostra só um carregando */
 body.is-booting #page { visibility: hidden; }
 .boot-spinner {

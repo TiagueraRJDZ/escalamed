@@ -44,6 +44,11 @@
    - fundo "off-white" quente, como as páginas do guia
    - sem negrito e sem CAPS nos títulos
    - canto "folha": o canto de baixo à direita mais arredondado (--folha) */
+/* Transição suave entre páginas (navegadores que suportam; respeita "reduzir movimento") */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+
 :root {
   /* Paleta do Guia de Marca */
   --hap-azul: #1539aa;

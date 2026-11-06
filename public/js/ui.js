@@ -21,6 +21,11 @@ export function initials(name) {
 
 // Aviso rápido no canto da tela
 export function toast(message, type = 'info', duration = 4000) {
+  // Página pré-carregada (ainda escondida): o aviso espera ela ser aberta
+  if (document.prerendering) {
+    document.addEventListener('prerenderingchange', () => toast(message, type, duration), { once: true });
+    return;
+  }
   let area = document.querySelector('.toast-area');
   if (!area) {
     area = document.createElement('div');

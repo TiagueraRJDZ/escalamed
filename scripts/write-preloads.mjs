@@ -54,8 +54,11 @@ for (const name of readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))) {
   const block = [START, ...modules.map((m) => `  <link rel="modulepreload" href="${url(m)}" />`), `  ${END}`].join('\n');
 
   let next;
-  if (html.includes(START)) {
-    next = html.replace(new RegExp(`${START}[\\s\\S]*?${END}`), block);
+  const from = html.indexOf(START);
+  if (from >= 0) {
+    // Troca o bloco entre os marcadores (procura como texto: o marcador tem parênteses)
+    const to = html.indexOf(END, from) + END.length;
+    next = html.slice(0, from) + block + html.slice(to);
   } else {
     // Primeira vez: logo depois dos preloads do SDK do Firebase (ou antes do </head>)
     const anchor = html.match(/.*firebase-firestore\.js" \/>\n/);
