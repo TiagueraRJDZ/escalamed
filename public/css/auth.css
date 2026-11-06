@@ -367,3 +367,108 @@
 
 /* Aviso do formulário com espaço antes do primeiro campo */
 .auth-view form .form-alert:not([hidden]) { margin-bottom: var(--esp-3); }
+
+/* ---------- Tela inicial: ícone da marca ao abrir a página ----------
+   Toda vez que a tela inicial abre ou é atualizada, os 4 blocos dão UMA volta: balançam
+   de um lado para o outro e trocam de lugar 4 vezes (sentido horário) até voltar à
+   posição inicial, e param. A cruz anda junto com o bloco verde.
+   Quem pediu menos movimento no sistema vê o ícone parado. */
+@media (prefers-reduced-motion: no-preference) {
+  .brand-icon--animado rect:nth-of-type(1) { animation: grade-tl 2.4s ease-in-out 1; }
+  .brand-icon--animado rect:nth-of-type(2) { animation: grade-tr 2.4s ease-in-out 1; }
+  .brand-icon--animado rect:nth-of-type(3) { animation: grade-bl 2.4s ease-in-out 1; }
+  .brand-icon--animado rect:nth-of-type(4) { animation: grade-br 2.4s ease-in-out 1; }
+  .brand-icon--animado path { animation: grade-br 2.4s ease-in-out 1; }
+}
+@keyframes grade-tl {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(14px, 0px); }
+  25%, 34% { transform: translate(14px, 0px); }
+  36% { transform: translate(12.5px, 0px); }
+  38% { transform: translate(15.5px, 0px); }
+  40% { transform: translate(14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(14px, 14px); }
+  50%, 59% { transform: translate(14px, 14px); }
+  61% { transform: translate(12.5px, 14px); }
+  63% { transform: translate(15.5px, 14px); }
+  65% { transform: translate(14px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(0px, 14px); }
+  75%, 84% { transform: translate(0px, 14px); }
+  86% { transform: translate(-1.5px, 14px); }
+  88% { transform: translate(1.5px, 14px); }
+  90% { transform: translate(0px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-tr {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(0px, 14px); }
+  25%, 34% { transform: translate(0px, 14px); }
+  36% { transform: translate(-1.5px, 14px); }
+  38% { transform: translate(1.5px, 14px); }
+  40% { transform: translate(0px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(-14px, 14px); }
+  50%, 59% { transform: translate(-14px, 14px); }
+  61% { transform: translate(-15.5px, 14px); }
+  63% { transform: translate(-12.5px, 14px); }
+  65% { transform: translate(-14px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(-14px, 0px); }
+  75%, 84% { transform: translate(-14px, 0px); }
+  86% { transform: translate(-15.5px, 0px); }
+  88% { transform: translate(-12.5px, 0px); }
+  90% { transform: translate(-14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-bl {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(0px, -14px); }
+  25%, 34% { transform: translate(0px, -14px); }
+  36% { transform: translate(-1.5px, -14px); }
+  38% { transform: translate(1.5px, -14px); }
+  40% { transform: translate(0px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(14px, -14px); }
+  50%, 59% { transform: translate(14px, -14px); }
+  61% { transform: translate(12.5px, -14px); }
+  63% { transform: translate(15.5px, -14px); }
+  65% { transform: translate(14px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(14px, 0px); }
+  75%, 84% { transform: translate(14px, 0px); }
+  86% { transform: translate(12.5px, 0px); }
+  88% { transform: translate(15.5px, 0px); }
+  90% { transform: translate(14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-br {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(-14px, 0px); }
+  25%, 34% { transform: translate(-14px, 0px); }
+  36% { transform: translate(-15.5px, 0px); }
+  38% { transform: translate(-12.5px, 0px); }
+  40% { transform: translate(-14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(-14px, -14px); }
+  50%, 59% { transform: translate(-14px, -14px); }
+  61% { transform: translate(-15.5px, -14px); }
+  63% { transform: translate(-12.5px, -14px); }
+  65% { transform: translate(-14px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(0px, -14px); }
+  75%, 84% { transform: translate(0px, -14px); }
+  86% { transform: translate(-1.5px, -14px); }
+  88% { transform: translate(1.5px, -14px); }
+  90% { transform: translate(0px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
