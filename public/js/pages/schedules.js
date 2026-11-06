@@ -14,8 +14,10 @@ import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
 import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
-import { monthKey, userDays } from '../schedule-math.js';
-import { loadSchedule } from '../schedule-data.js';
+import { monthKey, userDays, dayShifts } from '../schedule-math.js';
+import { loadSchedule, loadShifts, scheduleShifts } from '../schedule-data.js';
+import { formatClock } from '../shifts.js';
+import { isoDate } from '../dates.js';
 
 renderIcons();
 const { user, profile } = await initLayout({ active: 'schedules' });
@@ -26,29 +28,173 @@ let groups = [];
 let loaded = false;
 
 setupMenu(document.getElementById('new-button'), document.getElementById('new-menu'));
-// Calendário: marca os dias em que o usuário tem plantão, em todos os grupos
+// ---------- Calendário e plantões do dia ----------
+// Marca os dias em que o usuário tem plantão (fundo azul) e os dias com vaga aberta
+// numa escala publicada (ponto laranja), em todos os grupos. Clicar num dia mostra
+// embaixo os plantões dele naquele dia e as vagas abertas ("Disponíveis").
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+let selectedDate = today;
 let calendarMonth = null;
-let markedFor = ''; // mês + grupos já marcados (evita ler de novo à toa)
+let groupsKey = null; // grupos prontos; quando muda, as escalas são lidas de novo
+const monthCache = new Map(); // "YYYY-MM" → Promise<[{ group, schedule, shifts }]>
+const shiftsCache = new Map(); // groupId → Promise<turnos do grupo>
+
+const readyGroups = () => groups.filter((g) => g.setupStep === 'done');
+
+// Escalas do mês em todos os grupos prontos (só as que existem e a pessoa pode ler)
+function monthEntries(month) {
+  if (!monthCache.has(month)) {
+    const promise = Promise.all(
+      readyGroups().map(async (group) => {
+        const schedule = await loadSchedule(group.id, month);
+        if (!schedule) return null;
+        if (!shiftsCache.has(group.id)) shiftsCache.set(group.id, loadShifts(group.id).catch(() => ({})));
+        return { group, schedule, shifts: scheduleShifts(schedule, await shiftsCache.get(group.id)) };
+      }),
+    ).then((list) => list.filter(Boolean));
+    promise.catch(() => monthCache.delete(month)); // erro de rede: tenta de novo na próxima vez
+    monthCache.set(month, promise);
+  }
+  return monthCache.get(month);
+}
+
+// Vagas abertas só contam em escala publicada (rascunho ainda pode mudar)
+const isPublished = (schedule) => schedule.status === 'published';
+
+// Vagas abertas do dia em que a pessoa ainda não está
+const openSlots = (schedule, key) =>
+  isPublished(schedule) && !schedule.assignments?.[key]?.includes(user.uid) ? schedule.vacancies?.[key] ?? 0 : 0;
+
+async function markDays() {
+  if (!loaded || !calendarMonth) return;
+  const month = calendarMonth;
+  const entries = await monthEntries(month).catch(() => []);
+  if (month !== calendarMonth) return; // trocou de mês enquanto carregava
+  const mine = new Set();
+  const open = new Set();
+  for (const { schedule, shifts } of entries) {
+    userDays(schedule.assignments, user.uid).forEach((day) => mine.add(day));
+    for (const key of Object.keys(schedule.vacancies ?? {})) {
+      if (shifts[key.slice(3)] && openSlots(schedule, key) > 0) open.add(Number(key.slice(0, 2)));
+    }
+  }
+  calendar.setMarks(mine, open);
+}
+
 const calendar = createCalendar(document.getElementById('calendar'), {
+  selected: today,
+  toggle: false,
   onMonthChange: (year, monthIndex) => {
     calendarMonth = monthKey(year, monthIndex);
-    markMyDays();
+    markDays();
+  },
+  onSelect: (date) => {
+    selectedDate = date;
+    renderDay();
   },
 });
 
-async function markMyDays() {
-  if (!loaded || !calendarMonth) return;
-  const month = calendarMonth;
-  const ready = groups.filter((g) => g.setupStep === 'done');
-  const signature = `${month}|${ready.map((g) => g.id).join(',')}`;
-  if (signature === markedFor) return;
-  markedFor = signature;
-  const schedules = await Promise.all(ready.map((g) => loadSchedule(g.id, month).catch(() => null)));
-  if (month !== calendarMonth) return; // trocou de mês enquanto carregava
-  const days = new Set();
-  schedules.forEach((s) => userDays(s?.assignments, user.uid).forEach((day) => days.add(day)));
-  calendar.setMarks(days);
+// ---------- Painel do dia escolhido ----------
+const dayPanel = document.getElementById('day-panel');
+const dayTitle = document.getElementById('day-title');
+const longDay = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+const panelSkeleton = () =>
+  `<div class="card day-card" aria-hidden="true">${'<div class="home-shift-skeleton"><span class="skeleton"></span><div><span class="skeleton"></span><span class="skeleton"></span></div></div>'.repeat(2)}</div>`;
+
+// Um plantão (seu ou vago) do dia: abre o grupo já na gaveta daquele dia
+function shiftItem({ group, shift, date, badge = '' }) {
+  return `<li><a class="home-shift" href="/group.html?id=${encodeURIComponent(group.id)}&dia=${isoDate(date)}">
+    <span class="group-avatar" style="background:${escapeHtml(groupColor(group.color))}" aria-hidden="true">${escapeHtml(initials(group.name))}</span>
+    <span class="home-shift-info">
+      <strong>${escapeHtml(shift.title)} · ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>
+      <span>${escapeHtml(group.name)}</span>
+    </span>
+    ${badge}
+    ${icon('chevronRight')}
+  </a></li>`;
 }
+
+const sectionHtml = (title, items, empty) => `<div class="card day-card">
+    <h3 class="day-card-title">${title} (${items.length})</h3>
+    ${items.length ? `<ul class="home-shifts">${items.join('')}</ul>` : `<p class="day-empty">${empty}</p>`}
+  </div>`;
+
+let dayRequest = 0;
+
+async function renderDay() {
+  const date = selectedDate;
+  const id = ++dayRequest;
+  const isToday = date.getTime() === today.getTime();
+  dayTitle.innerHTML = `${escapeHtml(capitalize(longDay.format(date)))}${isToday ? ' <span class="badge badge-primary">Hoje</span>' : ''}`;
+  if (!loaded) {
+    dayPanel.innerHTML = panelSkeleton();
+    return; // desenha de novo quando os grupos chegarem
+  }
+  if (!readyGroups().length) {
+    dayPanel.setAttribute('aria-busy', 'false');
+    dayPanel.innerHTML = `<div class="card"><div class="empty-state">${icon('calendar')}<h3>Nenhuma escala ainda</h3>
+      <p>Quando você fizer parte de um grupo com escala, os plantões de cada dia aparecem aqui.</p></div></div>`;
+    return;
+  }
+  dayPanel.setAttribute('aria-busy', 'true');
+  dayPanel.innerHTML = panelSkeleton();
+  let entries;
+  try {
+    entries = await monthEntries(monthKey(date.getFullYear(), date.getMonth()));
+  } catch (error) {
+    if (id !== dayRequest || isLeaving()) return;
+    console.error(error);
+    dayPanel.setAttribute('aria-busy', 'false');
+    dayPanel.innerHTML = `<div class="card"><div class="empty-state">${icon('x')}<h3>Não foi possível carregar os plantões</h3>
+      <p>Verifique sua conexão e tente de novo.</p>
+      <button type="button" class="btn btn-secondary" data-retry>Tentar de novo</button></div></div>`;
+    return;
+  }
+  if (id !== dayRequest) return; // escolheu outro dia enquanto carregava
+
+  const day = date.getDate();
+  const mine = [];
+  const open = [];
+  for (const { group, schedule, shifts } of entries) {
+    for (const { shiftId, shift, uids } of dayShifts(schedule, shifts, day)) {
+      if (uids.includes(user.uid)) {
+        const badge = isPublished(schedule) ? '' : '<span class="badge badge-muted">Rascunho</span>';
+        mine.push({ start: shift.startMinute, html: shiftItem({ group, shift, date, badge }) });
+        continue;
+      }
+      const slots = openSlots(schedule, `${String(day).padStart(2, '0')}_${shiftId}`);
+      if (slots > 0) {
+        const badge = `<span class="badge badge-warning">${slots} ${slots === 1 ? 'vaga' : 'vagas'}</span>`;
+        open.push({ start: shift.startMinute, html: shiftItem({ group, shift, date, badge }) });
+      }
+    }
+  }
+  const sorted = (list) => list.sort((a, b) => a.start - b.start).map((item) => item.html);
+  dayPanel.setAttribute('aria-busy', 'false');
+  dayPanel.innerHTML =
+    sectionHtml('Seus plantões', sorted(mine), isToday ? 'Você não tem plantão hoje.' : 'Você não tem plantão neste dia.') +
+    sectionHtml('Disponíveis', sorted(open), 'Nenhuma vaga aberta neste dia. Plantões vagos nos seus grupos aparecem aqui.');
+}
+
+dayPanel.addEventListener('click', (event) => {
+  if (event.target.closest('[data-retry]')) renderDay();
+});
+
+// Os grupos mudaram (entrou, saiu, terminou a configuração): lê as escalas de novo
+function refreshCalendar() {
+  const key = readyGroups()
+    .map((g) => g.id)
+    .join(',');
+  if (key === groupsKey) return;
+  groupsKey = key;
+  monthCache.clear();
+  markDays();
+  renderDay();
+}
+renderDay();
 
 // Aviso depois de concluir o wizard
 const params = new URLSearchParams(location.search);
@@ -164,7 +310,7 @@ onSnapshot(
     loaded = true;
     setManagerFromGroups(user.uid, groups); // mostra "Relatórios" no menu se for gestor
     render();
-    markMyDays();
+    refreshCalendar();
   },
   (error) => {
     if (isLeaving()) return; // trocando de página: não é erro de verdade

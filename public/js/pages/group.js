@@ -888,6 +888,12 @@ onSnapshot(
       const fromHash = { '#membros': isTeam && $('tab-members'), '#escala': !$('tab-schedule').hidden && $('tab-schedule') }[location.hash];
       selectTab(fromHash || $('tab-calendar'));
       if (fromHash === $('tab-schedule')) renderMonthList();
+      // Veio da tela de Escalas pelo plantão de um dia (?dia=AAAA-MM-DD): abre a gaveta daquele dia
+      const dia = new URLSearchParams(location.search).get('dia');
+      if (/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(dia ?? '')) {
+        history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(groupId)}${location.hash}`);
+        openDay(dia.slice(0, 7), Number(dia.slice(8)));
+      }
     }
   },
   (error) => {

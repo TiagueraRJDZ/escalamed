@@ -117,16 +117,25 @@
 }
 
 /* ---------- Coluna direita ---------- */
-.schedules-side {
-  display: flex;
-  flex-direction: column;
+/* Estreita (tela larga ou celular): calendário em cima, plantões do dia embaixo.
+   Larga (tablet / janela média, quando a coluna fica embaixo da lista): lado a lado. */
+.schedules-side { container: lado / inline-size; }
+.side-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--esp-5);
+  align-items: start;
+}
+@container lado (min-width: 720px) {
+  .side-grid { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); }
 }
 
 .side-title { font-size: var(--texto-xl); margin-bottom: var(--esp-3); }
+#day-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--esp-2); }
 
 /* ---------- Calendário ---------- */
-.calendar-card { padding: var(--esp-5); }
+/* O tamanho dos dias acompanha a largura do cartão (sem crescer demais em telas largas) */
+.calendar-card { container-type: inline-size; padding: clamp(var(--esp-3), 4cqi, var(--esp-5)); }
 
 .cal-header {
   display: flex;
@@ -140,8 +149,8 @@
 
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: clamp(2px, 1cqi, 6px);
   text-align: center;
 }
 
@@ -152,7 +161,7 @@
 }
 
 .cal-day {
-  aspect-ratio: 1;
+  height: clamp(36px, 11.5cqi, 52px);
   display: grid;
   place-items: center;
   border: 2px solid transparent;
@@ -186,6 +195,55 @@
   background: currentColor;
 }
 .cal-day.is-marked[aria-pressed='true'] { background: var(--cor-primaria); color: var(--cor-sobre-primaria); }
+
+/* Dia com vaga aberta nos seus grupos: ponto laranja no canto */
+.cal-day.has-alt { position: relative; }
+.cal-day.has-alt::before {
+  content: '';
+  position: absolute;
+  top: 14%;
+  right: 16%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hap-laranja);
+}
+
+/* Celular estreito: dias menores e sem o canto arredondado grande */
+@container (max-width: 300px) {
+  .cal-weekday { font-size: var(--texto-xs); }
+  .cal-day { font-size: var(--texto-sm); border-radius: var(--raio-sm); }
+}
+
+/* ---------- Plantões do dia ---------- */
+.day-panel-body { display: grid; gap: var(--esp-3); }
+.day-card { padding: var(--esp-4); }
+.day-card-title { font-size: var(--texto-md); margin-bottom: var(--esp-2); color: var(--cor-primaria); }
+.day-empty { color: var(--cor-texto-3); font-size: var(--texto-sm); }
+.home-shifts { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
+.home-shift {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+.home-shift:hover { background: var(--cor-primaria-suave); border-color: var(--cor-primaria-borda); }
+.home-shift .group-avatar { width: 40px; height: 40px; border-radius: 10px 10px 18px 10px; font-size: var(--texto-sm); }
+.home-shift > svg { width: 18px; height: 18px; color: var(--cor-texto-3); }
+.home-shift-info { display: grid; min-width: 0; }
+.home-shift-info strong { font-weight: 500; }
+.home-shift-info span { overflow: hidden; color: var(--cor-texto-2); font-size: var(--texto-sm); text-overflow: ellipsis; white-space: nowrap; }
+.home-shift .badge { justify-self: end; }
+.home-shift-skeleton { display: flex; align-items: center; gap: var(--esp-3); padding: var(--esp-2) 0; }
+.home-shift-skeleton > .skeleton { width: 40px; height: 40px; border-radius: 50%; }
+.home-shift-skeleton > div { display: grid; flex: 1; gap: 6px; }
+.home-shift-skeleton > div .skeleton { height: 12px; width: 60%; }
+.home-shift-skeleton > div .skeleton:first-child { height: 14px; width: 80%; }
 
 /* Seções da lista: cargo do usuário em cada grupo (azul, sem CAPS) */
 .group-section h2 {
