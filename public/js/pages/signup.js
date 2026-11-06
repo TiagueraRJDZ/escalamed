@@ -15,6 +15,7 @@ import { currentUser, loadProfile, isProfileComplete, nextUrl, nextParam } from 
 import { signUp } from '../auth-api.js';
 import { renderIcons } from '../icons.js';
 import { mountCredits } from '../version.js';
+import { setupLegalLinks, TERMS_VERSION } from '../legal.js';
 import { setupCarousel, setupPasswordToggles, setupPasswordRules, setupGoogleButtons } from '../auth-ui.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
@@ -40,8 +41,9 @@ import {
   firebaseErrorMessage,
 } from '../ui.js';
 
-// Versão dos Termos de Uso e do Aviso de Privacidade aceitos no cadastro
-const TERMS_VERSION = '2026-10';
+// Termos de Uso e Aviso de Privacidade: os nomes no aceite abrem o texto numa janela
+// (a versão aceita fica gravada no perfil, em termsVersion)
+setupLegalLinks();
 
 const $ = (id) => document.getElementById(id);
 let email = '';

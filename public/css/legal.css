@@ -1,0 +1,117 @@
+/* Termos de Uso e Aviso de Privacidade: janela no cadastro e página /termos.html.
+   A janela fica num arquivo próprio porque as telas de login não carregam layout.css. */
+
+/* Links no texto do aceite */
+.legal-link {
+  color: var(--cor-primaria);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-link:hover { color: var(--cor-primaria-hover); }
+
+/* ---------- Janela ---------- */
+.legal-modal {
+  width: min(720px, calc(100vw - 2rem));
+  max-height: min(86vh, 860px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--raio-lg) var(--raio-lg) var(--folha) var(--raio-lg);
+  color: inherit;
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra-lg);
+}
+.legal-modal[open] { display: flex; flex-direction: column; animation: legal-aparecer 180ms ease; }
+.legal-modal::backdrop { background: var(--fundo-escurecido, rgb(15 23 42 / 0.5)); }
+
+.legal-modal .dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: var(--esp-4) var(--esp-5) var(--esp-2);
+}
+.legal-modal .dialog-header h2 { font-size: var(--texto-xl); color: var(--cor-primaria); }
+.legal-modal .legal-switch { padding: 0 var(--esp-5) var(--esp-3); border-bottom: 1px solid var(--cor-borda); }
+.legal-modal .dialog-body { flex: 1; min-height: 0; padding: var(--esp-4) var(--esp-5); overflow-y: auto; overscroll-behavior: contain; }
+.legal-modal .dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-5);
+  border-top: 1px solid var(--cor-borda);
+}
+
+@keyframes legal-aparecer {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* Celular: ocupa a tela toda, com os botões sempre à vista */
+@media (max-width: 600px) {
+  .legal-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+  .legal-modal .dialog-header,
+  .legal-modal .dialog-body,
+  .legal-modal .dialog-footer { padding-inline: var(--esp-4); }
+  .legal-modal .legal-switch { padding-inline: var(--esp-4); }
+  .legal-modal .dialog-footer { padding-bottom: max(var(--esp-3), env(safe-area-inset-bottom)); }
+  .legal-modal .dialog-footer .btn { flex: 1; }
+}
+
+/* Abas Termos | Privacidade */
+.legal-switch { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+.legal-tab {
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-2);
+  font: inherit;
+  font-size: var(--texto-sm);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.legal-tab:hover { background: var(--cor-superficie-2); text-decoration: none; }
+.legal-tab[aria-pressed='true'],
+.legal-tab[aria-current='true'] { border-color: var(--cor-primaria); background: var(--cor-primaria-suave); color: var(--cor-primaria); }
+
+/* ---------- Texto dos documentos ---------- */
+.legal-doc { max-width: 72ch; color: var(--cor-texto); font-size: var(--texto-md); line-height: 1.6; }
+.legal-doc h2 { margin-bottom: var(--esp-1); color: var(--cor-primaria); }
+.legal-doc h3 { margin: var(--esp-5) 0 var(--esp-2); font-size: var(--texto-md); color: var(--cor-primaria); }
+.legal-doc p,
+.legal-doc ul { margin: 0 0 var(--esp-3); }
+.legal-doc ul { padding-left: 1.25rem; }
+.legal-doc li + li { margin-top: var(--esp-1); }
+.legal-meta { color: var(--cor-texto-3); font-size: var(--texto-sm); }
+
+/* ---------- Página /termos.html ---------- */
+.legal-page {
+  display: grid;
+  gap: var(--esp-4);
+  width: min(880px, 100%);
+  margin: 0 auto;
+  padding: var(--esp-4) var(--esp-4) var(--esp-6);
+}
+.legal-page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-3); }
+.legal-page-card { padding: clamp(var(--esp-4), 4vw, var(--esp-6)); }
+.legal-page-card h1 { margin-bottom: var(--esp-3); font-size: clamp(1.375rem, 4vw, 1.75rem); color: var(--cor-primaria); }
+.legal-page-card .legal-switch {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 calc(-1 * var(--esp-2)) var(--esp-4);
+  padding: var(--esp-2);
+  background: var(--cor-superficie);
+}
+.legal-page .legal-doc + .legal-doc { margin-top: var(--esp-6); padding-top: var(--esp-5); border-top: 1px solid var(--cor-borda); }
+.legal-page .legal-doc { scroll-margin-top: 64px; }
+.legal-page .app-credits { text-align: center; }
