@@ -3,6 +3,7 @@
 // "Todos os meus grupos" faz uma consulta por grupo e junta aqui: assim cada consulta
 // respeita o cargo da pessoa naquele grupo (quem não vê rascunho só lê as públicas).
 import { initLayout } from '../layout.js';
+import { isLeaving } from '../firebase.js';
 import { icon, renderIcons } from '../icons.js';
 import { escapeHtml, initials, setupMenu } from '../ui.js';
 import { groupColor } from '/data/colors.js';
@@ -188,7 +189,7 @@ async function load() {
     movements = results.flat().sort((a, b) => whenOf(b) - whenOf(a));
     render(movements);
   } catch (error) {
-    if (id !== loadId) return;
+    if (id !== loadId || isLeaving()) return; // filtro mudou ou a página está saindo
     console.error(error);
     showError();
   } finally {
@@ -200,6 +201,7 @@ async function load() {
 try {
   groups = await loadMyGroups(user.uid);
 } catch (error) {
+  if (isLeaving()) await new Promise(() => {}); // a página está saindo: para aqui
   console.error(error);
   showError();
   throw error;

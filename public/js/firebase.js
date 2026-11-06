@@ -102,6 +102,16 @@ window.addEventListener('pagehide', () => {
   terminate(db).catch(() => {});
 });
 
+// Transição entre páginas (@view-transition em base.css): se um redirecionamento
+// interromper a transição, o navegador rejeita as promessas dela. Não é erro do app.
+for (const type of ['pageswap', 'pagereveal']) {
+  window.addEventListener(type, (event) => {
+    event.viewTransition?.ready?.catch(() => {});
+    event.viewTransition?.finished?.catch(() => {});
+    event.viewTransition?.updateCallbackDone?.catch(() => {});
+  });
+}
+
 // ...e, se o navegador restaurar a página do cache, recarrega para reconectar.
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) location.reload();

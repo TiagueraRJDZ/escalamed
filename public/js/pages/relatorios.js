@@ -3,6 +3,7 @@
 // A escala de cada mês vem de groups/{g}/schedules/{AAAA-MM} (mapa "dia_turno" → pessoas);
 // meses em rascunho não entram (aparece um aviso).
 import { initLayout, avatarHtml, setManagerFromGroups } from '../layout.js';
+import { isLeaving } from '../firebase.js';
 import { icon, renderIcons } from '../icons.js';
 import { escapeHtml, setupMenu, toast, firebaseErrorMessage } from '../ui.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
@@ -26,6 +27,7 @@ try {
   setManagerFromGroups(user.uid, mine);
   groups = mine.filter((g) => g.role === 'manager' && g.type === 'team');
 } catch (error) {
+  if (isLeaving()) await new Promise(() => {}); // a página está saindo: para aqui
   body.innerHTML = errorState(firebaseErrorMessage(error));
   throw error;
 }
@@ -202,6 +204,7 @@ form.addEventListener('submit', async (event) => {
     $('print-info').textContent = `${group.name}${group.unit ? ` · ${group.unit.name} · ${group.unit.city}/${group.unit.state}` : ''} · ${brDate(start)} a ${brDate(end)}`;
     $('export-bar').hidden = false;
   } catch (error) {
+    if (isLeaving()) return; // a página está saindo
     console.error(error);
     body.innerHTML = errorState(firebaseErrorMessage(error));
   } finally {
