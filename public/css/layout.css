@@ -97,6 +97,8 @@ body.is-booting.has-shell .page-skeleton {
 .sidebar-brand:hover { text-decoration: none; }
 .sidebar-brand img { width: 100%; max-width: 280px; height: auto; display: block; }
 .sidebar-brand .sidebar-brand-icon { display: none; width: 32px; height: 32px; }
+.sidebar-brand .sidebar-brand-hapvida { display: none; width: 26px; height: 26px; }
+.sidebar-brand-divider { display: none; flex: none; width: 1px; height: 22px; margin: 0 8px; background: rgba(255, 255, 255, 0.3); }
 
 .nav {
   display: flex;
@@ -205,8 +207,11 @@ body.is-booting.has-shell .page-skeleton {
 .app.is-collapsed .sidebar-toggle { left: calc(var(--sidebar-w-collapsed) - 14px); }
 
 /* Menu recolhido: da marca fica só o ícone (36px), no centro */
+/* Menu recolhido: ícone do EscalaMed | flor da Hapvida, lado a lado */
 .app.is-collapsed .sidebar-brand-full { display: none; }
-.app.is-collapsed .sidebar-brand .sidebar-brand-icon { display: block; }
+.app.is-collapsed .sidebar-brand .sidebar-brand-icon,
+.app.is-collapsed .sidebar-brand .sidebar-brand-hapvida,
+.app.is-collapsed .sidebar-brand-divider { display: block; }
 /* Menu recolhido: ícone com o nome embaixo, em letra pequena */
 .app.is-collapsed .sidebar { padding-inline: 6px; }
 .app.is-collapsed .nav-item {
@@ -724,7 +729,9 @@ dialog::backdrop { background: var(--fundo-escurecido); }
   /* No celular o menu sempre aparece completo */
   .app.is-collapsed .nav-label { display: inline; }
   .app.is-collapsed .sidebar-brand-full { display: block; }
-  .app.is-collapsed .sidebar-brand .sidebar-brand-icon { display: none; }
+  .app.is-collapsed .sidebar-brand .sidebar-brand-icon,
+  .app.is-collapsed .sidebar-brand .sidebar-brand-hapvida,
+  .app.is-collapsed .sidebar-brand-divider { display: none; }
   .app.is-collapsed .nav-item { flex-direction: row; gap: var(--esp-3); min-height: 48px; justify-content: flex-start; padding: 0 var(--esp-3); }
   .app.is-collapsed .nav-label { font-size: inherit; text-align: left; }
   .app.is-collapsed .sidebar { padding-inline: var(--esp-3); }

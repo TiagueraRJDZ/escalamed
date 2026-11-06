@@ -1,7 +1,7 @@
 // Versões dos arquivos do app no HTML, sem build (os nomes dos arquivos não mudam):
 //  1. import map: cada módulo (.js) aponta para "arquivo.js?v=<hash do conteúdo>";
 //  2. modulepreload de todos os módulos que a página importa, já com ?v= (baixam em paralelo);
-//  3. o <script type="module"> de entrada e os <link rel="stylesheet"> com ?v=.
+//  3. o <script type="module"> de entrada, os <link rel="stylesheet"> e o favicon/ícones com ?v=.
 // O HTML é sempre buscado de novo (no-cache); quando um .js ou .css muda, a URL dele muda
 // junto. Por isso .js e .css podem ter cache "immutable" de 1 ano (firebase.json).
 // Roda sozinho antes de publicar (predeploy em firebase.json).
@@ -39,6 +39,7 @@ const versions = new Map(
   ),
 );
 const versioned = (href) => versions.get(href) ?? href;
+const hashOf = (path) => createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 10);
 
 function resolveSpec(spec, fromFile) {
   if (/^https?:/.test(spec)) return null; // CDN (o SDK do Firebase já tem preload próprio)
@@ -91,6 +92,12 @@ for (const name of readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))) {
 
   // Folhas de estilo com ?v=
   next = next.replace(/href="(\/css\/[^"?]+\.css)(?:\?v=[^"]*)?"/g, (_, href) => `href="${versioned(href)}"`);
+
+  // Favicon e ícones de atalho com ?v= (o navegador guarda o favicon por muito tempo:
+  // com a versão no endereço, um ícone novo aparece logo)
+  next = next.replace(/<link rel="(?:icon|apple-touch-icon)"[^>]*>/g, (tag) =>
+    tag.replace(/href="(\/img\/[^"?]+)(?:\?v=[^"]*)?"/, (_, href) => `href="${href}?v=${hashOf(join(PUBLIC, href))}"`),
+  );
 
   if (entry) {
     // 1. Import map: antes de qualquer carregamento de módulo (inclusive os modulepreload)
