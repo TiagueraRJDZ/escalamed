@@ -83,7 +83,18 @@ function validate() {
   else if (daysBetween(start.value, end.value) + 1 > MAX_RANGE_DAYS) message = `Escolha um período de até ${MAX_RANGE_DAYS} dias.`;
   $('range-error').textContent = start.value && end.value ? message : '';
   $('report-submit').disabled = Boolean(message);
+  markRange();
   return !message;
+}
+
+// Atalho aceso quando as datas são exatamente as dele ("Este mês", "Mês passado");
+// mudar as datas na mão apaga
+function markRange() {
+  const today = new Date();
+  form.querySelectorAll('[data-range]').forEach((chip) => {
+    const { start, end } = monthRange(today, Number(chip.dataset.range));
+    chip.setAttribute('aria-pressed', String(form.start.value === start && form.end.value === end));
+  });
 }
 
 form.addEventListener('input', validate);
