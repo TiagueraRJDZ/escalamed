@@ -9,13 +9,22 @@
       "node scripts/write-version.mjs",
       "node scripts/write-preloads.mjs"
     ],
-    "cleanUrls": false,
+    "cleanUrls": true,
     "ignore": [
       "**/.*"
     ],
     "headers": [
       {
         "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "regex": "^/[^.]*$",
         "headers": [
           {
             "key": "Cache-Control",

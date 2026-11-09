@@ -9,6 +9,7 @@ import {
   terminate,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig, useEmulators, appCheckSiteKey } from './config.js';
+import { pagePath } from './redirect.js';
 
 export const app = initializeApp(firebaseConfig);
 
@@ -93,7 +94,7 @@ document.addEventListener('click', (event) => {
   const url = new URL(link.href, location.href);
   if (url.origin !== location.origin) return;
   // Âncoras na mesma página (ex.: #entrar, #cadastro) continuam normais
-  if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+  if (pagePath(url.pathname) === pagePath(location.pathname) && url.search === location.search && url.hash) return;
   leaving = true;
   terminate(db).catch(() => {});
 });

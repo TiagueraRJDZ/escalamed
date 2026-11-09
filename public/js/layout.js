@@ -4,6 +4,7 @@
 import { collection, doc, getDoc, getDocs, getDocsFromCache, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
+import { pagePath } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, setupMenu } from './ui.js';
@@ -65,7 +66,7 @@ function navGroup(item, active, { admin }) {
 
 // Item ativo: o da página aberta (pelo endereço) ou o que a página informar
 // (ex.: a tela do grupo marca "Escalas")
-const isCurrent = (item, active) => item.id === active || item.href === location.pathname;
+const isCurrent = (item, active) => item.id === active || pagePath(item.href ?? '') === pagePath(location.pathname);
 
 function navItem(item, active, options) {
   if (item.children) return navGroup(item, active, options);
