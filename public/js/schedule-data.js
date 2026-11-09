@@ -62,6 +62,11 @@ function commitWithLog(groupId, write, movement) {
   return batch.commit();
 }
 
+// Quem está em cada plantão mudou: avisa a Agenda Google (gcal.js), que atualiza a
+// agenda de quem está escalado
+const announceChange = (groupId, month) => () =>
+  window.dispatchEvent(new CustomEvent('escalamed:escala-alterada', { detail: { groupId, month } }));
+
 // Campos de um mês novo, em rascunho (primeira alocação ou vaga)
 const newSchedule = (fields) => ({
   status: 'draft',
@@ -82,7 +87,7 @@ export function setAssignment(groupId, month, key, uid, add, exists, movement) {
         ? batch.update(ref, { [`assignments.${key}`]: add ? arrayUnion(uid) : arrayRemove(uid), ...stamp() })
         : batch.set(ref, newSchedule({ assignments: add ? { [key]: [uid] } : {} })),
     movement,
-  );
+  ).then(announceChange(groupId, month));
 }
 
 export function setVacancies(groupId, month, key, count, exists, movement) {
@@ -111,12 +116,14 @@ export function publishSchedule(groupId, month, schedule, shifts, movement) {
     groupId,
     (batch) => (schedule ? batch.update(ref, { ...fields, ...stamp() }) : batch.set(ref, newSchedule(fields))),
     movement,
-  );
+  ).then(announceChange(groupId, month));
 }
 
 // Volta para rascunho (some para plantonistas e observadores até publicar de novo)
 export const unpublishSchedule = (groupId, month, movement) =>
-  commitWithLog(groupId, (batch) => batch.update(scheduleRef(groupId, month), { status: 'draft', ...stamp() }), movement);
+  commitWithLog(groupId, (batch) => batch.update(scheduleRef(groupId, month), { status: 'draft', ...stamp() }), movement).then(
+    announceChange(groupId, month),
+  );
 
 // Grava o resultado de uma replicação no mês de destino, em rascunho
 export function writeReplica(groupId, month, { assignments, vacancies }, targetExists, movement) {
@@ -128,5 +135,5 @@ export function writeReplica(groupId, month, { assignments, vacancies }, targetE
         ? batch.update(ref, { status: 'draft', assignments, vacancies, ...stamp() })
         : batch.set(ref, newSchedule({ assignments, vacancies })),
     movement,
-  );
+  ).then(announceChange(groupId, month));
 }

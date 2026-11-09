@@ -300,6 +300,7 @@ Limitação: sem servidor, a localização vem do aparelho e pode ser falsificad
 
 ### Lembretes
 - **Plano gratuito**: botão "Adicionar à agenda", que gera um arquivo `.ics` com os plantões do mês e alarmes (1h, 2h, 6h, 12h ou 24h antes, à escolha do usuário). O celular ou o Google Agenda cuidam do aviso. As preferências ficam em `users/{uid}/private/data`.
+- **Agenda Google** (feito): os plantões publicados vão para uma agenda "EscalaMed" no Google da pessoa, com lembrete, e se atualizam quando a escala muda. Fica no serviço de contas (Cloudflare Worker), sem Blaze. Ver "Agenda Google" no README.
 - **[Blaze]**: lembretes automáticos por push ou e-mail, com uma Cloud Function agendada lendo a escala dinâmica.
 
 ---

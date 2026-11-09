@@ -25,6 +25,9 @@ export class AuthApiError extends Error {
   }
 }
 
+// Chamada ao serviço de contas. Também usada pela Agenda Google (gcal.js), sempre com login.
+export const callAccountService = (route, body) => call(route, body, { signedIn: true });
+
 async function call(route, body, { signedIn = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (signedIn) {

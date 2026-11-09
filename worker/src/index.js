@@ -26,6 +26,7 @@
  *   /admin/senha-provisoria  { uid }
  *   /admin/acesso            { uid, ativo }   ativo=false inativa (e derruba as sessões)
  *   /admin/excluir           { uid }          apaga o login e libera o nome de usuário
+ *   Agenda Google (/agenda/...): ver agenda.js. O Cron (wrangler.toml) termina os envios pendentes.
  * Falhas respondem { erro } com a mensagem pronta para mostrar.
  *
  * Configuração (wrangler.toml e segredo):
@@ -35,11 +36,13 @@
  *   DB             banco D1 (escalamed-contas): nomes de usuário, limites e histórico
  *   CONTA_SERVICO  (segredo) JSON da chave de serviço, com o papel
  *                  "Administrador do Firebase Authentication"
+ *   GOOGLE_CLIENTE, GOOGLE_SEGREDO (segredo), APP   Agenda Google (ver agenda.js)
  *   EMULADOR       "1" só em teste local: usa os emuladores do Firebase
  *   EMULADOR_AUTH / EMULADOR_FIRESTORE  endereços dos emuladores (padrão 127.0.0.1:9099 / :8080)
  * ===================================================================== */
 
 import { gerarSenhaProvisoria, emailValido, motivoUsuarioInvalido } from './senhas.js';
+import { rotasDaAgenda } from './agenda.js';
 
 const LIMITE_POR_MINUTO = 10; // logins por nome de usuário, por endereço IP
 const LOGIN_RECENTE_S = 5 * 60; // troca de e-mail: login (ou senha conferida) há até 5 min
@@ -62,7 +65,10 @@ class Falha extends Error {
 
 const LOGIN_INVALIDO = 'Usuário, e-mail ou senha inválidos.';
 
+const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento });
+
 const ROTAS = {
+  ...agenda.rotas,
   '/entrar-usuario': entrarComUsuario,
   '/trocar-usuario': trocarUsuario,
   '/trocar-email': trocarEmail,
@@ -91,6 +97,11 @@ export default {
       console.error(erro);
       return responder({ erro: 'Não foi possível concluir. Tente de novo.' }, 500, cors);
     }
+  },
+
+  // Cron (wrangler.toml): envia ao Google Agenda o que ficou pendente
+  async scheduled(_evento, env, ctx) {
+    ctx.waitUntil(agenda.cron(env));
   },
 };
 

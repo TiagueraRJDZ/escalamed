@@ -6,13 +6,14 @@ import { auth, db } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
-import { escapeHtml, initials, toast, setupMenu } from './ui.js';
+import { escapeHtml, initials, setupMenu } from './ui.js';
 import { mountCredits } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 import { whenActivated } from './prerender.js';
 import { setupNotifications } from './notifications.js';
+import { googleCalendarModalHtml, setupGoogleCalendar } from './gcal.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
@@ -245,21 +246,7 @@ function dialogsHtml() {
         <div id="notifications-list" aria-live="polite"></div>
       </div>
     </dialog>
-
-    <dialog class="modal modal-center" id="modal-gcal" aria-labelledby="modal-gcal-title">
-      <div class="dialog-header" style="border:0;justify-content:flex-end">${closeButton}</div>
-      <div class="dialog-body">
-        <div class="modal-hero">${icon('calendar')}</div>
-        <h2 id="modal-gcal-title">Conecte sua Agenda Google</h2>
-        <p class="muted" style="margin-top:var(--esp-2)">
-          Seus plantões aparecem automaticamente no seu calendário do Google, com lembretes antes de cada um.
-        </p>
-      </div>
-      <div class="dialog-footer">
-        <button type="button" class="btn btn-secondary" data-close>Agora não</button>
-        <button type="button" class="btn btn-primary" id="gcal-connect">Conectar</button>
-      </div>
-    </dialog>`;
+${googleCalendarModalHtml()}`;
 }
 
 function setupSidebar(app) {
@@ -352,11 +339,6 @@ function setupDialogs() {
       chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));
     });
   });
-
-  document.getElementById('gcal-connect').addEventListener('click', () => {
-    document.getElementById('modal-gcal').close();
-    toast('A integração com o Google Agenda chega em uma próxima versão.');
-  });
 }
 
 // Cartões de membro sem e-mail (criados antes da busca por e-mail) ou com o e-mail
@@ -436,6 +418,7 @@ export async function initLayout({ active, search = true } = {}) {
   showAdminRole(app, user.uid, profile);
   showManagerItems(user.uid);
   setupNotifications(app, user, profile);
+  setupGoogleCalendar(app, user);
 
   mountCredits(app);
   app.querySelector('.page-skeleton')?.remove();

@@ -34,6 +34,11 @@ export const authApiUrl = useEmulators
   ? 'http://127.0.0.1:8787'
   : 'https://escalamed-auth.tiago-tlmsmartins.workers.dev';
 
+// Agenda Google: ID do cliente OAuth (Google Cloud > APIs e serviços > Credenciais), o mesmo de
+// GOOGLE_CLIENTE no worker/wrangler.toml. Não é senha. Vazio = botão avisa que falta configurar.
+// Passo a passo em "Agenda Google" no README.
+export const googleClientId = '227779900020-24293hkjt0ie4j6sfr64m3ab06h0ciql.apps.googleusercontent.com';
+
 // App Check com reCAPTCHA v3 (invisível): bloqueia robôs no login, no cadastro e no banco.
 // Vazio = desligado. Para ligar, veja "App Check" no README e cole aqui a chave do site.
 export const appCheckSiteKey = '';

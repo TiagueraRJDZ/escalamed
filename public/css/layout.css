@@ -431,6 +431,19 @@ body.is-booting.has-shell .page-skeleton {
 }
 
 .gcal-icon { color: var(--cor-primaria); }
+/* Agenda Google conectada: bolinha verde no ícone */
+.gcal-button { position: relative; }
+.gcal-button.is-connected::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--cor-superficie);
+  border-radius: 50%;
+  background: var(--cor-sucesso);
+}
 
 /* ---------- Avatar e menu suspenso ---------- */
 .avatar {
@@ -647,6 +660,12 @@ dialog::backdrop { background: var(--fundo-escurecido); }
 .modal-hero svg { width: 32px; height: 32px; }
 .modal-center { text-align: center; }
 .modal-center .dialog-footer { justify-content: center; }
+
+/* Modal da Agenda Google (gcal.js) */
+.gcal-note { margin-top: var(--esp-3); }
+.gcal-settings { margin-top: var(--esp-5); text-align: left; }
+.gcal-status { min-height: 1.25em; margin-top: var(--esp-3); }
+.modal-center .gcal-footer { justify-content: space-between; }
 
 /* ---------- Formulários (páginas e modais) ---------- */
 .form-row {

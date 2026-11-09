@@ -46,12 +46,14 @@ escalamed/
 │  │  ├─ my-groups.js   meus grupos com o cargo em cada um e membros de um grupo
 │  │  ├─ dates.js       datas em português e períodos (sem Firebase, com testes)
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
+│  │  ├─ gcal.js        Agenda Google: conectar, lembrete, desconectar e envio dos plantões ao Worker
+│  │  ├─ gcal-data.js   Agenda Google: monta os plantões no formato do Worker (sem Firebase, com testes)
 │  │  ├─ settings/      uma seção das Configurações por arquivo; menu.js lista as seções (subitens do menu lateral)
 │  │  └─ pages/         código de cada tela
 │  ├─ fonts/            fonte Pitanga (woff2)
 │  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)
 │  └─ img/              logo e imagens
-├─ worker/              serviço de contas (Cloudflare Worker + D1): login por usuário, senha provisória, troca de e-mail
+├─ worker/              serviço de contas (Cloudflare Worker + D1): login por usuário, senha provisória, troca de e-mail e Agenda Google
 ├─ scripts/             utilitários de desenvolvimento (dados de teste)
 ├─ tests/               testes (node --test) e testes das regras (tests/rules)
 ├─ docs/                especificações
@@ -151,11 +153,40 @@ O Live Server já está configurado para servir a pasta `public` (arquivo `.vsco
 
 Os endereços do app que podem chamar o serviço ficam em `ORIGENS`, no `worker/wrangler.toml`. Para ver os erros do serviço: `npx wrangler tail`, na pasta `worker/`.
 
+## Agenda Google
+
+O ícone de calendário na barra do topo conecta a conta Google da pessoa. O EscalaMed cria nela uma agenda própria, **EscalaMed**, com os plantões **publicados** da pessoa e um lembrete antes de cada um (a pessoa escolhe: sem lembrete, 30 min, 1 h, 2 h, 6 h, 12 h ou 1 dia). A permissão pedida (`calendar.app.created`) só deixa mexer nas agendas criadas pelo próprio EscalaMed: as outras agendas da pessoa ficam fora de alcance.
+
+- **Quem guarda o acesso:** o serviço de contas (`worker/src/agenda.js`). O app manda ao Worker só o código de autorização do Google; o token de renovação fica no D1, criptografado com uma chave derivada de `GOOGLE_SEGREDO`.
+- **Quando a agenda é atualizada:**
+  - ao abrir o app (no máximo a cada 30 minutos) e em **Atualizar agora**: os plantões publicados da pessoa no mês anterior, no atual e nos dois seguintes;
+  - quando o gestor ou o auxiliar aloca, publica, volta para rascunho ou replica uma escala: a agenda de todos os escalados daquele mês (o Worker confere no Firestore se quem pediu administra o grupo). Escala em rascunho sai da agenda.
+- **Envio:** em lotes de até 50 eventos por chamada ao Google. O que não couber numa chamada fica pendente e o Cron do Worker (a cada 5 minutos) termina.
+- **Desconectar** apaga a agenda EscalaMed do Google e revoga o acesso. Se a pessoa tirar o acesso pela conta Google, o EscalaMed percebe no próximo envio e mostra o botão Conectar de novo.
+
+### Configurar (uma vez)
+
+1. **Google Cloud** (projeto `escalamed-hapvida`), em [APIs e serviços › Biblioteca](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=escalamed-hapvida): ative a **Google Calendar API**.
+2. **Google Auth Platform › Acesso a dados:** adicione o escopo `https://www.googleapis.com/auth/calendar.app.created`. Em **Público**, deixe o app **Em produção**: no modo "Teste" só os usuários de teste conseguem conectar, e a autorização vence em 7 dias. Se o Google pedir verificação para o escopo, até ela sair as pessoas veem o aviso "O Google não verificou este app" (dá para seguir em "Avançado"), com limite de 100 contas.
+3. **Google Auth Platform › Clientes:** use o cliente **Web client (auto created by Google Service)**, criado pelo login com Google do Firebase, ou crie um **ID do cliente OAuth** do tipo **Aplicativo da Web**. Em **Origens JavaScript autorizadas**, inclua `https://escalamed-hapvida.web.app`, `https://escalamed-hapvida.firebaseapp.com` e, para testar localmente, `http://localhost:5000` e `http://127.0.0.1:5500`. Não precisa de URI de redirecionamento.
+4. Cole o **ID do cliente** (termina em `.apps.googleusercontent.com`) em `googleClientId`, em [public/js/config.js](public/js/config.js), e em `GOOGLE_CLIENTE`, em [worker/wrangler.toml](worker/wrangler.toml).
+5. Na pasta `worker/`:
+   ```powershell
+   npx wrangler d1 migrations apply escalamed-contas --remote
+   npx wrangler secret put GOOGLE_SEGREDO      # cole a "Chave secreta do cliente"
+   npx wrangler deploy
+   ```
+6. Publique o site (`firebase deploy --project prod --only hosting`).
+
+Sem o `googleClientId`, o botão Conectar avisa que a integração ainda não foi configurada. Trocar o `GOOGLE_SEGREDO` desconecta todo mundo (os tokens guardados deixam de abrir).
+
 ## Testes
 
 ```bash
 node --test "tests/*.test.mjs"
 ```
+
+Inclui o teste da Agenda Google no Worker (`tests/agenda-worker.test.mjs`), com o SQLite do Node no lugar do D1 e o Google simulado; não precisa de emulador.
 
 Teste completo do serviço de contas (roda o código do Worker no Node, com o SQLite do Node no lugar do D1, o emulador de Authentication e a leitura do grupo simulada):
 
