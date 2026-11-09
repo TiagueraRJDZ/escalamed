@@ -9,7 +9,7 @@
 }
 
 /* A tela de entrada mantém a arte própria: cantos iguais e botões/rótulos em 600
-   (a fonte é a mesma do app, Plus Jakarta Sans: --fonte-entrada em base.css) */
+   (a fonte é a mesma do app, Pitanga: --fonte-entrada em base.css) */
 .auth,
 .auth-panel {
   font-family: var(--fonte-entrada);
