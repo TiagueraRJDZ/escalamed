@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatPhone, isValidPhone, formatCPF, isValidCPF, isStrongPassword } from '../public/js/validators.js';
-import { PROFESSIONAL_CATEGORIES, professionLabel, councilLabel } from '../public/data/categories.js';
+import { PROFESSIONAL_CATEGORIES, getCategory, professionLabel, councilLabel } from '../public/data/categories.js';
 
 test('máscara de telefone', () => {
   assert.equal(formatPhone('8'), '(8');
@@ -37,6 +37,19 @@ test('categorias: ids únicos e em minúsculas', () => {
   const ids = PROFESSIONAL_CATEGORIES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ids) assert.match(id, /^[a-z-]+$/);
+});
+
+test('categorias para escolher: só Administrativo, Auxiliar de Enfermagem, Médico e Outro', () => {
+  assert.deepEqual(
+    PROFESSIONAL_CATEGORIES.map((c) => c.name),
+    ['Administrativo', 'Auxiliar de Enfermagem', 'Médico', 'Outro'],
+  );
+});
+
+test('profissão que saiu da lista continua com o nome na tela', () => {
+  assert.equal(professionLabel({ categoryId: 'enfermeiro' }), 'Enfermeiro');
+  assert.equal(getCategory('tecnico-enfermagem')?.council, 'COREN');
+  assert.equal(getCategory('nao-existe'), null);
 });
 
 test('rótulos de profissão e conselho', () => {

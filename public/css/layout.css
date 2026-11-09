@@ -594,7 +594,11 @@ dialog {
   color: inherit;
   background: var(--cor-superficie);
 }
-dialog::backdrop { background: var(--fundo-escurecido); }
+dialog::backdrop {
+  background: var(--fundo-modal);
+  -webkit-backdrop-filter: var(--desfoque-modal);
+  backdrop-filter: var(--desfoque-modal);
+}
 
 .drawer {
   position: fixed;
@@ -751,7 +755,9 @@ dialog::backdrop { background: var(--fundo-escurecido); }
     position: fixed;
     inset: 0;
     z-index: 35;
-    background: var(--fundo-escurecido);
+    background: var(--fundo-modal);
+    -webkit-backdrop-filter: var(--desfoque-modal);
+    backdrop-filter: var(--desfoque-modal);
   }
 
   /* No celular o menu sempre aparece completo */

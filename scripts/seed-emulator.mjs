@@ -30,7 +30,7 @@ const HEALTH_UNITS = [
 // role = cargo no grupo de referência TELEAUDITORIA HAPVIDA (sem role = fora do grupo)
 const PASSWORD = 'Teste@123';
 const USERS = [
-  { email: 'gestor@teste.com', name: 'Ana Gestora', categoryId: 'enfermeiro', council: ['COREN', '100200'], role: 'manager' },
+  { email: 'gestor@teste.com', name: 'Ana Gestora', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100200'], role: 'manager' },
   { email: 'auxiliar1@teste.com', name: 'Carla Auxiliar', categoryId: 'administrativo', role: 'assistant' },
   { email: 'auxiliar2@teste.com', name: 'Diego Auxiliar', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10001'], role: 'assistant' },
   { email: 'analista@teste.com', name: 'Elisa Analista', categoryId: 'administrativo', role: 'analyst' },
@@ -40,8 +40,8 @@ const USERS = [
   { email: 'plantonista3@teste.com', name: 'Henrique Lima', categoryId: 'medico', specialty: 'Medicina de Família', council: ['CRM', '10004'], role: 'staff' },
   { email: 'plantonista4@teste.com', name: 'Isabela Rocha', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10005'], role: 'staff' },
   { email: 'plantonista5@teste.com', name: 'João Pereira', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10006'], role: 'staff' },
-  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'enfermeiro', council: ['COREN', '100300'], role: 'staff' },
-  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'tecnico-enfermagem', council: ['COREN', '100400'], role: 'staff' },
+  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100300'], role: 'staff' },
+  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100400'], role: 'staff' },
   { email: 'plantonista8@teste.com', name: 'Natália Costa', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10007'], role: 'staff' },
   { email: 'novo@teste.com', name: 'Otávio Novo', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10008'] },
 ];

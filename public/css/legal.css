@@ -22,7 +22,11 @@
   box-shadow: var(--sombra-lg);
 }
 .legal-modal[open] { display: flex; flex-direction: column; animation: legal-aparecer 180ms ease; }
-.legal-modal::backdrop { background: var(--fundo-escurecido, rgb(15 23 42 / 0.5)); }
+.legal-modal::backdrop {
+  background: var(--fundo-modal, rgb(10 22 70 / 0.12));
+  -webkit-backdrop-filter: var(--desfoque-modal, blur(6px));
+  backdrop-filter: var(--desfoque-modal, blur(6px));
+}
 
 .legal-modal .dialog-header {
   display: flex;

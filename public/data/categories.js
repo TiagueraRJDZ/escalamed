@@ -1,13 +1,20 @@
 // Categorias profissionais (profissões). O "id" é gravado no banco; o "name" aparece na tela.
 // "council": sigla do conselho de classe (mostrada como rótulo do registro). Sem conselho = null.
 // "specialty": pede especialidade no cadastro. "councilRequired": registro obrigatório.
-// Para incluir uma categoria nova, adicione aqui (ordem alfabética) e também na lista
-// CATEGORY_IDS do firestore.rules.
+// Só estas aparecem para escolher (cadastro, Configurações e criação de grupo); "Outro" fica por último.
+// Para incluir uma categoria nova, adicione aqui e também na lista do optCategory no firestore.rules.
 export const PROFESSIONAL_CATEGORIES = [
-  { id: 'academico', name: 'Acadêmico', council: null },
   { id: 'administrativo', name: 'Administrativo', council: null },
-  { id: 'assistente-social', name: 'Assistente Social', council: 'CRESS' },
   { id: 'auxiliar-enfermagem', name: 'Auxiliar de Enfermagem', council: 'COREN' },
+  { id: 'medico', name: 'Médico', council: 'CRM', specialty: true, councilRequired: true },
+  { id: 'outro', name: 'Outro', council: null },
+];
+
+// Profissões que saíram da lista: ninguém escolhe mais, mas quem já tinha uma continua
+// com o nome certo na tela até trocar (e o firestore.rules ainda aceita o id gravado)
+const RETIRED_CATEGORIES = [
+  { id: 'academico', name: 'Acadêmico', council: null },
+  { id: 'assistente-social', name: 'Assistente Social', council: 'CRESS' },
   { id: 'auxiliar-laboratorio', name: 'Auxiliar de Laboratório', council: null },
   { id: 'auxiliar-saude-bucal', name: 'Auxiliar de Saúde Bucal', council: 'CRO' },
   { id: 'biomedico', name: 'Biomédico', council: 'CRBM' },
@@ -23,7 +30,6 @@ export const PROFESSIONAL_CATEGORIES = [
   { id: 'fonoaudiologo', name: 'Fonoaudiólogo', council: 'CRFa' },
   { id: 'instrumentador-cirurgico', name: 'Instrumentador Cirúrgico', council: null },
   { id: 'maqueiro', name: 'Maqueiro', council: null },
-  { id: 'medico', name: 'Médico', council: 'CRM', specialty: true, councilRequired: true },
   { id: 'medico-residente', name: 'Médico Residente', council: 'CRM', specialty: true, councilRequired: true },
   { id: 'nutricionista', name: 'Nutricionista', council: 'CRN' },
   { id: 'psicologo', name: 'Psicólogo', council: 'CRP' },
@@ -34,7 +40,6 @@ export const PROFESSIONAL_CATEGORIES = [
   { id: 'tecnico-radiologia', name: 'Técnico de Radiologia', council: 'CRTR' },
   { id: 'terapeuta-ocupacional', name: 'Terapeuta Ocupacional', council: 'CREFITO' },
   { id: 'veterinario', name: 'Veterinário', council: 'CRMV' },
-  { id: 'outro', name: 'Outro', council: null },
 ];
 
 // Sugestões de especialidade (o campo aceita qualquer texto)
@@ -47,7 +52,7 @@ export const SPECIALTIES = [
 ];
 
 export function getCategory(id) {
-  return PROFESSIONAL_CATEGORIES.find((c) => c.id === id) ?? null;
+  return PROFESSIONAL_CATEGORIES.find((c) => c.id === id) ?? RETIRED_CATEGORIES.find((c) => c.id === id) ?? null;
 }
 
 export function categoryName(id) {
