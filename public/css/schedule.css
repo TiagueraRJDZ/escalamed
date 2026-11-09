@@ -156,24 +156,47 @@
 .replicate-arrow { padding-bottom: var(--esp-3); color: var(--cor-texto-3); }
 .replicate-arrow svg { width: 18px; height: 18px; }
 
-/* Revisar: uma coluna por dia, com rolagem lateral */
+/* Revisar: o mês em grade de calendário (Dom a Sáb), só com rolagem vertical */
 .modal-wide { width: min(1200px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); }
 .modal-wide[open] { display: flex; flex-direction: column; }
-.review-body { overflow-x: auto; overflow-y: auto; }
-.review-columns { display: flex; gap: var(--esp-3); align-items: flex-start; min-height: 200px; }
-.review-note { padding: var(--esp-5); }
-.review-day {
-  flex: 0 0 200px;
-  display: grid;
-  gap: var(--esp-2);
+.review-body { overflow-y: auto; }
+.review-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--esp-2); }
+.review-note { grid-column: 1 / -1; padding: var(--esp-5); }
+.review-weekday {
+  position: sticky;
+  top: calc(-1 * var(--esp-4));
+  z-index: 1;
   padding: var(--esp-2);
+  background: var(--cor-superficie);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--cor-texto-3);
+}
+.review-weekday.is-weekend { color: var(--cor-texto-2); }
+.review-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  min-width: 0;
+  min-height: 96px;
+  padding: var(--esp-2);
+  border: 1px solid var(--cor-borda);
   border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-superficie);
 }
 .review-day.is-weekend { background: var(--cor-superficie-2); }
 .review-day h3 { display: flex; align-items: baseline; gap: var(--esp-2); font-size: var(--texto-md); }
-.review-day h3 span { font-size: var(--texto-sm); font-weight: 500; color: var(--cor-texto-3); }
-.review-shift { padding: var(--esp-2); border: 1px solid var(--cor-borda); border-radius: var(--raio-sm); background: var(--cor-superficie); }
+.review-day h3 span { display: none; font-size: var(--texto-sm); font-weight: 500; color: var(--cor-texto-3); }
+.review-shift { min-width: 0; padding: var(--esp-2); border: 1px solid var(--cor-borda); border-radius: var(--raio-sm); background: var(--cor-superficie); }
+.review-shift li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Telas estreitas: sem a linha da semana, os dias em 2+ colunas com o dia da semana em cada um */
+@media (max-width: 720px) {
+  .review-columns { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .review-weekday,
+  .review-blank { display: none; }
+  .review-day h3 span { display: inline; }
+}
 .review-shift header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--esp-1) var(--esp-2); margin-bottom: var(--esp-1); }
 .review-shift header small { color: var(--cor-texto-3); }
 .review-shift ul { display: grid; gap: var(--esp-1); margin: 0; padding: 0; list-style: none; }

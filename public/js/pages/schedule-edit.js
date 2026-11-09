@@ -297,8 +297,8 @@ $('vacancy-form').addEventListener('submit', async (event) => {
 // ---------- Filtrar membros ----------
 $('find-member').addEventListener('input', render);
 
-// ---------- Revisar: uma coluna por dia, com os turnos e quem está em cada um ----------
-const WEEKDAY_LONG = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+// ---------- Revisar: o mês em grade de calendário (Dom a Sáb), com os turnos e quem está em cada um ----------
+const WEEKDAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 let reviewMode = 'dynamic';
 
 function renderReview() {
@@ -312,7 +312,10 @@ function renderReview() {
   }
   const byId = new Map(members.map((m) => [m.id, m]));
   const reviewShifts = fixed ? { ...shifts, ...(schedule.shifts ?? {}) } : shifts;
-  $('review-columns').innerHTML = Array.from({ length: daysInMonth(month) }, (_, i) => {
+  // Cabeçalho da semana e espaços vazios até o dia da semana do dia 1
+  const head = WEEKDAY_SHORT.map((name, i) => `<div class="review-weekday${[0, 6].includes(i) ? ' is-weekend' : ''}">${name}</div>`).join('');
+  const blanks = '<div class="review-blank" aria-hidden="true"></div>'.repeat(weekdayOf(month, 1));
+  const days = Array.from({ length: daysInMonth(month) }, (_, i) => {
     const day = i + 1;
     const cards = dayShifts(schedule, reviewShifts, day, { fixed })
       .map(({ shift, uids, vacancies }) => {
@@ -327,11 +330,12 @@ function renderReview() {
         </article>`;
       })
       .join('');
-    return `<section class="review-day${isWeekend(day) ? ' is-weekend' : ''}">
-      <h3><strong>${String(day).padStart(2, '0')}</strong><span>${WEEKDAY_LONG[weekdayOf(month, day)]}</span></h3>
+    return `<section class="review-day${isWeekend(day) ? ' is-weekend' : ''}" aria-label="${dayLabel(day)}">
+      <h3><strong>${String(day).padStart(2, '0')}</strong><span>${WEEKDAY_SHORT[weekdayOf(month, day)]}</span></h3>
       ${cards}
     </section>`;
   }).join('');
+  $('review-columns').innerHTML = head + blanks + days;
 }
 
 $('review-button').addEventListener('click', () => {
