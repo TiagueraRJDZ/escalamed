@@ -430,14 +430,14 @@ body.is-booting.has-shell .page-skeleton {
   background: var(--hap-vermelho);
 }
 
-.gcal-icon { color: var(--cor-primaria); }
+.gcal-icon { display: block; width: 22px; height: 22px; }
 /* Agenda Google conectada: bolinha verde no ícone */
 .gcal-button { position: relative; }
 .gcal-button.is-connected::after {
   content: '';
   position: absolute;
-  top: 9px;
-  right: 10px;
+  top: 4px;
+  right: 4px;
   width: 9px;
   height: 9px;
   border: 2px solid var(--cor-superficie);
@@ -646,22 +646,31 @@ dialog::backdrop { background: var(--fundo-escurecido); }
 .modal .dialog-body { padding-top: var(--esp-4); }
 .modal .dialog-footer { border-top: 0; padding-top: 0; }
 
-/* Ilustração no topo de um modal (ex.: Google Agenda) */
-.modal-hero {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto var(--esp-4);
-  border-radius: 16px 16px 26px 16px;
-  background: var(--cor-primaria);
-  color: var(--cor-sobre-primaria);
-}
-.modal-hero svg { width: 32px; height: 32px; }
 .modal-center { text-align: center; }
 .modal-center .dialog-footer { justify-content: center; }
 
-/* Modal da Agenda Google (gcal.js) */
+/* Modal da Agenda Google (gcal.js): ícone do Google Agenda no topo; conectada, com o selo verde */
+.gcal-hero {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--esp-4);
+}
+.gcal-hero img { display: block; width: 100%; height: 100%; }
+.gcal-hero-check {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--cor-superficie);
+  border-radius: 50%;
+  background: var(--cor-sucesso);
+  color: #fff;
+}
+.gcal-hero-check svg { width: 14px; height: 14px; stroke-width: 3; }
 .gcal-note { margin-top: var(--esp-3); }
 .gcal-settings { margin-top: var(--esp-5); text-align: left; }
 .gcal-status { min-height: 1.25em; margin-top: var(--esp-3); }

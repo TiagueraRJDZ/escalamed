@@ -202,7 +202,7 @@ ${search ? searchHtml() : ''}
 
         <div class="topbar-actions">
           <button type="button" class="btn-icon gcal-button" data-open="modal-gcal" aria-haspopup="dialog" aria-label="Conectar Google Agenda" title="Google Agenda">
-            ${icon('calendar', 'gcal-icon')}
+            <img class="gcal-icon" src="/img/google-agenda.svg" alt="" width="22" height="22" />
           </button>
           <button type="button" class="btn-icon" id="notifications-button" data-open="drawer-notifications" aria-haspopup="dialog" aria-label="Notificações" title="Notificações">
             ${icon('bell')}

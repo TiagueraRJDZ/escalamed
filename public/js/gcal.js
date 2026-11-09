@@ -44,7 +44,7 @@ function contentHtml(state) {
   if (!state?.conectado) {
     return `
       <div class="dialog-body">
-        <div class="modal-hero">${icon('calendar')}</div>
+        <div class="gcal-hero"><img src="/img/google-agenda.svg" alt="" width="64" height="64" /></div>
         <h2 id="modal-gcal-title">Conecte sua Agenda Google</h2>
         <p class="muted" style="margin-top:var(--esp-2)">
           Seus plantões aparecem automaticamente no seu calendário do Google, com lembretes antes de cada um.
@@ -61,7 +61,10 @@ function contentHtml(state) {
   ).join('');
   return `
     <div class="dialog-body">
-      <div class="modal-hero">${icon('checkCircle')}</div>
+      <div class="gcal-hero">
+        <img src="/img/google-agenda.svg" alt="" width="64" height="64" />
+        <span class="gcal-hero-check">${icon('check')}</span>
+      </div>
       <h2 id="modal-gcal-title">Agenda Google conectada</h2>
       <p class="muted" style="margin-top:var(--esp-2)">
         Seus plantões publicados ficam na agenda "EscalaMed" do seu Google e se atualizam sozinhos quando a escala muda.
