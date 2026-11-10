@@ -1,18 +1,18 @@
 // Categorias profissionais (profissões). O "id" é gravado no banco; o "name" aparece na tela.
 // "council": sigla do conselho de classe (mostrada como rótulo do registro). Sem conselho = null.
 // "specialty": pede especialidade no cadastro. "councilRequired": registro obrigatório.
-// Só estas aparecem para escolher (cadastro, Configurações e criação de grupo); "Outro" fica por último.
+// Só estas aparecem para escolher (cadastro, Configurações e criação de grupo).
 // Para incluir uma categoria nova, adicione aqui e também na lista do optCategory no firestore.rules.
 export const PROFESSIONAL_CATEGORIES = [
   { id: 'administrativo', name: 'Administrativo', council: null },
   { id: 'auxiliar-enfermagem', name: 'Auxiliar de Enfermagem', council: 'COREN' },
   { id: 'medico', name: 'Médico', council: 'CRM', specialty: true, councilRequired: true },
-  { id: 'outro', name: 'Outro', council: null },
 ];
 
 // Profissões que saíram da lista: ninguém escolhe mais, mas quem já tinha uma continua
 // com o nome certo na tela até trocar (e o firestore.rules ainda aceita o id gravado)
 const RETIRED_CATEGORIES = [
+  { id: 'outro', name: 'Outro', council: null },
   { id: 'academico', name: 'Acadêmico', council: null },
   { id: 'assistente-social', name: 'Assistente Social', council: 'CRESS' },
   { id: 'auxiliar-laboratorio', name: 'Auxiliar de Laboratório', council: null },

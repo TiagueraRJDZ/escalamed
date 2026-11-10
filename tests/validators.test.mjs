@@ -39,15 +39,16 @@ test('categorias: ids únicos e em minúsculas', () => {
   for (const id of ids) assert.match(id, /^[a-z-]+$/);
 });
 
-test('categorias para escolher: só Administrativo, Auxiliar de Enfermagem, Médico e Outro', () => {
+test('categorias para escolher: só Administrativo, Auxiliar de Enfermagem e Médico', () => {
   assert.deepEqual(
     PROFESSIONAL_CATEGORIES.map((c) => c.name),
-    ['Administrativo', 'Auxiliar de Enfermagem', 'Médico', 'Outro'],
+    ['Administrativo', 'Auxiliar de Enfermagem', 'Médico'],
   );
 });
 
 test('profissão que saiu da lista continua com o nome na tela', () => {
   assert.equal(professionLabel({ categoryId: 'enfermeiro' }), 'Enfermeiro');
+  assert.equal(professionLabel({ categoryId: 'outro' }), 'Outro');
   assert.equal(getCategory('tecnico-enfermagem')?.council, 'COREN');
   assert.equal(getCategory('nao-existe'), null);
 });
