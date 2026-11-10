@@ -18,18 +18,18 @@ import {
 import { auth, db } from './firebase.js';
 import { toTime } from './shifts.js';
 
-// Tipos de movimentação: ícone e grupo do filtro "tipo" da página Histórico
+// Tipos de movimentação: ícone, grupo do filtro "tipo" e nome na página Histórico
 export const MOVEMENT_TYPES = {
-  swap: { icon: 'arrowRightLeft', filter: 'swap' },
-  cession: { icon: 'arrowRight', filter: 'cession' },
-  vacant_open: { icon: 'star', filter: 'vacant' },
-  vacant_closed: { icon: 'x', filter: 'vacant' },
-  vacant_taken: { icon: 'userCheck', filter: 'vacant' },
-  assigned: { icon: 'userPlus', filter: 'editor' },
-  unassigned: { icon: 'userMinus', filter: 'editor' },
-  published: { icon: 'checkCircle', filter: 'editor' },
-  unpublished: { icon: 'eyeOff', filter: 'editor' },
-  replicated: { icon: 'copy', filter: 'editor' },
+  swap: { icon: 'arrowRightLeft', filter: 'swap', label: 'Troca' },
+  cession: { icon: 'arrowRight', filter: 'cession', label: 'Cessão' },
+  vacant_open: { icon: 'star', filter: 'vacant', label: 'Vaga aberta' },
+  vacant_closed: { icon: 'x', filter: 'vacant', label: 'Vaga fechada' },
+  vacant_taken: { icon: 'userCheck', filter: 'vacant', label: 'Vaga assumida' },
+  assigned: { icon: 'userPlus', filter: 'editor', label: 'Escalação' },
+  unassigned: { icon: 'userMinus', filter: 'editor', label: 'Saída do plantão' },
+  published: { icon: 'checkCircle', filter: 'editor', label: 'Escala publicada' },
+  unpublished: { icon: 'eyeOff', filter: 'editor', label: 'Volta para rascunho' },
+  replicated: { icon: 'copy', filter: 'editor', label: 'Escala replicada' },
 };
 
 // Opções do botão de tipo (na ordem do menu)
