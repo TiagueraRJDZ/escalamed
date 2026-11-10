@@ -71,6 +71,8 @@ body.is-booting.has-shell .page-skeleton {
   background: var(--brand-sidebar);
   color: #fff;
   overflow: hidden auto;
+  /* Canto de baixo à direita arredondado, igual ao canto "folha" dos cartões */
+  border-bottom-right-radius: var(--folha);
 }
 
 /* Rodapé do menu: marca d'água discreta (calendário, batimento e relógio), só em azul */
@@ -179,19 +181,20 @@ body.is-booting.has-shell .page-skeleton {
   padding: 1px 6px;
 }
 
-/* Botão redondo na borda do menu, centralizado na altura da tela */
+/* Botão na borda do menu, centralizado na altura da tela, no formato "folha" do layout
+   (cantos levemente arredondados e o de baixo à direita mais curvo) */
 .sidebar-toggle {
   position: fixed;
-  top: calc(50% - 14px);
-  left: calc(var(--sidebar-w) - 14px);
+  top: calc(50% - 18px);
+  left: calc(var(--sidebar-w) - 18px);
   z-index: 30;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-total);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
   background: var(--cor-superficie);
   color: var(--hap-azul);
   box-shadow: var(--sombra-sm);
@@ -203,8 +206,8 @@ body.is-booting.has-shell .page-skeleton {
   border-color: var(--cor-primaria-borda);
   background: var(--cor-primaria-suave);
 }
-.sidebar-toggle svg { width: 16px; height: 16px; transition: transform 200ms ease; }
-.app.is-collapsed .sidebar-toggle { left: calc(var(--sidebar-w-collapsed) - 14px); }
+.sidebar-toggle svg { width: 20px; height: 20px; transition: transform 200ms ease; }
+.app.is-collapsed .sidebar-toggle { left: calc(var(--sidebar-w-collapsed) - 18px); }
 
 /* Menu recolhido: da marca fica só o ícone (36px), no centro */
 /* Menu recolhido: ícone do EscalaMed | flor da Hapvida, lado a lado */
