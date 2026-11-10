@@ -18,7 +18,7 @@
 }
 
 .group-title { flex: 1; min-width: 200px; }
-.group-title h1 { font-size: 2rem; line-height: 1.2; }
+.group-title h1 { font-size: 2rem; line-height: 1.2; overflow-wrap: break-word; }
 .group-title p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); margin-top: var(--esp-1); }
 
 .group-header-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
@@ -67,6 +67,7 @@
 .member-list,
 .invite-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -168,8 +169,23 @@
 
 @media (max-width: 640px) {
   .group-header-card { padding: var(--esp-4); }
+  .group-title { min-width: 0; }
+  .group-header-actions { flex-basis: 100%; }
+  .group-title h1 { font-size: 1.5rem; }
   .tab-panel { padding: var(--esp-4); }
-  .invite-item { flex-wrap: wrap; }
+  /* Abas dividem a largura (as três cabem sem rolar) */
+  .tabs { gap: 0; }
+  .tab { flex: 1 1 auto; justify-content: center; gap: var(--esp-1); padding: var(--esp-3) var(--esp-1); font-size: var(--texto-sm); }
+  .tab svg { display: none; }
+  /* Convite: texto numa linha inteira (sem cortar) e os botões embaixo, à direita */
+  .invite-item { flex-wrap: wrap; row-gap: var(--esp-1); }
+  .invite-item .member-info { flex-basis: 100%; }
+  /* Nome, profissão e dados do convite quebram linha em vez de cortar com "…" */
+  .member-info strong,
+  .member-info span { white-space: normal; overflow-wrap: break-word; }
+  /* O cargo já está no título de cada seção (Gestor, Auxiliares...): sem o selo, sobra espaço para o nome */
+  .member-item > .badge { display: none; }
+  .invite-actions { width: 100%; }
 }
 
 /* ---------- Convidar: busca de pessoas da plataforma ---------- */
@@ -210,10 +226,10 @@
 .my-shifts-title { font-size: var(--texto-lg); }
 .my-shifts { display: grid; gap: var(--esp-2); margin: var(--esp-3) 0 0; padding: 0; list-style: none; }
 .my-shift {
-  display: grid;
-  grid-template-columns: 110px 56px 1fr;
-  align-items: center;
-  gap: var(--esp-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--esp-3);
   width: 100%;
   padding: var(--esp-2) var(--esp-3);
   border: 1px solid var(--cor-borda);
@@ -224,7 +240,13 @@
   cursor: pointer;
 }
 .my-shift:hover { background: var(--cor-primaria-suave); border-color: var(--cor-primaria-borda); }
-.my-shift-date { text-transform: capitalize; color: var(--cor-texto-2); font-size: var(--texto-sm); }
+.my-shift-date { min-width: 6.5em; text-transform: capitalize; color: var(--cor-texto-2); font-size: var(--texto-sm); }
+.my-shift strong { flex: 1 1 auto; min-width: 0; }
+.my-shift .muted { margin-left: auto; white-space: nowrap; }
+@media (max-width: 480px) {
+  .my-shift { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .my-shift-date { grid-column: 1 / -1; }
+}
 
 /* Gaveta "Plantões do dia" */
 /* Faixa de 7 dias: meus dias com plantão preenchidos, o escolhido com borda */

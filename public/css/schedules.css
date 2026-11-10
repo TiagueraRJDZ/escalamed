@@ -131,7 +131,10 @@
 }
 
 .side-title { font-size: var(--texto-xl); margin-bottom: var(--esp-3); }
-#day-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--esp-2); }
+/* Título do dia com o selo "Hoje" sempre à direita (o texto quebra, o selo não desce) */
+#day-title { display: flex; align-items: center; gap: var(--esp-2); }
+#day-title .day-title-text { min-width: 0; }
+#day-title .badge { flex-shrink: 0; }
 
 /* ---------- Calendário ---------- */
 /* O tamanho dos dias acompanha a largura do cartão (sem crescer demais em telas largas) */

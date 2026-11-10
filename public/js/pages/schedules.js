@@ -128,7 +128,7 @@ async function renderDay() {
   const date = selectedDate;
   const id = ++dayRequest;
   const isToday = date.getTime() === today.getTime();
-  dayTitle.innerHTML = `${escapeHtml(capitalize(longDay.format(date)))}${isToday ? ' <span class="badge badge-primary">Hoje</span>' : ''}`;
+  dayTitle.innerHTML = `<span class="day-title-text">${escapeHtml(capitalize(longDay.format(date)))}</span>${isToday ? '<span class="badge badge-primary">Hoje</span>' : ''}`;
   if (!loaded) {
     dayPanel.innerHTML = panelSkeleton();
     return; // desenha de novo quando os grupos chegarem

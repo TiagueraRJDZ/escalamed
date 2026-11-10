@@ -320,6 +320,21 @@ a:hover {
 
 .textarea { min-height: 120px; resize: vertical; }
 
+/* iPhone/iPad (Safari): data e hora têm largura mínima própria e saem do cartão.
+   Sem a aparência nativa eles respeitam a largura do campo; o seletor nativo continua abrindo. */
+@supports (-webkit-touch-callout: none) {
+  input.input[type='date'],
+  input.input[type='time'],
+  input.input[type='month'],
+  input.input[type='datetime-local'] {
+    display: block;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input.input::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
+}
+
 .input::placeholder,
 .textarea::placeholder { color: var(--cor-texto-3); }
 
