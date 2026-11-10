@@ -7,7 +7,6 @@ export const SETTINGS_SECTIONS = [
   { hash: 'perfil', title: 'Editar perfil', icon: 'edit' },
   { hash: 'senha', title: 'Alterar senha', icon: 'lock' },
   { hash: 'usuarios', title: 'Usuários', icon: 'users', adminOnly: true },
-  { hash: 'excluir', title: 'Excluir minha conta', icon: 'trash' },
 ];
 
 export const DEFAULT_SECTION = 'conta';

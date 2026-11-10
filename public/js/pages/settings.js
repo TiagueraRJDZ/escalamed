@@ -1,6 +1,6 @@
 // Configurações: uma seção por vez no painel, escolhida pelos subitens de "Configurações"
 // no menu lateral. A troca é sem recarregar a página e fica no endereço (#conta,
-// #profissional, #perfil, #senha, #usuarios, #excluir), para dar link direto
+// #profissional, #perfil, #senha, #usuarios), para dar link direto
 // e o botão Voltar funcionar. Cada seção fica em js/settings/<hash>.js e é montada na
 // primeira vez que aparece; a lista (títulos e ícones) fica em js/settings/menu.js.
 import { doc, getDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -13,9 +13,8 @@ import profissional from '../settings/profissional.js';
 import perfil from '../settings/perfil.js';
 import senha from '../settings/senha.js';
 import usuarios from '../settings/usuarios.js';
-import excluir from '../settings/excluir.js';
 
-const MODULES = Object.fromEntries([conta, profissional, perfil, senha, usuarios, excluir].map((m) => [m.hash, m]));
+const MODULES = Object.fromEntries([conta, profissional, perfil, senha, usuarios].map((m) => [m.hash, m]));
 const initialHash = location.hash; // "#usuarios" só vale depois de confirmar o administrador
 
 // Sem login, initLayout manda para a tela de entrada

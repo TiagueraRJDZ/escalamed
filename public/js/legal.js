@@ -5,7 +5,7 @@
 import { icon } from './icons.js';
 
 export const TERMS_VERSION = '2026-11';
-export const LEGAL_UPDATED = '6 de novembro de 2026';
+export const LEGAL_UPDATED = '10 de novembro de 2026';
 
 const TERMS = `
 <p>Estes Termos de Uso explicam as regras para usar o EscalaMed, a plataforma de escalas de plantão
@@ -22,7 +22,7 @@ profissionais, abrir vagas, publicar a escala do mês e acompanhar o histórico 
   <li>Você precisa informar dados verdadeiros e mantê-los atualizados, inclusive profissão e registro no conselho de classe, quando houver.</li>
   <li>A conta é pessoal e intransferível. Guarde a sua senha e não a compartilhe; você responde pelo que for feito com o seu acesso.</li>
   <li>Se perceber uso indevido da sua conta, troque a senha em Configurações e avise o administrador da plataforma.</li>
-  <li>Você pode excluir a sua conta a qualquer momento em Configurações &gt; Excluir minha conta, observadas as condições descritas lá (por exemplo, transferir a gestão de um grupo antes de sair).</li>
+  <li>Para excluir a sua conta, peça ao administrador da plataforma. Antes, é preciso transferir a gestão dos grupos que você administra e não ter plantões a cumprir.</li>
 </ul>
 
 <h3>3. Grupos, cargos e escalas</h3>
@@ -119,8 +119,8 @@ grupo aberto) e uma cópia dos dados já carregados, para abrir mais rápido. Ao
 dados é apagada. Não usamos cookies de publicidade nem ferramentas de rastreamento de terceiros.</p>
 
 <h3>6. Por quanto tempo guardamos</h3>
-<p>Mantemos os seus dados enquanto a sua conta existir. Ao excluir a conta em Configurações &gt; Excluir minha
-conta, apagamos o seu perfil, os dados privados, o nome de usuário e o login. Movimentações já registradas
+<p>Mantemos os seus dados enquanto a sua conta existir. Quando a conta é excluída (a pedido seu, ao
+administrador da plataforma), apagamos o seu perfil, os dados privados, o nome de usuário e o login. Movimentações já registradas
 no histórico de um grupo podem continuar lá, sem o seu nome (aparece como "Ex-membro"), para manter a
 escala da equipe consistente. Registros de segurança podem ser mantidos pelo tempo necessário para
 cumprir obrigações legais.</p>
@@ -135,7 +135,7 @@ incidente que possa trazer risco a você, avisaremos conforme a lei.</p>
 desatualizados, anonimização, bloqueio ou eliminação de dados desnecessários, portabilidade, informação
 sobre compartilhamentos e revisão do consentimento, quando ele for a base do tratamento.</p>
 <ul>
-  <li>Você mesmo pode ver e corrigir os seus dados em Configurações e excluir a sua conta a qualquer momento.</li>
+  <li>Você mesmo pode ver e corrigir os seus dados em Configurações. Para excluir a sua conta, fale com o administrador da plataforma.</li>
   <li>Para os demais pedidos, fale com o administrador da plataforma ou com o encarregado de proteção de dados da instituição responsável pelo seu grupo.</li>
   <li>Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</li>
 </ul>

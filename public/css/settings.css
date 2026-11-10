@@ -100,7 +100,7 @@
 .row-link-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-link-value.is-placeholder { color: var(--cor-texto-3); }
 
-/* Botão só de texto (ex.: "+ Adicionar", "Recuperar", "Excluir minha conta") */
+/* Botão só de texto (ex.: "+ Adicionar", "Recuperar") */
 .btn-link {
   display: inline-flex;
   align-items: center;
@@ -258,26 +258,6 @@
 #password-help,
 #password-google-hint { font-size: var(--texto-sm); }
 
-/* ---------- Excluir minha conta ---------- */
-.delete-card {
-  display: flex;
-  align-items: center;
-  gap: var(--esp-3);
-  margin-bottom: var(--esp-2);
-  padding: var(--esp-3) var(--esp-4);
-  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
-  background: var(--campo);
-}
-.delete-card > div { display: flex; flex-direction: column; min-width: 0; }
-.delete-card strong { font-weight: 500; }
-.delete-card span { font-size: var(--texto-sm); color: var(--cor-texto-3); }
-.delete-avatar { width: 48px; height: 48px; flex-shrink: 0; }
-#delete-blockers .alert { margin-top: var(--esp-4); }
-.delete-open { margin-top: var(--esp-5); }
-.delete-card { max-width: 480px; }
-.delete-info { gap: 0 var(--esp-6); }
-.delete-info .settings-label { margin-top: var(--esp-5); }
-
 /* ---------- Usuários (administrador da plataforma) ---------- */
 .users-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-3); }
 .users-intro { margin: 0; }
@@ -328,9 +308,6 @@
 .profile-list-title { font-size: var(--texto-sm); }
 .profile-item strong { font-size: var(--texto-md); }
 .profile-item span { font-size: var(--texto-sm); }
-.delete-card strong { font-size: var(--texto-lg); }
-.delete-card span { font-size: var(--texto-md); }
-.delete-avatar { width: 56px; height: 56px; }
 #users-list .member-info strong { font-size: var(--texto-md); }
 #users-list .member-info span { font-size: var(--texto-md); }
 .users-count,
