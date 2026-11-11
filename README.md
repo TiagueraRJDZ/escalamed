@@ -215,6 +215,7 @@ firebase emulators:exec --config firebase.test.json --project demo-escalamed-tes
 
 - **Authentication > Método de login**: E-mail/senha e **Google** ativados (no Google, escolha o e-mail de suporte do projeto).
 - **Firestore > config/admins**: campo `uids` (array) com os administradores da plataforma (veja "Publicar o Worker", passo 4).
+- **Dev** (acima de todos os cargos, acesso total): não fica no console. Os e-mails estão em `isDev()` no `firestore.rules`; para incluir alguém, adicione o e-mail e publique as regras (`firebase deploy --only firestore:rules --project prod`).
 - **Foto de perfil**: fica no próprio Firestore (160 px, cerca de 10 KB), porque o Cloud Storage só funciona no plano pago em projetos novos.
 
 ### App Check (proteção contra robôs)

@@ -5,12 +5,14 @@ import { db } from './firebase.js';
 import { groupRole, seesAllGroups, can } from './permissions.js';
 
 // Consultas que as regras deixam fazer: grupos em que está, grupos que coordena e,
-// para Gestor e Administrativo, todos os grupos de equipe
+// para Gestor e Administrativo, todos os grupos de equipe. Dev: todos, inclusive as escalas
+// individuais dos outros.
 export function groupQueries(uid, platformRole) {
   const groups = collection(db, 'groups');
   const list = [query(groups, where('memberIds', 'array-contains', uid))];
   if (platformRole === 'coordenador') list.push(query(groups, where('coordinatorIds', 'array-contains', uid)));
-  if (seesAllGroups(platformRole)) list.push(query(groups, where('type', '==', 'team')));
+  if (platformRole === 'dev') list.push(query(groups));
+  else if (seesAllGroups(platformRole)) list.push(query(groups, where('type', '==', 'team')));
   return list;
 }
 

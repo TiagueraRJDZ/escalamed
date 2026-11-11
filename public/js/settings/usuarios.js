@@ -125,7 +125,9 @@ export default {
       const work = profile ? [professionLabel(profile), councilLabel(profile.council)].filter(Boolean).join(' · ') : '';
       const badges = [
         me ? '<span class="badge badge-primary">Você</span>' : '',
-        p.isAdmin ? '<span class="badge badge-primary">Administrador</span>' : '',
+        // Só dá para saber se a própria conta é Dev (a lista fica no firestore.rules)
+        me && ctx.access?.isDev ? '<span class="badge badge-primary">Dev</span>' : '',
+        p.isAdmin && !(me && ctx.access?.isDev) ? '<span class="badge badge-primary">Administrador</span>' : '',
         APPROVAL_BADGE[state] ?? '',
         p.inativa ? '<span class="badge badge-danger">Inativo</span>' : '',
         !isProfileComplete(profile) && !p.semLogin ? '<span class="badge badge-muted">Cadastro incompleto</span>' : '',
@@ -155,9 +157,12 @@ export default {
       </li>`;
     }
 
-    // Aprovado: "Retirar aprovação". Recusado: "Aprovar". Ninguém decide sobre si mesmo.
+    // Ninguém decide sobre si mesmo, exceto o Dev
+    const decidesFor = (p) => p.uid !== user.uid || Boolean(ctx.access?.isDev);
+
+    // Aprovado: "Retirar aprovação". Recusado: "Aprovar".
     function roleButton(p, name) {
-      if (p.uid === user.uid) return '';
+      if (!decidesFor(p)) return '';
       const state = stateOf(p);
       const role = escapeHtml(categoryName(p.profile?.categoryId));
       if (state === 'approved') {
@@ -183,7 +188,7 @@ export default {
         </div>
         <div class="approval-actions">
           ${
-            mine
+            !decidesFor(p)
               ? '<span class="muted text-sm">Outro Gestor ou o administrador precisa aprovar</span>'
               : `<button type="button" class="btn btn-secondary" data-action="decline">Recusar</button>
           <button type="button" class="btn btn-primary" data-action="approve">${icon('check')}Aprovar</button>`

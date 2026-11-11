@@ -5,6 +5,8 @@
 // O cargo é escolhido no cadastro (users/{uid}.categoryId). Gestor, Coordenador de escala e
 // Administrativo só valem depois de aprovados (access/{uid}); o administrador da plataforma
 // (config/admins) vale como Gestor. Sem cargo aprovado, a pessoa vê só os grupos em que está.
+//   Dev (desenvolvedor, pelo e-mail no firestore.rules): acima de todos. Vê e altera tudo,
+//   inclusive as escalas individuais dos outros, e tem os poderes do administrador.
 //   Gestor: vê e altera todos os grupos de equipe; aprova cargos.
 //   Coordenador de escala: altera a escala e os membros dos grupos em que o Gestor o marcou.
 //   Administrativo: vê todos os grupos de equipe, só o que está publicado, sem alterar.
@@ -17,8 +19,9 @@ export const ACCESS_OF_CATEGORY = {
   administrativo: 'administrativo',
 };
 
-// Cargo que vale: 'gestor' | 'coordenador' | 'administrativo' | null
-export function platformRoleOf({ isAdmin = false, access = null } = {}) {
+// Cargo que vale: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null
+export function platformRoleOf({ isDev = false, isAdmin = false, access = null } = {}) {
+  if (isDev) return 'dev';
   if (isAdmin) return 'gestor';
   if (access?.approved === true) return ACCESS_OF_CATEGORY[access.categoryId] ?? null;
   return null;
@@ -34,13 +37,14 @@ export function approvalState(profile, access) {
 }
 
 // O que o cargo libera fora dos grupos
-export const seesAllGroups = (platformRole) => platformRole === 'gestor' || platformRole === 'administrativo';
-export const canCreateTeam = (platformRole) => platformRole === 'gestor' || platformRole === 'coordenador';
-export const canApprove = (platformRole) => platformRole === 'gestor';
-export const seesReports = (platformRole) => ['gestor', 'coordenador', 'administrativo'].includes(platformRole);
+export const seesAllGroups = (platformRole) => ['dev', 'gestor', 'administrativo'].includes(platformRole);
+export const canCreateTeam = (platformRole) => ['dev', 'gestor', 'coordenador'].includes(platformRole);
+export const canApprove = (platformRole) => platformRole === 'dev' || platformRole === 'gestor';
+export const seesReports = (platformRole) => ['dev', 'gestor', 'coordenador', 'administrativo'].includes(platformRole);
 
 // Papel de alguém num grupo (nome mostrado no selo do cabeçalho)
 export const GROUP_ROLES = {
+  dev: 'Dev',
   gestor: 'Gestor',
   coordinator: 'Coordenador de escala',
   administrativo: 'Administrativo',
@@ -52,28 +56,30 @@ export const isMember = (group, uid) => Boolean(uid && group?.memberIds?.include
 // Marcado como coordenador no grupo (o direito só vale com o cargo aprovado: ver groupRole)
 export const isMarkedCoordinator = (group, uid) => Boolean(uid && group?.coordinatorIds?.includes(uid));
 
-// 'gestor' | 'coordinator' | 'administrativo' | 'member' | 'owner' | null
+// 'dev' | 'gestor' | 'coordinator' | 'administrativo' | 'member' | 'owner' | null
 export function groupRole(group, uid, platformRole) {
   if (!group || !uid) return null;
-  if (group.type === 'personal') return group.ownerId === uid ? 'owner' : null;
+  if (group.type === 'personal' && group.ownerId === uid) return 'owner';
+  if (platformRole === 'dev') return 'dev';
+  if (group.type === 'personal') return null;
   if (platformRole === 'gestor') return 'gestor';
   if (platformRole === 'coordenador' && isMarkedCoordinator(group, uid)) return 'coordinator';
   if (platformRole === 'administrativo') return 'administrativo';
   return isMember(group, uid) ? 'member' : null;
 }
 
-// Ações e papéis que podem fazê-las.
+// Ações e papéis que podem fazê-las (o Dev, todas).
 // "own": o membro comum só vê o que é dele (relatório).
 const MATRIX = {
-  viewDraft: ['gestor', 'coordinator', 'owner'],
-  editSchedule: ['gestor', 'coordinator', 'owner'],
-  editSettings: ['gestor', 'owner'], // turnos, valores e dados do grupo (o coordenador só ao criar)
-  manageMembers: ['gestor', 'coordinator'], // convidar e remover
-  setCoordinators: ['gestor'],
-  viewHistory: ['gestor', 'coordinator', 'administrativo', 'member', 'owner'],
-  viewReports: ['gestor', 'coordinator', 'administrativo', 'owner'],
+  viewDraft: ['dev', 'gestor', 'coordinator', 'owner'],
+  editSchedule: ['dev', 'gestor', 'coordinator', 'owner'],
+  editSettings: ['dev', 'gestor', 'owner'], // turnos, valores e dados do grupo (o coordenador só ao criar)
+  manageMembers: ['dev', 'gestor', 'coordinator'], // convidar e remover
+  setCoordinators: ['dev', 'gestor'],
+  viewHistory: ['dev', 'gestor', 'coordinator', 'administrativo', 'member', 'owner'],
+  viewReports: ['dev', 'gestor', 'coordinator', 'administrativo', 'owner'],
   viewOwnReport: ['member'],
-  deleteGroup: ['gestor', 'owner'],
+  deleteGroup: ['dev', 'gestor', 'owner'],
 };
 
 export const ACTIONS = Object.keys(MATRIX);
@@ -93,10 +99,10 @@ export const canTakeShifts = (group, uid) => isMember(group, uid);
 // Sair do grupo: qualquer membro de um grupo de equipe
 export const canLeave = (group, uid) => group?.type === 'team' && isMember(group, uid);
 
-// O coordenador remove membros, mas não outro coordenador (isso é com o Gestor)
+// O coordenador remove membros, mas não outro coordenador (isso é com o Gestor ou o Dev)
 export function canRemoveMember(group, role, targetUid, myUid) {
   if (!can(role, 'manageMembers') || targetUid === myUid) return false;
-  return role === 'gestor' || !isMarkedCoordinator(group, targetUid);
+  return role === 'dev' || role === 'gestor' || !isMarkedCoordinator(group, targetUid);
 }
 
 // Campos do grupo sem a pessoa (remover membro ou sair do grupo)

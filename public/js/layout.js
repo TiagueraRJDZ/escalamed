@@ -1,7 +1,7 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user, profile, access } = await initLayout({ active: 'schedules' });
-// access = { isAdmin, access, role }: cargo aprovado (role: 'gestor' | 'coordenador' | 'administrativo' | null)
+// access = { isDev, isAdmin, access, role }: cargo que vale (role: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null)
 import { auth } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { pagePath } from './redirect.js';
@@ -99,11 +99,13 @@ function shortName(name) {
 }
 
 // ---------- Cargo embaixo do nome e itens do menu que dependem dele ----------
-// "Administrador" (config/admins) ou o cargo do perfil, com "aguardando aprovação" quando
+// "Dev" (e-mail no firestore.rules), "Administrador" (config/admins) ou o cargo do perfil, com "aguardando aprovação" quando
 // for o caso. Relatórios e Configurações > Usuários seguem o cargo aprovado (access.js).
 const ADMIN_LABEL = 'Administrador';
+const DEV_LABEL = 'Dev';
 
 function roleLabel(profile, value) {
+  if (value?.isDev) return DEV_LABEL;
   if (value?.isAdmin) return ADMIN_LABEL;
   const name = categoryName(profile?.categoryId);
   return name && myApprovalState(profile, value) === 'pending' ? `${name} (aguardando aprovação)` : name;

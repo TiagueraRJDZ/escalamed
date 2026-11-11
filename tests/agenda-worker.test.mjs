@@ -63,6 +63,7 @@ const google = {
 let grupos = {}; // Firestore simulado: groups/{id}
 let acessos = {}; // access/{uid}: cargo aprovado
 let admins = []; // config/admins
+let devs = []; // uids que as regras tratam como Dev (só eles leem config/dev)
 
 function respostaJson(dados, status = 200) {
   return new Response(JSON.stringify(dados), { status, headers: { 'Content-Type': 'application/json' } });
@@ -105,6 +106,11 @@ globalThis.fetch = async (url, opcoes = {}) => {
   if (endereco.startsWith('http://firestore.falso/')) {
     const caminho = endereco.split('/documents/')[1];
     if (caminho === 'config/admins') return respostaJson({ fields: { uids: lista(admins) } });
+    if (caminho === 'config/dev') {
+      const token = String(opcoes.headers?.Authorization ?? '').replace('Bearer ', '');
+      const uid = JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).sub;
+      return new Response('{}', { status: devs.includes(uid) ? 404 : 403 });
+    }
     if (caminho.startsWith('access/')) {
       const cargo = acessos[caminho.slice(7)];
       return cargo ? respostaJson({ fields: { categoryId: { stringValue: cargo }, approved: { booleanValue: true } } }) : new Response('{}', { status: 404 });
@@ -205,6 +211,7 @@ beforeEach(() => {
   grupos = {};
   acessos = { gestor: 'gestor', coord: 'coordenador-escala', coordSemGrupo: 'coordenador-escala', adm: 'administrativo' };
   admins = [];
+  devs = [];
 });
 
 // ---------- Testes ----------
@@ -302,6 +309,10 @@ test('escala do grupo: só Gestor/coordenador, só membros conectados; rascunho 
   assert.equal(eventosDe('intruso').size, 0);
   // Nome, local e fuso vêm do Firestore
   assert.equal([...eventosDe('bia').values()][0].start.timeZone, 'America/Fortaleza');
+
+  // Dev atualiza a agenda de qualquer grupo, mesmo sem estar nele
+  devs = ['dev'];
+  assert.equal((await chamar('/agenda/grupo', pedido, 'dev')).status, 200);
 
   // Escala volta para rascunho: some de todas as agendas
   const rascunho = await chamar('/agenda/grupo', { ...pedido, publicada: false }, 'gestor');

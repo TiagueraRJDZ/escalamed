@@ -32,6 +32,22 @@ test('cargo que vale: administrador é Gestor; os outros só com aprovação', (
   assert.equal(platformRoleOf(), null);
 });
 
+test('Dev: acima de todos, mesmo com outro cargo pedido ou aprovado', () => {
+  assert.equal(platformRoleOf({ isDev: true }), 'dev');
+  assert.equal(platformRoleOf({ isDev: true, isAdmin: true, access: approved('administrativo') }), 'dev');
+  // Grupos de equipe e escalas individuais dos outros; a própria continua "owner"
+  assert.equal(groupRole(team, 'x', 'dev'), 'dev');
+  assert.equal(groupRole(team, 'c', 'dev'), 'dev');
+  assert.equal(groupRole(personal, 'x', 'dev'), 'dev');
+  assert.equal(groupRole(personal, 'm1', 'dev'), 'owner');
+  // Todas as ações de grupo (o relatório "só o meu" é do membro; o Dev vê o completo)
+  for (const action of ACTIONS.filter((a) => a !== 'viewOwnReport')) assert.ok(can('dev', action), action);
+  assert.ok(canEditSettings(team, 'dev'));
+  assert.ok(canRemoveMember(team, 'dev', 'c', 'x'));
+  assert.ok(!canRemoveMember(team, 'dev', 'x', 'x'), 'remover a si mesmo é "Sair do grupo"');
+  assert.ok(canCreateTeam('dev') && canApprove('dev') && seesAllGroups('dev') && seesReports('dev'));
+});
+
 test('situação da aprovação segue o cargo pedido naquele momento', () => {
   assert.equal(approvalState({ categoryId: 'medico' }, null), 'none');
   assert.equal(approvalState({ categoryId: 'gestor' }, null), 'pending');
@@ -75,7 +91,7 @@ test('matriz de permissões', () => {
 });
 
 test('todo papel tem ao menos uma ação', () => {
-  for (const role of ['gestor', 'coordinator', 'administrativo', 'member', 'owner']) {
+  for (const role of ['dev', 'gestor', 'coordinator', 'administrativo', 'member', 'owner']) {
     assert.ok(ACTIONS.some((a) => can(role, a)), role);
   }
 });

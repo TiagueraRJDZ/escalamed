@@ -179,23 +179,27 @@ async function meusPlantoes(contexto) {
   return estadoAtual(env, uid);
 }
 
-// Cargo aprovado de quem chamou: 'gestor' | 'coordenador' | 'administrativo' | null.
-// Mesma regra do firestore.rules: administrador da plataforma vale como Gestor; os outros
-// cargos só valem aprovados em access/{uid}.
+// Cargo aprovado de quem chamou: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null.
+// Mesma regra do firestore.rules: Dev acima de todos; administrador da plataforma vale como
+// Gestor; os outros cargos só valem aprovados em access/{uid}.
 const CARGO_DE_ACESSO = { gestor: 'gestor', 'coordenador-escala': 'coordenador', administrativo: 'administrativo' };
 
 async function cargoDe(contexto, quem) {
   const { env, local } = contexto;
+  if (await apoio.ehDev(env, quem.token, local)) return 'dev';
   if ((await apoio.lerAdmins(env, quem.token, local)).includes(quem.uid)) return 'gestor';
   const acesso = await apoio.lerDocumento(env, quem.token, `access/${quem.uid}`, local);
   if (acesso?.approved?.booleanValue !== true) return null;
   return CARGO_DE_ACESSO[acesso.categoryId?.stringValue] ?? null;
 }
 
-// Pode alterar a escala do grupo: Gestor (equipe), coordenador do grupo ou dono da escala individual
+// Pode alterar a escala do grupo: Dev (qualquer grupo), Gestor (equipe), coordenador do grupo
+// ou dono da escala individual
 async function editaEscala(contexto, quem, campos) {
-  if (campos.type?.stringValue === 'personal') return campos.ownerId?.stringValue === quem.uid;
+  if (campos.type?.stringValue === 'personal' && campos.ownerId?.stringValue === quem.uid) return true;
   const cargo = await cargoDe(contexto, quem);
+  if (cargo === 'dev') return true;
+  if (campos.type?.stringValue === 'personal') return false;
   return cargo === 'gestor' || (cargo === 'coordenador' && textos(campos.coordinatorIds).includes(quem.uid));
 }
 

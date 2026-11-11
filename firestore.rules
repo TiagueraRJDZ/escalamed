@@ -24,6 +24,16 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Dev (desenvolvedor): cargo acima de todos, pelo e-mail da conta. Lê e grava tudo no
+    // banco, sem exceção (veja o match /{document=**} no fim). Ninguém escolhe esse cargo
+    // no app: para incluir alguém, adicione o e-mail aqui (em minúsculas) e publique as regras.
+    // O app e o serviço de contas descobrem quem é Dev tentando ler config/dev.
+    function isDev() {
+      return signedIn() && request.auth.token.get('email', '').lower() in [
+        'tiago.smartins@hapvida.com.br'
+      ];
+    }
+
     // Administrador da plataforma: uid listado em config/admins (campo "uids").
     // O documento só é editado pelo console do Firebase.
     function isPlatformAdmin() {
@@ -615,6 +625,13 @@ service cloud.firestore {
     // a aba Usuários); ninguém grava pelo app.
     match /config/admins {
       allow read: if signedIn();
+    }
+
+    // Dev: lê e grava qualquer documento (soma-se às regras acima; para os outros nada muda).
+    // config/dev (pode nem existir) só o Dev lê: é assim que o app e o serviço de contas
+    // sabem que a conta é Dev.
+    match /{document=**} {
+      allow read, write: if isDev();
     }
 
     // "Meus convites": busca em todos os grupos pelos convites do próprio e-mail

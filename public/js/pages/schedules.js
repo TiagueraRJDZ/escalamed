@@ -258,11 +258,17 @@ const SECTION_TITLES = {
   member: 'Participo',
   other: 'Outros grupos',
   personal: 'Escalas individuais',
+  otherPersonal: 'Escalas individuais de outras pessoas', // só o Dev vê
 };
 
+function sectionKey(g) {
+  if (g.type === 'personal') return g.ownerId === user.uid ? 'personal' : 'otherPersonal';
+  if (g.role === 'coordinator') return 'coordinator';
+  return isMember(g, user.uid) ? 'member' : 'other';
+}
+
 function sectionsHtml(list) {
-  const keyOf = (g) =>
-    g.type === 'personal' ? 'personal' : g.role === 'coordinator' ? 'coordinator' : isMember(g, user.uid) ? 'member' : 'other';
+  const keyOf = sectionKey;
   return Object.keys(SECTION_TITLES)
     .map((key) => {
       const items = list.filter((g) => keyOf(g) === key);

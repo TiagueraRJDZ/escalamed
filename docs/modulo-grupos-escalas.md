@@ -63,6 +63,7 @@ profissionais (`users/{uid}.categoryId`).
 
 | Cargo (`categoryId`) | Aprovação | O que pode |
 |---|---|---|
+| Dev (sem `categoryId`) | não se escolhe | Acima de todos: lê e grava qualquer documento do banco (inclusive escalas individuais e dados pessoais dos outros) e tem os poderes do administrador da plataforma. Definido por e-mail em `isDev()` no `firestore.rules`. |
 | `gestor` | sim | Vê e altera todos os grupos de equipe: dados, turnos, escala, membros, coordenadores, excluir. Aprova cargos (Configurações > Usuários). |
 | `coordenador-escala` | sim | Nos grupos em que o Gestor o marcou (`coordinatorIds`): monta e publica a escala, convida e remove membros (não remove outro coordenador). Cria grupos e vira coordenador do que criou; ajusta dados e turnos só enquanto o grupo está sendo criado. |
 | `administrativo` | sim | Vê as escalas publicadas, o histórico e os relatórios de todos os grupos de equipe. Não altera nada e não vê rascunhos. |
@@ -70,6 +71,7 @@ profissionais (`users/{uid}.categoryId`).
 
 - **Aprovação**: `access/{uid}` = `{ categoryId, approved, decidedBy, decidedAt }`, gravado pelo administrador da plataforma (`config/admins`) ou por um Gestor aprovado, nunca sobre si mesmo, e sempre com o cargo que a pessoa pediu. Até ser aprovada, a pessoa tem o acesso de Médico. Ao trocar de cargo, o app apaga o `access` dela e o pedido volta para a lista.
 - **Administrador da plataforma** vale como Gestor.
+- **Dev** (desde 1.0.55): e-mails listados em `isDev()` no `firestore.rules`; um `match /{document=**}` libera leitura e gravação de tudo para eles. Ninguém escolhe esse cargo no app: para incluir alguém, adicione o e-mail e publique as regras. O app (`access.js`) e o Worker (`ehDev`) descobrem o cargo tentando ler `config/dev`, que só o Dev pode ler (o documento não precisa existir). No app, o Dev vê todos os grupos (seção "Escalas individuais de outras pessoas" para as dos outros), tem todas as ações de grupo e as de administrador em Configurações > Usuários; o cargo aparece como "Dev" embaixo do nome.
 - **Grupo de equipe**: `memberIds` (quem está na escala) e `coordinatorIds` (sempre também membros). Entrar só por convite (sem cargo no convite). O direito de coordenador só vale com o cargo aprovado: retirar a aprovação tira o acesso sem mexer nos grupos.
 - **Escala individual** (`type: 'personal'`): `memberIds == [dono]`, sem coordenadores; só o dono vê e edita.
 - **Código**: `public/js/permissions.js` (`platformRoleOf`, `approvalState`, `groupRole`, `can`) com testes; `public/js/access.js` lê o cargo de quem está logado; `public/js/my-groups.js` junta as consultas que as regras permitem (grupos em que está, que coordena e, para Gestor e Administrativo, `type == 'team'`). O `firestore.rules` repete a mesma tabela (`platformRole()`, `editorOf()`, `canView()`), testado em `tests/rules/rules.test.mjs`.

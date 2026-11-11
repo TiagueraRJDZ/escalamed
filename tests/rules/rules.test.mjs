@@ -8,13 +8,15 @@ import { w, NOW, commit, admin, canRead, canQuery, canQueryGroup, clearFirestore
 
 // Cargos: plataforma (config/admins), gestor, coordenador (marcado no g1), coordenador de outro
 // grupo, administrativo, médico membro, pendente (pediu Gestor, sem aprovação), de fora.
-let platformAdmin, gestor, coord, coordOther, adm, medico, pending, outsider, invited, unverified;
+let dev, platformAdmin, gestor, coord, coordOther, adm, medico, pending, outsider, invited, unverified;
 const G = 'groups/g1';
 const G2 = 'groups/g2'; // grupo de que o gestor não é membro
 const DAYS = 24 * 60 * 60 * 1000;
 
 before(async () => {
   await clearAuth();
+  // Dev: e-mail listado em isDev() no firestore.rules
+  dev = await createUser('tiago.smartins@hapvida.com.br');
   platformAdmin = await createUser('admin@teste.com');
   gestor = await createUser('gestor@teste.com');
   coord = await createUser('coordenador@teste.com');
@@ -574,4 +576,32 @@ test('entrar por convite com o e-mail de outra pessoa no cartão é recusado', a
     ]);
   assert.ok(!(await entrar('falso@teste.com')));
   assert.ok(await entrar(invited.email));
+});
+
+// ---------- Dev (e-mail em isDev(), acima de todos) ----------
+test('Dev: lê e grava tudo, inclusive escala individual e dados pessoais dos outros', async () => {
+  const P = 'groups/p1';
+  await admin([
+    w.set(P, baseGroup({ type: 'personal', unit: null, ownerId: medico.uid, memberIds: [medico.uid], coordinatorIds: [] })),
+    w.set(`users/${medico.uid}/private/data`, { email: medico.email, phone: null, cpf: null, state: 'CE', updatedAt: new Date() }),
+  ]);
+  // Só o Dev lê config/dev (é assim que o app descobre o cargo)
+  assert.ok(await canRead(dev.token, 'config/dev'));
+  assert.ok(!(await canRead(platformAdmin.token, 'config/dev')));
+  assert.ok(!(await canRead(gestor.token, 'config/dev')));
+  // Lê o que nenhum outro cargo lê
+  assert.ok(await canRead(dev.token, P));
+  assert.ok(await canRead(dev.token, `users/${medico.uid}/private/data`));
+  assert.ok(await canQuery(dev.token, 'groups', [['type', 'EQUAL', 'personal']]));
+  assert.ok(!(await canQuery(gestor.token, 'groups', [['type', 'EQUAL', 'personal']])));
+  assert.ok(await canQueryGroup(dev.token, 'invites', 'email', 'qualquer@teste.com'));
+  // Altera e apaga qualquer coisa
+  assert.ok(await commit(dev.token, [w.update(P, { name: 'Escala revisada', updatedAt: NOW })]));
+  assert.ok(await commit(dev.token, [w.update(`users/${medico.uid}`, { name: 'Nome Corrigido' })]));
+  assert.ok(await commit(dev.token, [w.set(`access/${dev.uid}`, decision('gestor'))]));
+  assert.ok(await commit(dev.token, [w.set('config/admins', { uids: [platformAdmin.uid, dev.uid] })]));
+  assert.ok(await commit(dev.token, [w.delete(G2)]));
+  // Os outros continuam sem esse acesso
+  assert.ok(!(await canRead(platformAdmin.token, P)));
+  assert.ok(!(await commit(platformAdmin.token, [w.set('config/admins', { uids: [platformAdmin.uid, gestor.uid] })])));
 });

@@ -7,7 +7,7 @@ import { platformRoleOf, approvalState } from './permissions.js';
 
 const storageKey = (uid) => `escalamed:acesso:${uid}`;
 
-// { isAdmin, access, role } guardado na sessão (ou null)
+// { isDev, isAdmin, access, role } guardado na sessão (ou null)
 export function cachedAccess(uid) {
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey(uid)) ?? 'null');
@@ -33,19 +33,33 @@ export function forgetAccess(uid) {
   }
 }
 
+// Dev: as regras só deixam o Dev ler config/dev (o documento pode nem existir).
+// Leitura recusada = não é Dev; outro erro (sem conexão) sobe para usar o guardado.
+const checkDev = () =>
+  getDoc(doc(db, 'config', 'dev')).then(
+    () => true,
+    (error) => (error?.code === 'permission-denied' ? false : Promise.reject(error)),
+  );
+
 // Lê do servidor. Falhou a leitura: devolve o que estava guardado (ou sem cargo).
+// O Dev vale também como administrador da plataforma (Configurações > Usuários completo).
 export async function loadMyAccess(uid) {
   try {
-    const [admins, mine] = await Promise.all([getDoc(doc(db, 'config', 'admins')), getDoc(doc(db, 'access', uid))]);
-    const isAdmin = (admins.data()?.uids ?? []).includes(uid);
+    const [isDev, admins, mine] = await Promise.all([
+      checkDev(),
+      getDoc(doc(db, 'config', 'admins')),
+      getDoc(doc(db, 'access', uid)),
+    ]);
+    const isAdmin = isDev || (admins.data()?.uids ?? []).includes(uid);
     const access = mine.exists() ? { categoryId: mine.data().categoryId ?? null, approved: mine.data().approved === true } : null;
-    const value = { isAdmin, access, role: platformRoleOf({ isAdmin, access }) };
+    const value = { isDev, isAdmin, access, role: platformRoleOf({ isDev, isAdmin, access }) };
     save(uid, value);
     return value;
   } catch {
-    return cachedAccess(uid) ?? { isAdmin: false, access: null, role: null };
+    return cachedAccess(uid) ?? { isDev: false, isAdmin: false, access: null, role: null };
   }
 }
 
 // Situação do cargo pedido no perfil ('none' | 'pending' | 'approved' | 'declined')
-export const myApprovalState = (profile, value) => (value?.isAdmin ? 'none' : approvalState(profile, value?.access));
+export const myApprovalState = (profile, value) =>
+  value?.isDev || value?.isAdmin ? 'none' : approvalState(profile, value?.access);

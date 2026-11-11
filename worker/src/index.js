@@ -14,6 +14,7 @@
  *     senha provisória, inativar/reativar e excluir o acesso. Administradores são
  *     os uids do documento config/admins (campo "uids") no Firestore, editado só
  *     pelo console do Firebase. As regras do Firestore leem o mesmo documento.
+ *     O Dev (e-mails no firestore.rules) também vale como administrador.
  *
  * Rotas (todas POST, corpo JSON):
  *   /entrar-usuario    { usuario, senha }
@@ -65,7 +66,7 @@ class Falha extends Error {
 
 const LOGIN_INVALIDO = 'Usuário, e-mail ou senha inválidos.';
 
-const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento, lerAdmins });
+const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento, lerAdmins, ehDev });
 
 const ROTAS = {
   ...agenda.rotas,
@@ -249,11 +250,14 @@ async function senhaDefinida(contexto) {
 
 /* ----- Administração da plataforma ----- */
 
-// Confere se quem chamou está em config/admins. Devolve { uid, token }.
+// Confere se quem chamou está em config/admins ou é Dev. Devolve { uid, token }.
 async function exigirAdmin(contexto) {
+  const { env, local } = contexto;
   const quem = await quemChamou(contexto);
-  const admins = await lerAdmins(contexto.env, quem.token, contexto.local);
-  if (!admins.includes(quem.uid)) throw new Falha(403, 'Só administradores da plataforma podem fazer isso.');
+  const admins = await lerAdmins(env, quem.token, local);
+  if (!admins.includes(quem.uid) && !(await ehDev(env, quem.token, local))) {
+    throw new Falha(403, 'Só administradores da plataforma podem fazer isso.');
+  }
   return quem;
 }
 
@@ -466,6 +470,16 @@ const listaDeTextos = (campo) => (campo?.arrayValue?.values || []).map((v) => v.
 async function lerAdmins(env, token, local) {
   const campos = await lerDocumento(env, token, 'config/admins', local);
   return listaDeTextos(campos?.uids);
+}
+
+// Dev (desenvolvedor, e-mails no firestore.rules): as regras só deixam o Dev ler config/dev.
+// O documento pode nem existir: 404 também é Dev; 403 não é.
+async function ehDev(env, token, local) {
+  const base = local ? `http://${env.EMULADOR_FIRESTORE || '127.0.0.1:8080'}` : 'https://firestore.googleapis.com';
+  const resposta = await fetch(`${base}/v1/projects/${env.PROJETO}/databases/(default)/documents/config/dev`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return resposta.ok || resposta.status === 404;
 }
 
 /* ----- Contas do Firebase Authentication, com a chave de serviço ----- */

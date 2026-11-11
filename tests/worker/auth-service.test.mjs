@@ -40,9 +40,16 @@ const env = { PROJETO, ORIGENS: ORIGEM, DB: D1, EMULADOR: '1', EMULADOR_AUTH: AU
 
 // Administradores simulados: a leitura de config/admins feita pelo Worker cai aqui
 let admins = [];
+let devs = []; // uids que as regras tratam como Dev (só eles leem config/dev)
 const fetchReal = globalThis.fetch;
 globalThis.fetch = async (url, opcoes) => {
   if (String(url).startsWith('http://firestore.falso/')) {
+    // config/dev: as regras só deixam o Dev ler (o documento não existe: 404)
+    if (String(url).endsWith('/documents/config/dev')) {
+      const token = String(opcoes?.headers?.Authorization ?? '').replace('Bearer ', '');
+      const uid = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).user_id;
+      return new Response('{}', { status: devs.includes(uid) ? 404 : 403 });
+    }
     if (!String(url).endsWith('/documents/config/admins')) return new Response('{}', { status: 404 });
     const uids = { arrayValue: { values: admins.map((id) => ({ stringValue: id })) } };
     return new Response(JSON.stringify({ fields: { uids } }));
@@ -195,6 +202,11 @@ test('rotas de administrador: só quem está em config/admins', async () => {
   admins = [];
   const negada = await chamar('/admin/contas', {}, { token: gestor.idToken });
   assert.equal(negada.status, 403);
+  // Dev vale como administrador, mesmo fora de config/admins
+  devs = [gestor.localId];
+  const dev = await chamar('/admin/contas', {}, { token: gestor.idToken });
+  devs = [];
+  assert.equal(dev.status, 200, dev.erro);
 });
 
 test('administrador lista as contas, com usuário e sem a própria senha', async () => {
