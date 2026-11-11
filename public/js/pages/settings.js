@@ -8,6 +8,8 @@ import { auth, db } from '../firebase.js';
 import { initLayout, refreshAccountButton, setActiveSettingsSection } from '../layout.js';
 import { toast } from '../ui.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from '../settings/menu.js';
+import { loadMyAccess } from '../access.js';
+import { canApprove } from '../permissions.js';
 import conta from '../settings/conta.js';
 import profissional from '../settings/profissional.js';
 import perfil from '../settings/perfil.js';
@@ -15,10 +17,10 @@ import senha from '../settings/senha.js';
 import usuarios from '../settings/usuarios.js';
 
 const MODULES = Object.fromEntries([conta, profissional, perfil, senha, usuarios].map((m) => [m.hash, m]));
-const initialHash = location.hash; // "#usuarios" só vale depois de confirmar o administrador
+const initialHash = location.hash; // "#usuarios" só vale depois de confirmar o cargo
 
 // Sem login, initLayout manda para a tela de entrada
-const { user, profile } = await initLayout({ active: 'settings', search: false });
+const { user, profile, access } = await initLayout({ active: 'settings', search: false });
 const $ = (id) => document.getElementById(id);
 const panels = $('settings-sections');
 const title = $('settings-section-title');
@@ -42,6 +44,8 @@ const ctx = {
   currentEmail: () => auth.currentUser?.email ?? user.email,
   // Nome, foto ou e-mail mudou: atualiza a pílula da conta no topo
   changed: refreshAccountButton,
+  // Cargo aprovado de quem está logado ({ isAdmin, access, role }); atualizado abaixo
+  access,
   // Título do painel (ex.: "Criar senha" para quem entra só pelo Google)
   setTitle(text) {
     if (current === senha.hash) title.textContent = text;
@@ -53,8 +57,10 @@ if (privateData.email && privateData.email !== ctx.currentEmail()) {
   updateDoc(privateRef, { email: ctx.currentEmail(), updatedAt: serverTimestamp() }).catch(() => {});
 }
 
-let isAdmin = false;
-const visible = () => SETTINGS_SECTIONS.filter((s) => !s.adminOnly || isAdmin);
+// Usuários: administrador da plataforma ou Gestor aprovado
+const isApprover = (value) => Boolean(value?.isAdmin || canApprove(value?.role));
+let approver = isApprover(access);
+const visible = () => SETTINGS_SECTIONS.filter((s) => !s.approverOnly || approver);
 const mounted = new Map(); // hash → { el, onShow }
 
 function show(section) {
@@ -89,13 +95,13 @@ function route() {
 window.addEventListener('hashchange', route);
 route();
 
-// "Usuários" só para administradores da plataforma (uid em config/admins)
-getDoc(doc(db, 'config', 'admins'))
-  .then((snapshot) => {
-    isAdmin = (snapshot.data()?.uids ?? []).includes(user.uid);
-    if (isAdmin && initialHash === `#${usuarios.hash}` && current === DEFAULT_SECTION) {
-      history.replaceState(null, '', initialHash);
-      route();
-    }
-  })
-  .catch(() => {});
+// Confere o cargo no servidor (o da sessão pode estar velho): libera ou esconde "Usuários"
+loadMyAccess(user.uid).then((value) => {
+  ctx.access = value;
+  const was = approver;
+  approver = isApprover(value);
+  if (approver && !was && initialHash === `#${usuarios.hash}` && current === DEFAULT_SECTION) {
+    history.replaceState(null, '', initialHash);
+  }
+  if (approver !== was) route();
+});

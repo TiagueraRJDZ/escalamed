@@ -119,7 +119,7 @@ export function publishSchedule(groupId, month, schedule, shifts, movement) {
   ).then(announceChange(groupId, month));
 }
 
-// Volta para rascunho (some para plantonistas e observadores até publicar de novo)
+// Volta para rascunho (some para membros e Administrativos até publicar de novo)
 export const unpublishSchedule = (groupId, month, movement) =>
   commitWithLog(groupId, (batch) => batch.update(scheduleRef(groupId, month), { status: 'draft', ...stamp() }), movement).then(
     announceChange(groupId, month),

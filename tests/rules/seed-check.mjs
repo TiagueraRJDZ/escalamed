@@ -29,6 +29,18 @@ test('usuários do seed entram e leem o grupo', async () => {
   assert.ok(await canRead(gestor.idToken, `users/${gestor.localId}`));
 });
 
+test('cargos do seed: Gestor e Administrativo veem todos os grupos; os outros só os seus', async () => {
+  const other = 'groups/uti-adulto';
+  for (const email of ['gestor@teste.com', 'administrativo@teste.com']) {
+    assert.ok(await canRead((await login(email)).idToken, other), email);
+  }
+  for (const email of ['coordenador@teste.com', 'pendente@teste.com', 'plantonista@teste.com']) {
+    const { idToken } = await login(email);
+    assert.ok(await canRead(idToken, 'groups/teleauditoria-hapvida'), email);
+    assert.ok(!(await canRead(idToken, other)), email);
+  }
+});
+
 test('convidado vê o próprio convite, mas ainda não lê o grupo', async () => {
   const novo = await login('novo@teste.com');
   assert.ok(await canQueryGroup(novo.idToken, 'invites', 'email', 'novo@teste.com'));

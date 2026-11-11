@@ -1,18 +1,16 @@
 // Tela de Escalas: lista de grupos do usuário, menu "+", calendário e disponíveis.
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { db, isLeaving } from '../firebase.js';
-import { initLayout, setManagerFromGroups } from '../layout.js';
+import { onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { isLeaving } from '../firebase.js';
+import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { createCalendar } from '../calendar.js';
 import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessage } from '../ui.js';
 import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
-import { ROLES, ROLE_ORDER, roleOf } from '../permissions.js';
+import { isMember, canCreateTeam, canEditSettings } from '../permissions.js';
+import { groupQueries, mergeGroups } from '../my-groups.js';
+import { myApprovalState } from '../access.js';
+import { categoryName } from '/data/categories.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays, dayShifts } from '../schedule-math.js';
 import { loadSchedule, loadShifts, scheduleShifts } from '../schedule-data.js';
@@ -20,7 +18,18 @@ import { formatClock } from '../shifts.js';
 import { isoDate } from '../dates.js';
 
 renderIcons();
-const { user, profile } = await initLayout({ active: 'schedules' });
+const { user, profile, access } = await initLayout({ active: 'schedules' });
+const platformRole = access.role;
+
+// "Criar novo grupo" só para Gestor e Coordenador de escala (cargo aprovado)
+document.getElementById('new-team').hidden = !canCreateTeam(platformRole);
+
+// Cargo pedido ainda sem aprovação: avisa que, por enquanto, vale o acesso de membro
+if (myApprovalState(profile, access) === 'pending') {
+  const notice = document.getElementById('approval-notice');
+  notice.textContent = `Seu cargo de ${categoryName(profile.categoryId)} está aguardando aprovação de um Gestor ou do administrador. Até lá, você vê só os grupos em que está.`;
+  notice.hidden = false;
+}
 
 const listEl = document.getElementById('group-list');
 const searchInput = document.getElementById('group-search');
@@ -40,7 +49,9 @@ let groupsKey = null; // grupos prontos; quando muda, as escalas são lidas de n
 const monthCache = new Map(); // "YYYY-MM" → Promise<[{ group, schedule, shifts }]>
 const shiftsCache = new Map(); // groupId → Promise<turnos do grupo>
 
-const readyGroups = () => groups.filter((g) => g.setupStep === 'done');
+// Calendário: só os grupos em que a pessoa está na escala (Gestor e Administrativo veem
+// todos os grupos na lista, mas os plantões e vagas do calendário são os da pessoa)
+const readyGroups = () => groups.filter((g) => g.setupStep === 'done' && isMember(g, user.uid));
 
 // Escalas do mês em todos os grupos prontos (só as que existem e a pessoa pode ler)
 function monthEntries(month) {
@@ -202,9 +213,9 @@ if (params.has('created')) {
   toast('Grupo criado com sucesso!', 'success');
   history.replaceState(null, '', location.pathname);
 }
-// Veio de Relatórios sem ser gestor de nenhum grupo
+// Veio de Relatórios sem ter acesso a nenhum grupo
 if (params.get('aviso') === 'relatorios') {
-  toast('Relatórios é só para gestores de grupo.', 'error', 6000);
+  toast('Relatórios é para Gestor, Coordenador de escala e Administrativo.', 'error', 6000);
   history.replaceState(null, '', location.pathname);
 }
 
@@ -241,19 +252,18 @@ function groupItem(group) {
   </li>`;
 }
 
-// Seções pelo cargo do usuário em cada grupo (GESTOR, AUXILIAR...); escalas individuais por último
+// Seções pela relação da pessoa com cada grupo; escalas individuais por último
 const SECTION_TITLES = {
-  manager: 'Gestor',
-  assistant: 'Auxiliar',
-  analyst: 'Analista',
-  observer: 'Observador',
-  staff: 'Plantonista',
+  coordinator: 'Coordeno',
+  member: 'Participo',
+  other: 'Outros grupos',
   personal: 'Escalas individuais',
 };
 
 function sectionsHtml(list) {
-  const keyOf = (g) => (g.type === 'personal' ? 'personal' : roleOf(g, user.uid) ?? 'staff');
-  return [...ROLE_ORDER, 'personal']
+  const keyOf = (g) =>
+    g.type === 'personal' ? 'personal' : g.role === 'coordinator' ? 'coordinator' : isMember(g, user.uid) ? 'member' : 'other';
+  return Object.keys(SECTION_TITLES)
     .map((key) => {
       const items = list.filter((g) => keyOf(g) === key);
       if (!items.length) return '';
@@ -263,13 +273,18 @@ function sectionsHtml(list) {
 }
 
 function emptyState() {
+  const creates = canCreateTeam(platformRole);
   return `<li class="empty-state">
     ${icon('users')}
     <h3>Você ainda não participa de nenhum grupo</h3>
-    <p>Crie um grupo para montar a escala da sua equipe ou uma escala individual para organizar seus plantões.</p>
+    <p>${
+      creates
+        ? 'Crie um grupo para montar a escala da sua equipe ou uma escala individual para organizar seus plantões.'
+        : 'Quando um Gestor ou Coordenador de escala convidar você, o grupo aparece aqui. Enquanto isso, você pode criar uma escala individual.'
+    }</p>
     <div class="empty-actions">
-      <a class="btn btn-primary" href="/group-new.html?type=team">${icon('plus')}Criar novo grupo</a>
-      <a class="btn btn-secondary" href="/group-new.html?type=personal">Criar escala individual</a>
+      ${creates ? `<a class="btn btn-primary" href="/group-new.html?type=team">${icon('plus')}Criar novo grupo</a>` : ''}
+      <a class="btn ${creates ? 'btn-secondary' : 'btn-primary'}" href="/group-new.html?type=personal">Criar escala individual</a>
     </div>
   </li>`;
 }
@@ -299,27 +314,33 @@ function render() {
 searchInput.addEventListener('input', render);
 render();
 
-// Grupos em que o usuário é membro, atualizados em tempo real
-const groupsQuery = query(collection(db, 'groups'), where('memberIds', 'array-contains', user.uid));
-onSnapshot(
-  groupsQuery,
-  (snapshot) => {
-    groups = snapshot.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    loaded = true;
-    setManagerFromGroups(user.uid, groups); // mostra "Relatórios" no menu se for gestor
-    render();
-    refreshCalendar();
-  },
-  (error) => {
-    if (isLeaving()) return; // trocando de página: não é erro de verdade
-    console.error(error);
-    listEl.setAttribute('aria-busy', 'false');
-    listEl.innerHTML = `<li class="empty-state">${icon('x')}<h3>Não foi possível carregar seus grupos</h3>
+// Grupos que a pessoa vê (em que está, que coordena e, para Gestor e Administrativo, todos
+// os de equipe), atualizados em tempo real. Grupo ainda sendo criado só aparece para quem
+// pode terminar a criação.
+const queries = groupQueries(user.uid, platformRole);
+const snapshots = queries.map(() => null);
+queries.forEach((q, i) =>
+  onSnapshot(
+    q,
+    (snapshot) => {
+      snapshots[i] = snapshot;
+      if (!snapshots.every(Boolean)) return; // espera todas as consultas responderem
+      groups = mergeGroups(snapshots, user.uid, platformRole)
+        .filter((g) => g.setupStep === 'done' || canEditSettings(g, g.role))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      loaded = true;
+      render();
+      refreshCalendar();
+    },
+    (error) => {
+      if (isLeaving()) return; // trocando de página: não é erro de verdade
+      console.error(error);
+      listEl.setAttribute('aria-busy', 'false');
+      listEl.innerHTML = `<li class="empty-state">${icon('x')}<h3>Não foi possível carregar seus grupos</h3>
       <p>Verifique sua conexão e tente novamente.</p>
       <div class="empty-actions"><button type="button" class="btn btn-secondary" onclick="location.reload()">Tentar de novo</button></div></li>`;
-  },
+    },
+  ),
 );
 
 // ---------- Convites pendentes (por pessoa ou pelo e-mail de quem está logado) ----------

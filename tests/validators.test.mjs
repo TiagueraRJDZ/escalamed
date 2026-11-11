@@ -39,16 +39,22 @@ test('categorias: ids únicos e em minúsculas', () => {
   for (const id of ids) assert.match(id, /^[a-z-]+$/);
 });
 
-test('categorias para escolher: só Administrativo, Auxiliar de Enfermagem e Médico', () => {
+test('cargos para escolher: Gestor, Coordenador de escala, Administrativo e Médico', () => {
   assert.deepEqual(
     PROFESSIONAL_CATEGORIES.map((c) => c.name),
-    ['Administrativo', 'Auxiliar de Enfermagem', 'Médico'],
+    ['Gestor', 'Coordenador de escala', 'Administrativo', 'Médico'],
+  );
+  // Só o Médico não passa por aprovação
+  assert.deepEqual(
+    PROFESSIONAL_CATEGORIES.filter((c) => c.needsApproval).map((c) => c.id),
+    ['gestor', 'coordenador-escala', 'administrativo'],
   );
 });
 
 test('profissão que saiu da lista continua com o nome na tela', () => {
   assert.equal(professionLabel({ categoryId: 'enfermeiro' }), 'Enfermeiro');
   assert.equal(professionLabel({ categoryId: 'outro' }), 'Outro');
+  assert.equal(professionLabel({ categoryId: 'auxiliar-enfermagem' }), 'Auxiliar de Enfermagem');
   assert.equal(getCategory('tecnico-enfermagem')?.council, 'COREN');
   assert.equal(getCategory('nao-existe'), null);
 });

@@ -1,6 +1,10 @@
-// Configurações > Informações profissionais: profissão (seletor com busca), especialidade
+// Configurações > Informações profissionais: cargo (seletor com busca), especialidade
 // e registro no conselho. Os gestores dos grupos veem estes dados no cartão de membro.
-import { updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+// Gestor, Coordenador de escala e Administrativo passam por aprovação: ao trocar de cargo, a
+// aprovação anterior (access/{uid}) é apagada e o cargo novo volta a aguardar.
+import { doc, deleteDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { db } from '../firebase.js';
+import { loadMyAccess, myApprovalState } from '../access.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
 import { icon } from '../icons.js';
@@ -15,10 +19,11 @@ function formHtml() {
     <div class="alert form-alert" role="alert" hidden></div>
     <div class="form-grid cols-2">
     <div class="field">
-      <span class="label">Profissão</span>
-      ${rowLinkHtml({ id: 'pro-category-button', label: 'Escolher profissão' })}
+      <span class="label">Cargo</span>
+      ${rowLinkHtml({ id: 'pro-category-button', label: 'Escolher cargo' })}
       <input type="hidden" name="categoryId" id="pro-category" />
       <span class="field-error"></span>
+      <span class="field-hint approval-status" id="pro-approval" hidden></span>
     </div>
     <div class="field" id="pro-specialty-field" hidden>
       <label class="label" for="pro-specialty">Especialidade</label>
@@ -48,15 +53,23 @@ function formHtml() {
 
 const PICKER_DIALOG = {
   id: 'modal-profession',
-  title: 'Profissão',
+  title: 'Cargo',
   className: 'picker-modal',
   body: `
     <div class="input-icon picker-search">
       ${icon('search')}
-      <input class="input" id="profession-search" type="search" placeholder="Buscar profissão" aria-label="Buscar profissão" autocomplete="off" />
+      <input class="input" id="profession-search" type="search" placeholder="Buscar cargo" aria-label="Buscar cargo" autocomplete="off" />
     </div>
-    <ul class="picker-list" id="profession-list" role="listbox" aria-label="Profissões"></ul>
-    <p class="muted picker-empty" id="profession-empty" hidden>Nenhuma profissão encontrada.</p>`,
+    <ul class="picker-list" id="profession-list" role="listbox" aria-label="Cargos"></ul>
+    <p class="muted picker-empty" id="profession-empty" hidden>Nenhum cargo encontrado.</p>
+    <p class="field-hint picker-note">Gestor, Coordenador de escala e Administrativo passam a valer depois de aprovados por um Gestor ou pelo administrador.</p>`,
+};
+
+// Situação do cargo salvo (aguardando, aprovado, recusado)
+const APPROVAL_TEXT = {
+  pending: 'Aguardando aprovação de um Gestor ou do administrador. Até lá, você vê só os grupos em que está.',
+  approved: 'Cargo aprovado.',
+  declined: 'Pedido recusado. Fale com um Gestor ou com o administrador da plataforma.',
 };
 
 export default {
@@ -70,7 +83,17 @@ export default {
     const categoryButton = container.querySelector('#pro-category-button');
     clearErrorsWhileTyping(form);
 
+    // Mostra a situação do cargo salvo (não do escolhido e ainda não salvo)
+    function paintApproval() {
+      const status = container.querySelector('#pro-approval');
+      const state = myApprovalState(profile, ctx.access);
+      status.hidden = state === 'none' || form.categoryId.value !== profile.categoryId;
+      status.textContent = APPROVAL_TEXT[state] ?? '';
+      status.dataset.state = state;
+    }
+
     function updateFields() {
+      paintApproval();
       const category = getCategory(form.categoryId.value);
       setRowLink(categoryButton, category?.name ?? '');
       container.querySelector('#pro-specialty-field').hidden = !category?.specialty;
@@ -88,7 +111,7 @@ export default {
     updateFields();
     const changes = trackChanges(form, submit);
 
-    // ---------- Seletor de profissão (modal com busca) ----------
+    // ---------- Seletor de cargo (modal com busca) ----------
     const dialog = createDialog(PICKER_DIALOG);
     const search = dialog.querySelector('#profession-search');
     const list = dialog.querySelector('#profession-list');
@@ -100,7 +123,7 @@ export default {
         .map((c) => {
           const selected = c.id === form.categoryId.value;
           return `<li><button type="button" class="picker-option" role="option" aria-selected="${selected}" data-id="${c.id}">
-            <span>${escapeHtml(c.name)}</span>${selected ? icon('check') : ''}</button></li>`;
+            <span>${escapeHtml(c.name)}${c.hint ? `<small>${escapeHtml(c.hint)}</small>` : ''}</span>${selected ? icon('check') : ''}</button></li>`;
         })
         .join('');
       dialog.querySelector('#profession-empty').hidden = shown.length > 0;
@@ -139,7 +162,7 @@ export default {
       const councilState = category?.council ? form.councilState.value : '';
 
       const errors = [];
-      if (!category) errors.push([categoryButton, 'Escolha sua profissão.']);
+      if (!category) errors.push([categoryButton, 'Escolha seu cargo.']);
       if (category?.councilRequired && !number) errors.push([form.councilNumber, `Informe o número do ${category.council}.`]);
       if (number && !/^[0-9A-Z.\-/]{1,20}$/.test(number)) errors.push([form.councilNumber, 'Use só números e letras.']);
       if (number && !councilState) errors.push([form.councilState, 'Escolha a UF.']);
@@ -153,12 +176,22 @@ export default {
           specialty: specialty || null,
           council: number ? { type: category.council, number, state: councilState } : null,
         };
+        const changedRole = data.categoryId !== profile.categoryId;
         await updateDoc(ctx.userRef, { ...data, updatedAt: serverTimestamp() });
         Object.assign(profile, data);
+        // Trocou de cargo: a aprovação anterior deixa de valer
+        if (changedRole) await deleteDoc(doc(db, 'access', user.uid)).catch(() => {});
         await syncMemberCards(user.uid, profile);
+        ctx.access = await loadMyAccess(user.uid);
         ctx.changed();
         changes.reset();
-        toast('Informações profissionais salvas.', 'success');
+        paintApproval();
+        toast(
+          changedRole && myApprovalState(profile, ctx.access) === 'pending'
+            ? 'Cargo salvo. Ele passa a valer depois da aprovação.'
+            : 'Informações profissionais salvas.',
+          'success',
+        );
       } catch (error) {
         showFormAlert(form, firebaseErrorMessage(error));
       } finally {

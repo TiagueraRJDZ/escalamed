@@ -3,7 +3,7 @@
 // A autorização do Google fica no serviço de contas (Worker, worker/src/agenda.js); o app
 // só manda os plantões:
 //   - os da própria pessoa, ao abrir o app (no máximo a cada 30 minutos) e em "Atualizar agora";
-//   - os de todo o grupo, quando gestor ou auxiliar altera uma escala (aviso de schedule-data.js).
+//   - os de todo o grupo, quando o Gestor ou um coordenador altera uma escala (aviso de schedule-data.js).
 import { googleClientId } from './config.js';
 import { callAccountService } from './auth-api.js';
 import { loadMyGroups } from './my-groups.js';
@@ -141,7 +141,7 @@ export function setupGoogleCalendar(app, user) {
   ctx.modal.addEventListener('click', onModalClick);
   ctx.modal.addEventListener('change', onModalChange);
 
-  // Escala alterada pelo gestor ou auxiliar (schedule-data.js)
+  // Escala alterada pelo Gestor ou por um coordenador (schedule-data.js)
   window.addEventListener('escalamed:escala-alterada', (event) => queueGroupSync(event.detail.groupId, event.detail.month));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushGroupSyncs();
@@ -325,7 +325,7 @@ async function mySchedules(group, months) {
   );
 }
 
-// ---------- Escala do grupo alterada (gestor ou auxiliar) ----------
+// ---------- Escala do grupo alterada (Gestor ou coordenador) ----------
 function queueGroupSync(groupId, month) {
   const key = `${groupId}|${month}`;
   clearTimeout(groupTimers.get(key));

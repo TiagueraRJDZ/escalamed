@@ -5,7 +5,6 @@
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 import { icon } from './icons.js';
 import { escapeHtml, toast, setLoading, firebaseErrorMessage } from './ui.js';
-import { ROLES } from './permissions.js';
 import {
   watchMyInvites,
   watchDeclinedInvites,
@@ -51,16 +50,14 @@ export async function respondInvite(invite, accept) {
   }
 }
 
-// "Erick convidou você como Observador · Hospital Luís de França"
+// "Erick convidou você para o grupo · Hospital Luís de França"
 export const inviteText = (invite) =>
-  `${escapeHtml(invite.invitedByName)} convidou você como ${ROLES[invite.role] ?? 'membro'}${
-    invite.unitName ? ` · ${escapeHtml(invite.unitName)}` : ''
-  }`;
+  `${escapeHtml(invite.invitedByName)} convidou você para o grupo${invite.unitName ? ` · ${escapeHtml(invite.unitName)}` : ''}`;
 
-// "Otávio Novo recusou o convite para Hospital Luís de França (Observador)"
+// "Otávio Novo recusou o convite para UTI Adulto"
 const declinedText = (inv) =>
   `<strong>${escapeHtml(inv.respondedByName ?? inv.name ?? inv.email ?? 'Alguém')}</strong> recusou o convite para
-  <strong>${escapeHtml(inv.groupName)}</strong> (${ROLES[inv.role] ?? 'membro'})`;
+  <strong>${escapeHtml(inv.groupName)}</strong>`;
 
 const whenText = (ts) => {
   const date = ts?.toDate?.();

@@ -1,5 +1,5 @@
-// Operações de membros e convites. Cada uma grava o grupo e os cartões no mesmo lote,
-// do jeito que o firestore.rules exige (o cargo do cartão precisa bater com os arrays do grupo).
+// Operações de membros, coordenadores e convites. Grupo e cartões são gravados no mesmo lote,
+// do jeito que o firestore.rules exige.
 import {
   collection,
   collectionGroup,
@@ -18,7 +18,7 @@ import {
   Timestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, isLeaving } from './firebase.js';
-import { ROLE_ARRAY, roleOf, changeRolePatch, removeMemberPatch } from './permissions.js';
+import { coordinatorPatch, removeMemberPatch } from './permissions.js';
 
 export const INVITE_DAYS = 7;
 
@@ -43,22 +43,12 @@ const memberRef = (groupId, uid) => doc(db, 'groups', groupId, 'members', uid);
 export const inviteKey = (invite) => invite.uid ?? invite.email;
 const inviteRef = (groupId, key) => doc(db, 'groups', groupId, 'invites', key.includes('@') ? key.toLowerCase() : key);
 
-// Muda o cargo de alguém. Para "manager" é a transferência de gestão:
-// o gestor antigo vira auxiliar (se houver vaga) ou plantonista.
-export async function changeRole(group, uid, newRole) {
-  const patch = changeRolePatch(group, uid, newRole);
-  const after = { ...group, ...patch };
-  const batch = writeBatch(db);
-  batch.update(groupRef(group.id), { ...patch, updatedAt: serverTimestamp() });
-  batch.update(memberRef(group.id, uid), { role: newRole });
-  const previousManager = group.managerIds?.[0];
-  if (newRole === 'manager' && previousManager && previousManager !== uid) {
-    batch.update(memberRef(group.id, previousManager), { role: roleOf(after, previousManager) });
-  }
-  await batch.commit();
+// Marca ou desmarca alguém como Coordenador de escala do grupo (só o Gestor)
+export async function setCoordinator(group, uid, on) {
+  await updateDoc(groupRef(group.id), { ...coordinatorPatch(group, uid, on), updatedAt: serverTimestamp() });
 }
 
-// Remover alguém (gestor/auxiliar) ou sair do grupo (a própria pessoa)
+// Remover alguém (Gestor/coordenador) ou sair do grupo (a própria pessoa)
 export async function removeMember(group, uid) {
   const batch = writeBatch(db);
   batch.update(groupRef(group.id), { ...removeMemberPatch(group, uid), updatedAt: serverTimestamp() });
@@ -67,12 +57,11 @@ export async function removeMember(group, uid) {
 }
 
 // target: { email } ou { uid, name } (pessoa escolhida na busca)
-export async function createInvite(group, target, role, inviter) {
+export async function createInvite(group, target, inviter) {
   const now = Date.now();
   const who = target.uid ? { uid: target.uid, name: target.name } : { email: target.email.toLowerCase() };
   await setDoc(inviteRef(group.id, inviteKey(who)), {
     ...who,
-    role,
     groupName: group.name,
     unitName: group.unit?.name ?? null,
     invitedBy: inviter.uid,
@@ -207,18 +196,15 @@ export async function myInviteFor(groupId, user) {
   return null;
 }
 
-// Aceitar: entra no grupo (no cargo do convite), cria o cartão e apaga o convite
+// Aceitar: entra no grupo como membro, cria o cartão e apaga o convite
 export async function acceptInvite(groupId, invite, user, profile) {
-  const field = ROLE_ARRAY[invite.role];
   const batch = writeBatch(db);
   batch.update(groupRef(groupId), {
     memberIds: arrayUnion(user.uid),
-    ...(field ? { [field]: arrayUnion(user.uid) } : {}),
     updatedAt: serverTimestamp(),
   });
   batch.set(memberRef(groupId, user.uid), {
     ...memberCard(profile),
-    role: invite.role,
     joinedAt: serverTimestamp(),
     addedBy: invite.invitedBy,
   });
@@ -228,7 +214,7 @@ export async function acceptInvite(groupId, invite, user, profile) {
 
 export const inviteLink = (groupId) => `${location.origin}/invite.html?g=${encodeURIComponent(groupId)}`;
 
-// Depois de mudar nome, e-mail, foto ou profissão: atualiza o cartão em todos os grupos
+// Depois de mudar nome, e-mail, foto ou cargo: atualiza o cartão em todos os grupos
 export async function syncMemberCards(uid, profile) {
   const snapshot = await getDocs(query(collection(db, 'groups'), where('memberIds', 'array-contains', uid)));
   if (snapshot.empty) return;

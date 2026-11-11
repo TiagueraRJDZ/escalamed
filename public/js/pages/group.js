@@ -1,5 +1,6 @@
-// Tela do grupo: cabeçalho, abas (Calendário, Editar escala, Membros), convites e cargos.
-import { doc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+// Tela do grupo: cabeçalho, abas (Calendário, Editar escala, Membros), convites e coordenadores.
+// O papel de quem está logado vem do cargo da plataforma (permissions.js: groupRole).
+import { doc, collection, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout, avatarHtml } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
@@ -7,17 +8,16 @@ import { professionLabel, councilLabel } from '/data/categories.js';
 import { groupColor } from '/data/colors.js';
 import { normalize, isValidEmail } from '../validators.js';
 import {
-  ROLES,
-  ROLE_ORDER,
-  ROLE_LIMITS,
-  INVITE_ROLES,
-  roleOf,
-  roleUsage,
-  hasRoom,
+  GROUP_ROLES,
+  groupRole,
   can,
-  assignableRoles,
+  canEditSettings,
+  canLeave,
+  canRemoveMember,
+  isMarkedCoordinator,
+  platformRoleOf,
 } from '../permissions.js';
-import { changeRole, removeMember, createInvite, cancelInvite, inviteLink, inviteKey, INVITE_DAYS } from '../members.js';
+import { setCoordinator, removeMember, createInvite, cancelInvite, inviteLink, inviteKey, INVITE_DAYS } from '../members.js';
 import { searchPeople } from '../people-search.js';
 import { createCalendar } from '../calendar.js';
 import { formatClock } from '../shifts.js';
@@ -46,7 +46,8 @@ import {
 } from '../ui.js';
 
 renderIcons();
-const { user, profile } = await initLayout({ active: 'schedules' });
+const { user, profile, access } = await initLayout({ active: 'schedules' });
+const platformRole = access.role;
 
 const $ = (id) => document.getElementById(id);
 const groupId = new URLSearchParams(location.search).get('id');
@@ -62,14 +63,12 @@ let invites = [];
 let stopInvites = null;
 let leaving = false;
 
-// Títulos das seções de membros (plural)
+// Seções da aba Membros
 const SECTION_TITLES = {
-  manager: 'Gestor',
-  assistant: 'Auxiliares',
-  analyst: 'Analistas',
-  observer: 'Observadores',
-  staff: 'Plantonistas',
+  coordinator: 'Coordenadores de escala',
+  member: 'Membros',
 };
+const memberKind = (uid) => (isMarkedCoordinator(group, uid) ? 'coordinator' : 'member');
 
 const formatDate = (timestamp) => timestamp?.toDate?.().toLocaleDateString('pt-BR') ?? '';
 
@@ -88,16 +87,16 @@ function renderHeader() {
   $('group-name').textContent = group.name;
   const unit = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
   $('group-unit').innerHTML = `${escapeHtml(unit)}${
-    group.type === 'team' ? ` <span class="badge badge-primary">${ROLES[myRole]}</span>` : ''
+    group.type === 'team' ? ` <span class="badge badge-primary">${GROUP_ROLES[myRole]}</span>` : ''
   }`;
 
   const actions = [];
-  if (can(myRole, 'editSettings')) {
+  if (canEditSettings(group, myRole)) {
     actions.push(
       `<a class="btn btn-secondary" href="/group-new.html?id=${encodeURIComponent(group.id)}&step=info">${icon('settings')}Configurações do grupo</a>`,
     );
   }
-  if (group.type === 'team' && can(myRole, 'leaveGroup')) {
+  if (canLeave(group, user.uid)) {
     actions.push(`<button type="button" class="btn btn-ghost is-danger" id="leave-group">${icon('logOut')}Sair do grupo</button>`);
   }
   $('group-actions').innerHTML = actions.join('');
@@ -153,26 +152,26 @@ $('group-tabs').addEventListener('keydown', (event) => {
 });
 
 // ---------- Membros ----------
-// Quem pode mexer no cargo de quem: gestor em todos; auxiliar em todos menos no gestor.
+// Gerenciar alguém: o Gestor marca coordenadores e remove qualquer um; o coordenador remove
+// quem não é coordenador. Ninguém gerencia a si mesmo (para sair, "Sair do grupo").
 function canManage(targetUid) {
   if (targetUid === user.uid) return false;
-  if (myRole === 'manager') return true;
-  return myRole === 'assistant' && roleOf(group, targetUid) !== 'manager';
+  return can(myRole, 'setCoordinators') || canRemoveMember(group, myRole, targetUid, user.uid);
 }
 
 function memberCardHtml(member) {
-  const role = roleOf(group, member.id);
   const details = [professionLabel(member), councilLabel(member.council)].filter(Boolean).join(' · ');
   const me = member.id === user.uid ? ' <span class="muted">(você)</span>' : '';
-  const badge = role !== 'staff' ? `<span class="badge badge-primary">${ROLES[role]}</span>` : '';
+  // Coordenadores ficam numa seção própria: sem selo repetido no cartão
+  const badge = '';
   const manage = canManage(member.id)
-    ? `<button type="button" class="btn-icon" data-manage="${member.id}" aria-label="Gerenciar ${escapeHtml(member.name)}" title="Alterar perfil">${icon('edit')}</button>`
+    ? `<button type="button" class="btn-icon" data-manage="${member.id}" aria-label="Gerenciar ${escapeHtml(member.name)}" title="Gerenciar membro">${icon('edit')}</button>`
     : '';
   return `<li class="member-item">
     ${avatarHtml(member, 'avatar member-avatar')}
     <div class="member-info">
       <strong>${escapeHtml(member.name)}${me}</strong>
-      <span>${escapeHtml(details || 'Profissão não informada')}</span>
+      <span>${escapeHtml(details || 'Cargo não informado')}</span>
     </div>
     ${badge}
     ${manage}
@@ -180,9 +179,8 @@ function memberCardHtml(member) {
 }
 
 function renderMembers() {
-  // Cada palavra digitada precisa aparecer (no começo, meio ou fim) no nome, e-mail ou profissão
+  // Cada palavra digitada precisa aparecer (no começo, meio ou fim) no nome, e-mail ou cargo
   const words = normalize($('member-search').value).split(' ').filter(Boolean);
-  const usage = roleUsage(group);
   const visible = members
     .filter((m) => group.memberIds.includes(m.id))
     .filter((m) => {
@@ -194,12 +192,12 @@ function renderMembers() {
 
   $('members-count').textContent = `(${group.memberIds.length})`;
 
-  const sections = ROLE_ORDER.map((role) => {
-    const list = visible.filter((m) => roleOf(group, m.id) === role);
+  const sections = Object.keys(SECTION_TITLES).map((kind) => {
+    const list = visible.filter((m) => memberKind(m.id) === kind);
     if (!list.length) return '';
-    const limit = ROLE_LIMITS[role] === Infinity ? usage[role] : `${usage[role]}/${ROLE_LIMITS[role]}`;
+    const total = group.memberIds.filter((uid) => memberKind(uid) === kind).length;
     return `<section class="member-section">
-      <h2 class="section-title">${SECTION_TITLES[role]} <span class="muted">(${limit})</span></h2>
+      <h2 class="section-title">${SECTION_TITLES[kind]} <span class="muted">(${total})</span></h2>
       <ul class="member-list">${list.map(memberCardHtml).join('')}</ul>
     </section>`;
   }).join('');
@@ -217,39 +215,42 @@ $('member-sections').addEventListener('click', (event) => {
   if (button) openRoleModal(button.dataset.manage);
 });
 
-// ---------- Alterar perfil ----------
-function openRoleModal(uid) {
+// ---------- Gerenciar membro ----------
+// Só quem tem o cargo de Coordenador de escala aprovado pode ser marcado como coordenador
+async function coordinatorEligibility(member) {
+  if (member.categoryId !== 'coordenador-escala') return 'Só para quem tem o cargo Coordenador de escala.';
+  const snapshot = await getDoc(doc(db, 'access', member.id)).catch(() => null);
+  const approved = platformRoleOf({ access: snapshot?.exists() ? snapshot.data() : null }) === 'coordenador';
+  return approved ? '' : 'O cargo de Coordenador de escala desta pessoa ainda não foi aprovado.';
+}
+
+async function openRoleModal(uid) {
   const member = members.find((m) => m.id === uid);
   if (!member) return;
-  const current = roleOf(group, uid);
-  const usage = roleUsage(group);
+  const marked = isMarkedCoordinator(group, uid);
 
   $('role-target').innerHTML = `${avatarHtml(member, 'avatar member-avatar')}
-    <div class="member-info"><strong>${escapeHtml(member.name)}</strong><span>Perfil atual: ${ROLES[current]}</span></div>`;
+    <div class="member-info"><strong>${escapeHtml(member.name)}</strong><span>${marked ? 'Coordenador de escala' : 'Membro'} do grupo</span></div>`;
 
-  // Mesma ordem do modelo de referência: Plantonista, Gestor, Auxiliar, Analista, Observador
-  const order = ['staff', 'manager', 'assistant', 'analyst', 'observer'];
-  const allowed = assignableRoles(myRole);
-  const options = order
-    .filter((role) => allowed.includes(role))
-    .map((role) => {
-      const isCurrent = role === current;
-      const isTransfer = role === 'manager';
-      const full = role !== 'staff' && !isTransfer && !hasRoom(group, role);
-      const label = role === 'staff' ? 'Plantonista' : `Tornar ${ROLES[role]}`;
-      const count = role === 'staff' ? '' : ` <span class="role-count">(${usage[role]}/${ROLE_LIMITS[role]})</span>`;
-      const hint = isCurrent ? 'Perfil atual' : full ? 'Limite atingido' : isTransfer ? 'Transfere a gestão do grupo' : '';
-      return `<button type="button" class="role-option" data-role="${role}" ${isCurrent || full ? 'disabled' : ''}>
-        <span>${label}${count}</span>${hint ? `<small>${hint}</small>` : ''}
-      </button>`;
-    })
-    .join('');
+  let options = '';
+  if (can(myRole, 'setCoordinators')) {
+    if (marked) {
+      options += `<button type="button" class="role-option" data-coordinator="off">
+        <span>Remover coordenação</span><small>Continua no grupo como membro</small></button>`;
+    } else {
+      const blocked = await coordinatorEligibility(member);
+      options += `<button type="button" class="role-option" data-coordinator="on" ${blocked ? 'disabled' : ''}>
+        <span>Tornar coordenador de escala</span><small>${escapeHtml(blocked || 'Passa a montar a escala e gerenciar os membros deste grupo')}</small></button>`;
+    }
+  }
+  if (canRemoveMember(group, myRole, uid, user.uid)) {
+    options += `<button type="button" class="role-option is-danger" data-remove>${icon('trash')}<span>Remover membro</span></button>`;
+  }
 
   // Senha provisória não fica aqui: só o administrador da plataforma gera (Configurações > Usuários)
-  $('role-options').innerHTML = `${options}
-    <button type="button" class="role-option is-danger" data-remove>${icon('trash')}<span>Remover membro</span></button>`;
+  $('role-options').innerHTML = options;
   $('role-options').dataset.uid = uid;
-  $('modal-role').showModal();
+  if (!$('modal-role').open) $('modal-role').showModal();
 }
 
 $('role-options').addEventListener('click', async (event) => {
@@ -276,20 +277,10 @@ $('role-options').addEventListener('click', async (event) => {
     return;
   }
 
-  const role = button.dataset.role;
-  if (role === 'manager') {
-    const next = roleUsage(group).assistant < ROLE_LIMITS.assistant ? 'auxiliar' : 'plantonista';
-    const ok = await confirmDialog({
-      title: 'Transferir a gestão?',
-      message: `${member.name} passa a ser o(a) gestor(a) do grupo e você passa a ser ${next}. Só o novo gestor pode desfazer.`,
-      confirmText: 'Transferir',
-      danger: true,
-    });
-    if (!ok) return;
-  }
+  const on = button.dataset.coordinator === 'on';
   try {
-    await changeRole(group, uid, role);
-    toast(`${member.name} agora é ${ROLES[role].toLowerCase()}.`, 'success');
+    await setCoordinator(group, uid, on);
+    toast(on ? `${member.name} agora coordena a escala deste grupo.` : `${member.name} deixou de coordenar este grupo.`, 'success');
   } catch (error) {
     toast(firebaseErrorMessage(error), 'error');
   }
@@ -426,12 +417,6 @@ function openInviteModal() {
   clearPerson({ focus: false });
   inviteResults = [];
   setInviteListOpen(false);
-  const usage = roleUsage(group);
-  $('invite-role').innerHTML = INVITE_ROLES.map((role) => {
-    const full = role !== 'staff' && !hasRoom(group, role);
-    const count = role === 'staff' ? '' : ` (${usage[role]}/${ROLE_LIMITS[role]})`;
-    return `<option value="${role}" ${full ? 'disabled' : ''}>${ROLES[role]}${count}${full ? ' · limite atingido' : ''}</option>`;
-  }).join('');
   $('modal-invite').showModal();
   inviteInput.focus();
 }
@@ -441,7 +426,6 @@ $('invite-button').addEventListener('click', openInviteModal);
 inviteForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   clearFormErrors(inviteForm);
-  const role = inviteForm.role.value;
 
   let target;
   if (invitePerson) {
@@ -463,7 +447,7 @@ inviteForm.addEventListener('submit', async (event) => {
   setLoading(button, true);
   try {
     const renewed = invites.some((i) => inviteKey(i) === inviteKey(target));
-    await createInvite(group, target, role, { uid: user.uid, name: profile.name });
+    await createInvite(group, target, { uid: user.uid, name: profile.name });
     $('modal-invite').close();
     showInviteLink(target, renewed);
   } catch (error) {
@@ -504,7 +488,7 @@ $('copy-link').addEventListener('click', () => copyText($('invite-link').value))
 const inviteLabel = (invite) => invite.name ?? invite.email;
 
 function renderInvites() {
-  const show = can(myRole, 'inviteMembers') && invites.length > 0;
+  const show = can(myRole, 'manageMembers') && invites.length > 0;
   $('invites-section').hidden = !show;
   if (!show) return;
   $('invite-list').innerHTML = invites
@@ -522,7 +506,7 @@ function renderInvites() {
       return `<li class="invite-item">
         <div class="member-info">
           <strong>${escapeHtml(inviteLabel(invite))}</strong>
-          <span>${kind}${ROLES[invite.role]} · ${status}</span>
+          <span>${kind}${status}</span>
         </div>
         <div class="invite-actions">
           ${declined ? '' : `<button type="button" class="btn btn-ghost" data-copy="${key}">${icon('arrowRightLeft')}Link</button>`}
@@ -563,7 +547,7 @@ $('invite-list').addEventListener('click', async (event) => {
 });
 
 function listenInvites() {
-  if (can(myRole, 'inviteMembers')) {
+  if (can(myRole, 'manageMembers')) {
     if (stopInvites) return;
     stopInvites = onSnapshot(
       collection(db, 'groups', groupId, 'invites'),
@@ -629,7 +613,7 @@ async function showMonth(month) {
   $('my-shifts-note').textContent = !schedule
     ? 'Ainda não há escala para este mês.'
     : schedule.status === 'draft'
-      ? 'Escala em rascunho: só gestor, auxiliares e analistas veem.'
+      ? 'Escala em rascunho: só o Gestor e os coordenadores veem.'
       : `${mine.length} ${mine.length === 1 ? 'plantão' : 'plantões'} · ${formatHours(memberMinutes(schedule.assignments, shifts, user.uid))}`;
   $('my-shifts').innerHTML = mine.length
     ? mine
@@ -871,14 +855,14 @@ onSnapshot(
   (snapshot) => {
     if (!snapshot.exists()) return goAway('Este grupo não existe mais.');
     group = { id: snapshot.id, ...snapshot.data() };
-    myRole = roleOf(group, user.uid);
-    if (!myRole) return goAway('Você não faz mais parte deste grupo.');
+    myRole = groupRole(group, user.uid, platformRole);
+    if (!myRole) return goAway('Você não tem mais acesso a este grupo.');
 
     renderHeader();
     const isTeam = group.type === 'team';
     $('tab-members').hidden = !isTeam;
     $('tab-schedule').hidden = !can(myRole, 'editSchedule');
-    $('invite-button').hidden = !can(myRole, 'inviteMembers');
+    $('invite-button').hidden = !can(myRole, 'manageMembers');
     listenInvites();
     renderMembers();
     renderInvites();
@@ -897,7 +881,7 @@ onSnapshot(
     }
   },
   (error) => {
-    if (error.code === 'permission-denied') goAway('Você não faz mais parte deste grupo.');
+    if (error.code === 'permission-denied') goAway('Você não tem mais acesso a este grupo.');
     else if (!isLeaving()) toast(firebaseErrorMessage(error), 'error');
   },
 );

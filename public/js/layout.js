@@ -1,8 +1,8 @@
 // Monta o layout das páginas internas: menu lateral, barra superior,
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
-// Uso na página:  const { user } = await initLayout({ active: 'schedules' });
-import { collection, doc, getDoc, getDocs, getDocsFromCache, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { auth, db } from './firebase.js';
+// Uso na página:  const { user, profile, access } = await initLayout({ active: 'schedules' });
+// access = { isAdmin, access, role }: cargo aprovado (role: 'gestor' | 'coordenador' | 'administrativo' | null)
+import { auth } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { pagePath } from './redirect.js';
 import { categoryName } from '/data/categories.js';
@@ -15,11 +15,13 @@ import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 import { whenActivated } from './prerender.js';
 import { setupNotifications } from './notifications.js';
 import { googleCalendarModalHtml, setupGoogleCalendar } from './gcal.js';
+import { cachedAccess, loadMyAccess, myApprovalState } from './access.js';
+import { seesReports, canApprove } from './permissions.js';
 
 const NAV = [
   { id: 'schedules', label: 'Escalas', icon: 'calendar', href: '/schedules.html' },
-  // Relatórios: só para quem é gestor de pelo menos um grupo (ver showManagerItems)
-  { id: 'reports', label: 'Relatórios', icon: 'fileText', href: '/relatorios.html', managerOnly: true },
+  // Relatórios: Gestor, Coordenador de escala e Administrativo (cargo aprovado)
+  { id: 'reports', label: 'Relatórios', icon: 'fileText', href: '/relatorios.html', reportsOnly: true },
   { id: 'history', label: 'Histórico', icon: 'clock', href: '/historico.html' },
   // Abre e fecha; as seções das Configurações ficam como subitens
   { id: 'settings', label: 'Configurações', icon: 'settings', href: '/settings.html', children: SETTINGS_SECTIONS },
@@ -45,11 +47,11 @@ function saveCollapsed(collapsed) {
 
 // Item com subitens (Configurações): clicar abre e fecha a lista. Começa aberto na
 // própria página. Com o menu recolhido (só ícones), o clique leva direto para a página.
-function navGroup(item, active, { admin }) {
+function navGroup(item, active, { approver }) {
   const open = isCurrent(item, active);
   const subitems = item.children
     .map(
-      (child) => `<li${child.adminOnly && !admin ? ' hidden' : ''} data-admin-only="${Boolean(child.adminOnly)}">
+      (child) => `<li${child.approverOnly && !approver ? ' hidden' : ''} data-approver-only="${Boolean(child.approverOnly)}">
         <a class="nav-subitem" href="${item.href}#${child.hash}" data-hash="${child.hash}" title="${child.title}">
           ${icon(child.icon)}<span>${child.title}</span>
         </a></li>`,
@@ -75,8 +77,8 @@ function navItem(item, active, options) {
   const common = `class="nav-item" title="${item.label}" aria-label="${item.label}"`;
   if (item.href) {
     const current = isCurrent(item, active) ? ' aria-current="page"' : '';
-    const hidden = item.managerOnly && !options.manager ? ' hidden' : '';
-    return `<li${hidden}${item.managerOnly ? ' data-manager-only' : ''}><a ${common} href="${item.href}"${current}>${content}</a></li>`;
+    const hidden = item.reportsOnly && !options.reports ? ' hidden' : '';
+    return `<li${hidden}${item.reportsOnly ? ' data-reports-only' : ''}><a ${common} href="${item.href}"${current}>${content}</a></li>`;
   }
   return `<li><button type="button" ${common} data-open="${item.drawer}" aria-haspopup="dialog">${content}</button></li>`;
 }
@@ -96,66 +98,33 @@ function shortName(name) {
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
 }
 
-// ---------- Cargo embaixo do nome: "Administrador" ou a profissão ----------
-// Administrador da plataforma = uid em config/admins. A resposta fica guardada na
-// sessão, para o cargo não piscar a cada troca de página.
+// ---------- Cargo embaixo do nome e itens do menu que dependem dele ----------
+// "Administrador" (config/admins) ou o cargo do perfil, com "aguardando aprovação" quando
+// for o caso. Relatórios e Configurações > Usuários seguem o cargo aprovado (access.js).
 const ADMIN_LABEL = 'Administrador';
-const adminKey = (uid) => `escalamed:admin:${uid}`;
 
-function cachedAdmin(uid) {
-  try {
-    return sessionStorage.getItem(adminKey(uid)) === '1';
-  } catch {
-    return false;
-  }
+function roleLabel(profile, value) {
+  if (value?.isAdmin) return ADMIN_LABEL;
+  const name = categoryName(profile?.categoryId);
+  return name && myApprovalState(profile, value) === 'pending' ? `${name} (aguardando aprovação)` : name;
 }
 
-// ---------- Gestor de algum grupo? (mostra "Relatórios") ----------
-// Guardado na sessão; a tela de Escalas atualiza ao carregar os grupos.
-const managerKey = (uid) => `escalamed:gestor:${uid}`;
+const menuOptions = (value) => ({
+  reports: seesReports(value?.role),
+  approver: Boolean(value?.isAdmin || canApprove(value?.role)),
+});
 
-function cachedManager(uid) {
-  try {
-    return sessionStorage.getItem(managerKey(uid));
-  } catch {
-    return null;
-  }
+function paintRole(app, profile, value) {
+  app.querySelector('#account-role').textContent = roleLabel(profile, value);
+  const { reports, approver } = menuOptions(value);
+  app.querySelectorAll('[data-reports-only]').forEach((li) => (li.hidden = !reports));
+  app.querySelectorAll('.nav-sub [data-approver-only="true"]').forEach((li) => (li.hidden = !approver));
 }
 
-// groups: grupos da pessoa (com managerIds). Atualiza o menu e a sessão.
-export function setManagerFromGroups(uid, groups) {
-  const manager = groups.some((g) => g.managerIds?.includes(uid));
-  try {
-    sessionStorage.setItem(managerKey(uid), manager ? '1' : '0');
-  } catch {
-    // sem armazenamento: só consulta de novo na próxima página
-  }
-  document.querySelectorAll('[data-manager-only]').forEach((li) => (li.hidden = !manager));
-}
-
-// Sem resposta guardada: consulta os grupos (pela lista de membros, que é o que as regras permitem)
-async function showManagerItems(uid) {
-  if (cachedManager(uid) !== null) return;
-  const mine = query(collection(db, 'groups'), where('memberIds', 'array-contains', uid));
-  // Primeiro o cache local (na hora), depois o servidor
-  const cached = await getDocsFromCache(mine).catch(() => null);
-  if (cached && !cached.empty) setManagerFromGroups(uid, cached.docs.map((d) => d.data()));
-  const snapshot = await getDocs(mine).catch(() => null);
-  if (snapshot) setManagerFromGroups(uid, snapshot.docs.map((d) => d.data()));
-}
-
-async function showAdminRole(app, uid, profile) {
-  const snapshot = await getDoc(doc(db, 'config', 'admins')).catch(() => null);
-  if (!snapshot) return; // sem resposta: mantém o que já está na tela
-  const isAdmin = (snapshot.data()?.uids ?? []).includes(uid);
-  try {
-    sessionStorage.setItem(adminKey(uid), isAdmin ? '1' : '0');
-  } catch {
-    // sem armazenamento: só pergunta de novo na próxima página
-  }
-  app.querySelector('#account-role').textContent = isAdmin ? ADMIN_LABEL : categoryName(profile.categoryId);
-  // Subitens só de administrador (Configurações > Usuários)
-  app.querySelectorAll('.nav-sub [data-admin-only="true"]').forEach((li) => (li.hidden = !isAdmin));
+async function showRole(app, uid, profile) {
+  const value = await loadMyAccess(uid);
+  paintRole(app, profile, value);
+  return value;
 }
 
 // Marca no menu lateral a seção das Configurações aberta (chamado pela página)
@@ -184,7 +153,7 @@ function shellHtml(user, profile, active, collapsed, search) {
         <img class="sidebar-brand-hapvida" src="/img/hapvida-flor.svg" alt="Hapvida" width="26" height="26" />
       </a>
       <nav aria-label="Navegação principal">
-        <ul class="nav">${NAV.map((item) => navItem(item, active, { admin: cachedAdmin(user.uid), manager: cachedManager(user.uid) === '1' })).join('')}</ul>
+        <ul class="nav">${NAV.map((item) => navItem(item, active, menuOptions(cachedAccess(user.uid)))).join('')}</ul>
       </nav>
     </aside>
     <!-- Botão redondo na borda do menu: recolhe e expande -->
@@ -214,7 +183,7 @@ ${search ? searchHtml() : ''}
               ${avatarHtml(profile, 'avatar account-avatar')}
               <span class="account-text">
                 <strong>${escapeHtml(shortName(profile.name))}</strong>
-                <small id="account-role">${escapeHtml(cachedAdmin(user.uid) ? ADMIN_LABEL : categoryName(profile.categoryId))}</small>
+                <small id="account-role">${escapeHtml(roleLabel(profile, cachedAccess(user.uid)))}</small>
               </span>
               ${icon('chevronDown', 'account-chevron')}
             </button>
@@ -296,7 +265,7 @@ function setupSidebar(app) {
 }
 
 // Pílula e menu da conta com o nome, a foto e o e-mail atuais. As Configurações chamam
-// depois de salvar nome, foto, profissão ou e-mail (atualiza sem recarregar a página).
+// depois de salvar nome, foto, cargo ou e-mail (atualiza sem recarregar a página).
 let shell = null;
 
 function paintAccount({ app, user, profile }) {
@@ -309,7 +278,7 @@ export function refreshAccountButton() {
   if (!shell) return;
   paintAccount(shell);
   saveSummary(shell.user, shell.profile);
-  showAdminRole(shell.app, shell.user.uid, shell.profile);
+  showRole(shell.app, shell.user.uid, shell.profile);
 }
 
 function setupUserMenu(app) {
@@ -416,13 +385,14 @@ export async function initLayout({ active, search = true } = {}) {
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);
-  showAdminRole(app, user.uid, profile);
-  showManagerItems(user.uid);
+  // Cargo: o guardado na sessão já serve; sem ele, espera a resposta (a página precisa dele)
+  const fresh = showRole(app, user.uid, profile);
+  const access = cachedAccess(user.uid) ?? (await fresh);
   setupNotifications(app, user, profile);
   setupGoogleCalendar(app, user);
 
   mountCredits(app);
   app.querySelector('.page-skeleton')?.remove();
   document.body.classList.remove('is-booting');
-  return { user, profile };
+  return { user, profile, access };
 }

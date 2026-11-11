@@ -61,6 +61,8 @@ const google = {
   proximaAgenda: 1,
 };
 let grupos = {}; // Firestore simulado: groups/{id}
+let acessos = {}; // access/{uid}: cargo aprovado
+let admins = []; // config/admins
 
 function respostaJson(dados, status = 200) {
   return new Response(JSON.stringify(dados), { status, headers: { 'Content-Type': 'application/json' } });
@@ -101,7 +103,13 @@ globalThis.fetch = async (url, opcoes = {}) => {
   const corpo = opcoes.body instanceof URLSearchParams ? Object.fromEntries(opcoes.body) : opcoes.body;
 
   if (endereco.startsWith('http://firestore.falso/')) {
-    const id = endereco.split('/documents/groups/')[1];
+    const caminho = endereco.split('/documents/')[1];
+    if (caminho === 'config/admins') return respostaJson({ fields: { uids: lista(admins) } });
+    if (caminho.startsWith('access/')) {
+      const cargo = acessos[caminho.slice(7)];
+      return cargo ? respostaJson({ fields: { categoryId: { stringValue: cargo }, approved: { booleanValue: true } } }) : new Response('{}', { status: 404 });
+    }
+    const id = caminho.split('groups/')[1];
     return grupos[id] ? respostaJson({ fields: grupos[id] }) : new Response('{}', { status: 404 });
   }
   if (endereco === 'https://oauth2.googleapis.com/token') {
@@ -153,13 +161,13 @@ const contaDe = (uid) => D1.linhas('SELECT * FROM agenda_contas WHERE uid = ?', 
 const eventosDe = (uid) => google.agendas.get(contaDe(uid)?.calendario) ?? new Map();
 
 const lista = (valores) => ({ arrayValue: { values: valores.map((v) => ({ stringValue: v })) } });
-function grupoFirestore({ gestor, auxiliares = [], membros }) {
+function grupoFirestore({ coordenadores = [], membros }) {
   return {
     name: { stringValue: 'UTI Adulto' },
+    type: { stringValue: 'team' },
     timezone: { stringValue: 'America/Fortaleza' },
     unit: { mapValue: { fields: { name: { stringValue: 'HAP' }, city: { stringValue: 'Fortaleza' }, state: { stringValue: 'CE' } } } },
-    managerIds: lista([gestor]),
-    assistantIds: lista(auxiliares),
+    coordinatorIds: lista(coordenadores),
     memberIds: lista(membros),
   };
 }
@@ -195,6 +203,8 @@ beforeEach(() => {
   google.tokensRevogados.clear();
   google.lotes = 0;
   grupos = {};
+  acessos = { gestor: 'gestor', coord: 'coordenador-escala', coordSemGrupo: 'coordenador-escala', adm: 'administrativo' };
+  admins = [];
 });
 
 // ---------- Testes ----------
@@ -268,8 +278,8 @@ test('trocar o lembrete regrava os eventos; 0 = sem lembrete', async () => {
   assert.equal((await chamar('/agenda/lembrete', { minutos: 45 }, 'ana')).status, 400);
 });
 
-test('escala do grupo: só gestor/auxiliar, só membros conectados; rascunho tira da agenda', async () => {
-  grupos.g1 = grupoFirestore({ gestor: 'gestor', auxiliares: ['aux'], membros: ['gestor', 'aux', 'ana', 'bia', 'caio'] });
+test('escala do grupo: só Gestor/coordenador, só membros conectados; rascunho tira da agenda', async () => {
+  grupos.g1 = grupoFirestore({ coordenadores: ['coord'], membros: ['coord', 'ana', 'bia', 'caio'] });
   await chamar('/agenda/conectar', { codigo: 'c1' }, 'ana');
   await chamar('/agenda/conectar', { codigo: 'c2' }, 'bia');
   await chamar('/agenda/conectar', { codigo: 'c3' }, 'intruso'); // conectado, mas fora do grupo
@@ -281,8 +291,10 @@ test('escala do grupo: só gestor/auxiliar, só membros conectados; rascunho tir
     celulas: { '01_d': ['ana', 'caio'], '02_n': ['bia', 'intruso'] },
   };
 
-  assert.equal((await chamar('/agenda/grupo', pedido, 'ana')).status, 403); // plantonista não pode
-  const r = await chamar('/agenda/grupo', pedido, 'aux');
+  assert.equal((await chamar('/agenda/grupo', pedido, 'ana')).status, 403); // membro não pode
+  assert.equal((await chamar('/agenda/grupo', pedido, 'adm')).status, 403); // Administrativo só vê
+  assert.equal((await chamar('/agenda/grupo', pedido, 'coordSemGrupo')).status, 403); // coordena outro grupo
+  const r = await chamar('/agenda/grupo', pedido, 'coord');
   assert.equal(r.status, 200);
   assert.deepEqual({ pessoas: r.pessoas, emDia: r.emDia }, { pessoas: 2, emDia: 2 });
   assert.equal(eventosDe('ana').size, 1);
@@ -300,7 +312,7 @@ test('escala do grupo: só gestor/auxiliar, só membros conectados; rascunho tir
 
 test('muitos plantões: lotes de até 50 e o Cron termina o que não coube', async () => {
   const pessoas = Array.from({ length: 8 }, (_, i) => `p${i}`);
-  grupos.g1 = grupoFirestore({ gestor: 'gestor', membros: ['gestor', ...pessoas] });
+  grupos.g1 = grupoFirestore({ membros: ['gestor', ...pessoas] }); // Gestor: altera qualquer grupo
   for (const [i, uid] of pessoas.entries()) await chamar('/agenda/conectar', { codigo: `c${i}` }, uid);
   // Todo mundo em todos os dias, nos dois turnos: 60 eventos por pessoa
   const celulas = {};

@@ -12,7 +12,7 @@ import { addMonths, monthParts } from '../schedule-math.js';
 import { MONTHS, brDate, isoDate, parseIsoDate } from '../dates.js';
 
 renderIcons();
-const { user } = await initLayout({ active: 'history' });
+const { user, access } = await initLayout({ active: 'history' });
 const $ = (id) => document.getElementById(id);
 const list = $('history-list');
 const ALL = 'all';
@@ -324,7 +324,7 @@ async function load() {
 
 // ---------- Início ----------
 try {
-  groups = await loadMyGroups(user.uid);
+  groups = await loadMyGroups(user.uid, access.role);
 } catch (error) {
   if (isLeaving()) await new Promise(() => {}); // a página está saindo: para aqui
   console.error(error);

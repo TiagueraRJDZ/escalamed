@@ -223,9 +223,13 @@ $('signup-council-state').insertAdjacentHTML(
 );
 $('specialty-options').innerHTML = SPECIALTIES.map((s) => `<option value="${s}"></option>`).join('');
 
-// Mostra especialidade e registro conforme a profissão
+// Explica o cargo escolhido e mostra especialidade e registro conforme ele
+const APPROVAL_NOTE = 'Gestor, Coordenador de escala e Administrativo passam a valer depois de aprovados por um Gestor ou pelo administrador.';
 function updateProfessionalFields() {
   const category = getCategory($('signup-category').value);
+  $('category-hint').textContent = category
+    ? `${category.hint ?? ''}${category.needsApproval ? ' Precisa de aprovação: até lá, você vê só os grupos em que está.' : ''}`.trim()
+    : APPROVAL_NOTE;
   $('specialty-field').hidden = !category?.specialty;
   $('council-fields').hidden = !category?.council;
   if (category?.council) {
@@ -245,7 +249,7 @@ $('form-professional').addEventListener('submit', async (event) => {
   const councilState = category?.council ? form.councilState.value : '';
 
   const errors = [];
-  if (!category) errors.push([form.categoryId, 'Escolha sua profissão.']);
+  if (!category) errors.push([form.categoryId, 'Escolha seu cargo.']);
   if (category?.councilRequired && !number) errors.push([form.councilNumber, `Informe o número do ${category.council}.`]);
   if (number && !/^[0-9A-Z.\-/]{1,20}$/.test(number)) errors.push([form.councilNumber, 'Use só números e letras.']);
   if (number && !councilState) errors.push([form.councilState, 'Escolha a UF.']);

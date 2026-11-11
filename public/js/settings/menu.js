@@ -6,7 +6,8 @@ export const SETTINGS_SECTIONS = [
   { hash: 'profissional', title: 'Informações profissionais', icon: 'stethoscope' },
   { hash: 'perfil', title: 'Editar perfil', icon: 'edit' },
   { hash: 'senha', title: 'Alterar senha', icon: 'lock' },
-  { hash: 'usuarios', title: 'Usuários', icon: 'users', adminOnly: true },
+  // Usuários: administrador da plataforma e Gestor aprovado (aprovação de cargos)
+  { hash: 'usuarios', title: 'Usuários', icon: 'users', approverOnly: true },
 ];
 
 export const DEFAULT_SECTION = 'conta';

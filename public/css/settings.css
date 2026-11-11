@@ -259,7 +259,8 @@
 #password-google-hint { font-size: var(--texto-sm); }
 
 /* ---------- Usuários (administrador da plataforma) ---------- */
-.users-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-3); }
+.users-header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--esp-1) var(--esp-3); }
+#users-count { white-space: nowrap; }
 .users-intro { margin: 0; }
 .users-search { margin: var(--esp-4) 0 var(--esp-2); }
 .users-empty { padding: var(--esp-4) 0; text-align: center; }
@@ -313,3 +314,29 @@
 .users-count,
 #users-count { font-size: var(--texto-md); }
 .settings-section .alert { font-size: var(--texto-md); }
+
+/* ---------- Cargo: explicação no seletor e situação da aprovação ---------- */
+.picker-option small { display: block; margin-top: 2px; color: var(--cor-texto-3); font-size: var(--texto-sm); font-weight: 400; }
+.picker-note { margin: var(--esp-3) 0 0; }
+.approval-status { display: block; margin-top: var(--esp-1); }
+.approval-status[data-state='pending'] { color: var(--cor-alerta); }
+.approval-status[data-state='approved'] { color: var(--cor-sucesso); }
+.approval-status[data-state='declined'] { color: var(--cor-perigo); }
+
+/* ---------- Usuários: cargos aguardando aprovação ---------- */
+.approvals {
+  margin-bottom: var(--esp-5);
+  padding: var(--esp-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: var(--cor-alerta-suave);
+}
+.approvals .settings-label { margin-top: 0; }
+.approvals-intro { margin: var(--esp-1) 0 var(--esp-3); font-size: var(--texto-sm); }
+.approval-item { background: var(--cor-superficie); }
+.approval-item .member-info strong strong { font-weight: 600; }
+.approval-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; gap: var(--esp-2); }
+@media (max-width: 560px) {
+  .approval-item { flex-wrap: wrap; row-gap: var(--esp-2); }
+  .approval-actions { width: 100%; justify-content: flex-end; }
+}

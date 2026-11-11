@@ -65,7 +65,7 @@ class Falha extends Error {
 
 const LOGIN_INVALIDO = 'Usuário, e-mail ou senha inválidos.';
 
-const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento });
+const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento, lerAdmins });
 
 const ROTAS = {
   ...agenda.rotas,

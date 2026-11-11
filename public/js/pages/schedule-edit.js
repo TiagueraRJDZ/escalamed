@@ -6,7 +6,7 @@ import { doc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/
 import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { renderIcons } from '../icons.js';
-import { can, roleOf } from '../permissions.js';
+import { can, groupRole } from '../permissions.js';
 import { formatClock, toTime } from '../shifts.js';
 import {
   MONTH_PATTERN,
@@ -37,7 +37,7 @@ import { shiftFields } from '../movements.js';
 import { escapeHtml, initials, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 
 renderIcons();
-const { user, profile } = await initLayout({ active: 'schedules' });
+const { user, profile, access } = await initLayout({ active: 'schedules' });
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -74,10 +74,10 @@ $('schedule-editor').textContent = `Editando: ${profile.name}`;
 document.title = `Escala ${monthName(month)} | EscalaMed`;
 
 // ---------- Grade ----------
-// Quem aparece na grade: gestor, auxiliar e plantonistas (analista e observador não fazem plantão)
+// Quem aparece na grade: todos os membros do grupo (quem está na escala)
 const gridMembers = () =>
   members
-    .filter((m) => ['manager', 'assistant', 'staff'].includes(roleOf(group, m.id)))
+    .filter((m) => group?.memberIds?.includes(m.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
 const shiftList = () => sortShifts(Object.entries(shifts).map(([id, s]) => ({ id, ...s })));
@@ -437,8 +437,8 @@ onSnapshot(
   (snapshot) => {
     if (!snapshot.exists()) return navigate('/schedules.html', { replace: true });
     group = { id: snapshot.id, ...snapshot.data() };
-    if (!can(roleOf(group, user.uid), 'editSchedule')) {
-      toast('Só o gestor e os auxiliares editam a escala.', 'error');
+    if (!can(groupRole(group, user.uid, access.role), 'editSchedule')) {
+      toast('Só o Gestor e os coordenadores do grupo editam a escala.', 'error');
       navigate(groupUrl, { replace: true });
       return;
     }

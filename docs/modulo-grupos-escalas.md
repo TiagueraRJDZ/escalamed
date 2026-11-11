@@ -55,43 +55,25 @@ O comportamento foi levantado a partir do grupo de referência "TELEAUDITORIA HA
 
 ---
 
-## 3. Papéis por grupo
+## 3. Cargos da plataforma (desde 1.0.54)
 
-| Papel (código) | Na tela | Limite | Permissões |
-|---|---|---|---|
-| `manager` | Gestor | 1 | Tudo: configurações, turnos, escala, membros, valores |
-| `assistant` | Auxiliar | 3 | Editar e publicar escala, gerenciar membros (não pode mudar o gestor) |
-| `analyst` | Analista | 3 | Leitura total, relatórios e exportação |
-| `observer` | Observador | 3 | Só leitura do calendário e da escala publicada |
-| `staff` | Plantonista | sem limite | Vê a escala, recebe plantões, pede troca ou cessão, pega vaga, faz check-in/out |
+O cargo vale para a plataforma inteira; os papéis por grupo (gestor, auxiliar, analista, observador,
+plantonista) foram retirados. O cargo é escolhido no cadastro e em Configurações > Informações
+profissionais (`users/{uid}.categoryId`).
 
-### Como guardar (pensado para as regras)
-No documento do grupo, um array por papel, além do `memberIds` que já existe:
+| Cargo (`categoryId`) | Aprovação | O que pode |
+|---|---|---|
+| `gestor` | sim | Vê e altera todos os grupos de equipe: dados, turnos, escala, membros, coordenadores, excluir. Aprova cargos (Configurações > Usuários). |
+| `coordenador-escala` | sim | Nos grupos em que o Gestor o marcou (`coordinatorIds`): monta e publica a escala, convida e remove membros (não remove outro coordenador). Cria grupos e vira coordenador do que criou; ajusta dados e turnos só enquanto o grupo está sendo criado. |
+| `administrativo` | sim | Vê as escalas publicadas, o histórico e os relatórios de todos os grupos de equipe. Não altera nada e não vê rascunhos. |
+| `medico` | não | Vê os grupos em que está (só o publicado); troca, cede e pega vaga. |
 
-```
-memberIds:    [todos]          // usado na consulta "meus grupos" (array-contains)
-managerIds:   [uid]            // já existe; regra: size() <= 1
-assistantIds: [até 3]
-analystIds:   [até 3]
-observerIds:  [até 3]
-// plantonista = está em memberIds e em nenhum dos outros
-```
-
-As regras garantem os limites com `size()` e que um uid esteja em no máximo um array de papel. Com isso, um único `get()` do grupo responde "qual o papel de quem está pedindo".
-
-O documento `groups/{g}/members/{uid}` guarda o cartão do membro, copiado do perfil para não precisar de leitura extra: `role`, `name`, `photoURL`, `categoryId`, `specialty`, `councilNumber`, `councilState`, `joinedAt`. O `role` precisa sempre bater com os arrays do grupo; os dois são gravados juntos, no mesmo lote.
-
-### Permissões no código
-Um helper central, `can(group, uid, action)`, em `public/js/permissions.js`, sem Firebase e com testes. Ações: `editSettings`, `editShifts`, `editSchedule`, `publishSchedule`, `manageMembers`, `changeManager`, `viewReports`, `viewValues`, `editValues`, `requestMovement`, `checkin`. A interface usa esse helper para esconder abas e botões; as regras do Firestore repetem a mesma tabela.
-
-### Telas
-- **Membros** (aba do grupo): cartões com avatar ou iniciais, nome, `Categoria / Especialidade`, `Nº do conselho / UF` e selo do papel quando não for plantonista. Busca por nome.
-- **Convidar** (gestor e auxiliar): convite por e-mail em `groups/{g}/invites/{email}` com o cargo inicial e validade de 7 dias. O gestor compartilha o link `/invite.html?g=<grupo>` (copiar ou WhatsApp). Ninguém é adicionado sem aceitar: as regras só deixam a própria pessoa entrar, no cargo do convite.
-- **Alterar perfil**: mostra o uso de cada limite, ex.: `Tornar gestor (1/1)`, `Tornar auxiliar (2/3)`. A opção fica desabilitada quando o papel está cheio. Trocar de gestor só pode ser feito pelo próprio gestor (passa o papel).
-- **Remover membro**, com confirmação. **Sair do grupo**: o próprio membro (o gestor precisa passar o papel antes).
-- Membros sem conselho (ex.: Administrativo) podem ser gestor ou auxiliar e não aparecem obrigatoriamente na grade da escala.
-- **Wizard, etapa 3 "Membros"**: não foi feita; os convites ficam na aba Membros do grupo, depois de criado.
-- **Lista de grupos** ([schedules.js](../public/js/pages/schedules.js)): agrupar em seções pelo papel do usuário (GESTOR, AUXILIAR, ANALISTA, OBSERVADOR, PLANTONISTA), cada item com o nome do grupo e o nome da unidade embaixo. A busca continua igual.
+- **Aprovação**: `access/{uid}` = `{ categoryId, approved, decidedBy, decidedAt }`, gravado pelo administrador da plataforma (`config/admins`) ou por um Gestor aprovado, nunca sobre si mesmo, e sempre com o cargo que a pessoa pediu. Até ser aprovada, a pessoa tem o acesso de Médico. Ao trocar de cargo, o app apaga o `access` dela e o pedido volta para a lista.
+- **Administrador da plataforma** vale como Gestor.
+- **Grupo de equipe**: `memberIds` (quem está na escala) e `coordinatorIds` (sempre também membros). Entrar só por convite (sem cargo no convite). O direito de coordenador só vale com o cargo aprovado: retirar a aprovação tira o acesso sem mexer nos grupos.
+- **Escala individual** (`type: 'personal'`): `memberIds == [dono]`, sem coordenadores; só o dono vê e edita.
+- **Código**: `public/js/permissions.js` (`platformRoleOf`, `approvalState`, `groupRole`, `can`) com testes; `public/js/access.js` lê o cargo de quem está logado; `public/js/my-groups.js` junta as consultas que as regras permitem (grupos em que está, que coordena e, para Gestor e Administrativo, `type == 'team'`). O `firestore.rules` repete a mesma tabela (`platformRole()`, `editorOf()`, `canView()`), testado em `tests/rules/rules.test.mjs`.
+- **Telas**: lista de grupos em seções "Coordeno", "Participo", "Outros grupos" e "Escalas individuais"; aba Membros com as seções "Coordenadores de escala" e "Membros" e o modal "Gerenciar membro"; Configurações > Usuários com o bloco "Aguardando aprovação".
 
 ---
 

@@ -1,111 +1,121 @@
-// Testes dos cargos e permissões. Rodar: node --test tests/
+// Testes dos cargos da plataforma e do papel de cada um nos grupos. Rodar: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   can,
-  roleOf,
-  roleUsage,
-  hasRoom,
-  assignableRoles,
-  changeRolePatch,
-  removeMemberPatch,
   ACTIONS,
+  platformRoleOf,
+  approvalState,
+  groupRole,
+  canEditSettings,
+  canRemoveMember,
+  canLeave,
+  canCreateTeam,
+  canApprove,
+  seesAllGroups,
+  seesReports,
+  removeMemberPatch,
+  coordinatorPatch,
 } from '../public/js/permissions.js';
 
-const group = {
-  memberIds: ['g', 'a1', 'a2', 'an', 'ob', 'p1', 'p2'],
-  managerIds: ['g'],
-  assistantIds: ['a1', 'a2'],
-  analystIds: ['an'],
-  observerIds: ['ob'],
-};
+const team = { type: 'team', ownerId: 'g', memberIds: ['g', 'c', 'm1', 'm2'], coordinatorIds: ['c'], setupStep: 'done' };
+const personal = { type: 'personal', ownerId: 'm1', memberIds: ['m1'], coordinatorIds: [] };
+const approved = (categoryId) => ({ categoryId, approved: true });
 
-test('roleOf identifica o cargo pelos arrays do grupo', () => {
-  assert.equal(roleOf(group, 'g'), 'manager');
-  assert.equal(roleOf(group, 'a2'), 'assistant');
-  assert.equal(roleOf(group, 'an'), 'analyst');
-  assert.equal(roleOf(group, 'ob'), 'observer');
-  assert.equal(roleOf(group, 'p1'), 'staff');
-  assert.equal(roleOf(group, 'estranho'), null);
+test('cargo que vale: administrador é Gestor; os outros só com aprovação', () => {
+  assert.equal(platformRoleOf({ isAdmin: true }), 'gestor');
+  assert.equal(platformRoleOf({ access: approved('gestor') }), 'gestor');
+  assert.equal(platformRoleOf({ access: approved('coordenador-escala') }), 'coordenador');
+  assert.equal(platformRoleOf({ access: approved('administrativo') }), 'administrativo');
+  assert.equal(platformRoleOf({ access: { categoryId: 'gestor', approved: false } }), null);
+  assert.equal(platformRoleOf({ access: null }), null);
+  assert.equal(platformRoleOf(), null);
 });
 
-test('roleUsage conta os lugares ocupados', () => {
-  assert.deepEqual(roleUsage(group), { manager: 1, assistant: 2, analyst: 1, observer: 1, staff: 2 });
-  assert.equal(hasRoom(group, 'manager'), false);
-  assert.equal(hasRoom(group, 'assistant'), true);
-  assert.equal(hasRoom({ ...group, assistantIds: ['a1', 'a2', 'a3'] }, 'assistant'), false);
-  assert.equal(hasRoom(group, 'staff'), true);
+test('situação da aprovação segue o cargo pedido naquele momento', () => {
+  assert.equal(approvalState({ categoryId: 'medico' }, null), 'none');
+  assert.equal(approvalState({ categoryId: 'gestor' }, null), 'pending');
+  assert.equal(approvalState({ categoryId: 'gestor' }, approved('gestor')), 'approved');
+  assert.equal(approvalState({ categoryId: 'gestor' }, { categoryId: 'gestor', approved: false }), 'declined');
+  // Trocou de cargo depois de aprovado: volta a aguardar
+  assert.equal(approvalState({ categoryId: 'administrativo' }, approved('gestor')), 'pending');
+});
+
+test('papel no grupo', () => {
+  assert.equal(groupRole(team, 'x', 'gestor'), 'gestor');
+  assert.equal(groupRole(team, 'c', 'coordenador'), 'coordinator');
+  // Marcado como coordenador, mas sem o cargo aprovado: só membro
+  assert.equal(groupRole(team, 'c', null), 'member');
+  // Coordenador de outro grupo
+  assert.equal(groupRole(team, 'x', 'coordenador'), null);
+  assert.equal(groupRole(team, 'x', 'administrativo'), 'administrativo');
+  assert.equal(groupRole(team, 'm1', null), 'member');
+  assert.equal(groupRole(team, 'x', null), null);
+  // Escala individual: só o dono, mesmo para o Gestor
+  assert.equal(groupRole(personal, 'm1', null), 'owner');
+  assert.equal(groupRole(personal, 'g', 'gestor'), null);
 });
 
 test('matriz de permissões', () => {
-  assert.ok(can('manager', 'editSettings'));
-  assert.ok(!can('assistant', 'editSettings'));
-  assert.ok(can('assistant', 'editSchedule'));
-  assert.ok(!can('analyst', 'editSchedule'));
-  assert.ok(can('analyst', 'viewReports'));
-  assert.ok(!can('observer', 'viewReports'));
-  assert.ok(!can('observer', 'viewDraft'));
-  assert.ok(can('observer', 'viewPublished'));
-  assert.ok(can('staff', 'takeShifts'));
-  assert.ok(!can('analyst', 'takeShifts'));
-  assert.ok(!can('staff', 'inviteMembers'));
-  assert.ok(can('assistant', 'inviteMembers'));
-  assert.ok(can('manager', 'transferManagement'));
-  assert.ok(!can('assistant', 'transferManagement'));
-  assert.ok(!can('manager', 'leaveGroup'));
-  assert.ok(can('staff', 'leaveGroup'));
-  assert.ok(!can(null, 'viewPublished'));
-  assert.ok(!can('manager', 'acaoInexistente'));
+  assert.ok(can('gestor', 'editSettings'));
+  assert.ok(!can('coordinator', 'editSettings'));
+  assert.ok(can('coordinator', 'editSchedule'));
+  assert.ok(can('coordinator', 'manageMembers'));
+  assert.ok(!can('coordinator', 'setCoordinators'));
+  assert.ok(can('gestor', 'setCoordinators'));
+  assert.ok(!can('administrativo', 'editSchedule'));
+  assert.ok(!can('administrativo', 'viewDraft'));
+  assert.ok(can('administrativo', 'viewReports'));
+  assert.ok(!can('member', 'viewDraft'));
+  assert.ok(!can('member', 'manageMembers'));
+  assert.ok(can('member', 'viewOwnReport'));
+  assert.ok(can('owner', 'editSchedule'));
+  assert.ok(!can(null, 'viewHistory'));
+  assert.ok(!can('gestor', 'acaoInexistente'));
 });
 
-test('todo cargo tem ao menos uma ação, e o gestor quase todas', () => {
-  for (const role of ['manager', 'assistant', 'analyst', 'observer', 'staff']) {
+test('todo papel tem ao menos uma ação', () => {
+  for (const role of ['gestor', 'coordinator', 'administrativo', 'member', 'owner']) {
     assert.ok(ACTIONS.some((a) => can(role, a)), role);
   }
-  const managerMissing = ACTIONS.filter((a) => !can('manager', a));
-  assert.deepEqual(managerMissing.sort(), ['leaveGroup', 'viewOwnHistory', 'viewOwnReport']);
 });
 
-test('auxiliar não pode dar o cargo de gestor', () => {
-  assert.ok(!assignableRoles('assistant').includes('manager'));
-  assert.ok(assignableRoles('manager').includes('manager'));
-  assert.deepEqual(assignableRoles('staff'), []);
+test('configurações: coordenador só enquanto o grupo é criado', () => {
+  assert.ok(canEditSettings(team, 'gestor'));
+  assert.ok(!canEditSettings(team, 'coordinator'));
+  assert.ok(canEditSettings({ ...team, setupStep: 'shifts' }, 'coordinator'));
+  assert.ok(!canEditSettings(team, 'administrativo'));
 });
 
-test('mudar cargo move a pessoa entre os arrays', () => {
-  const patch = changeRolePatch(group, 'p1', 'analyst');
-  assert.deepEqual(patch.analystIds, ['an', 'p1']);
-  assert.deepEqual(patch.assistantIds, ['a1', 'a2']);
-
-  const back = changeRolePatch(group, 'a1', 'staff');
-  assert.deepEqual(back.assistantIds, ['a2']);
-  assert.equal(back.managerIds.length, 1);
+test('remover membro: coordenador não remove outro coordenador nem a si mesmo', () => {
+  assert.ok(canRemoveMember(team, 'gestor', 'c', 'g'));
+  assert.ok(canRemoveMember(team, 'coordinator', 'm1', 'c'));
+  assert.ok(!canRemoveMember({ ...team, coordinatorIds: ['c', 'm1'] }, 'coordinator', 'm1', 'c'));
+  assert.ok(!canRemoveMember(team, 'coordinator', 'c', 'c'));
+  assert.ok(!canRemoveMember(team, 'member', 'm2', 'm1'));
+  assert.ok(!canRemoveMember(team, 'administrativo', 'm1', 'x'));
 });
 
-test('transferir gestão: antigo gestor vira auxiliar se houver vaga', () => {
-  const patch = changeRolePatch(group, 'p1', 'manager');
-  assert.deepEqual(patch.managerIds, ['p1']);
-  assert.deepEqual(patch.assistantIds, ['a1', 'a2', 'g']);
+test('sair do grupo: só membro de grupo de equipe', () => {
+  assert.ok(canLeave(team, 'm1'));
+  assert.ok(!canLeave(team, 'x'));
+  assert.ok(!canLeave(personal, 'm1'));
 });
 
-test('transferir gestão: sem vaga de auxiliar, antigo gestor vira plantonista', () => {
-  const full = { ...group, memberIds: [...group.memberIds, 'a3'], assistantIds: ['a1', 'a2', 'a3'] };
-  const patch = changeRolePatch(full, 'p1', 'manager');
-  assert.deepEqual(patch.managerIds, ['p1']);
-  assert.deepEqual(patch.assistantIds, ['a1', 'a2', 'a3']);
-  assert.equal(roleOf({ ...full, ...patch }, 'g'), 'staff');
+test('o que cada cargo libera fora dos grupos', () => {
+  assert.ok(canCreateTeam('gestor') && canCreateTeam('coordenador'));
+  assert.ok(!canCreateTeam('administrativo') && !canCreateTeam(null));
+  assert.ok(canApprove('gestor') && !canApprove('coordenador'));
+  assert.ok(seesAllGroups('gestor') && seesAllGroups('administrativo') && !seesAllGroups('coordenador'));
+  assert.ok(seesReports('coordenador') && !seesReports(null));
 });
 
-test('transferir gestão para um auxiliar libera a vaga dele para o antigo gestor', () => {
-  const full = { ...group, memberIds: [...group.memberIds, 'a3'], assistantIds: ['a1', 'a2', 'a3'] };
-  const patch = changeRolePatch(full, 'a1', 'manager');
-  assert.deepEqual(patch.managerIds, ['a1']);
-  assert.deepEqual(patch.assistantIds, ['a2', 'a3', 'g']);
-});
-
-test('remover membro tira a pessoa de todos os arrays', () => {
-  const patch = removeMemberPatch(group, 'a2');
-  assert.ok(!patch.memberIds.includes('a2'));
-  assert.deepEqual(patch.assistantIds, ['a1']);
-  assert.deepEqual(patch.managerIds, ['g']);
+test('remover membro tira a pessoa também dos coordenadores; marcar e desmarcar coordenador', () => {
+  const patch = removeMemberPatch(team, 'c');
+  assert.deepEqual(patch.memberIds, ['g', 'm1', 'm2']);
+  assert.deepEqual(patch.coordinatorIds, []);
+  assert.deepEqual(coordinatorPatch(team, 'm1', true).coordinatorIds, ['c', 'm1']);
+  assert.deepEqual(coordinatorPatch(team, 'c', false).coordinatorIds, []);
+  // Marcar duas vezes não repete
+  assert.deepEqual(coordinatorPatch(team, 'c', true).coordinatorIds, ['c']);
 });

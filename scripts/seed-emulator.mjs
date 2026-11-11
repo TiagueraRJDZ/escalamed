@@ -27,22 +27,26 @@ const HEALTH_UNITS = [
 ];
 
 // Usuários de teste (senha igual para todos; nomes e registros fictícios)
-// role = cargo no grupo de referência TELEAUDITORIA HAPVIDA (sem role = fora do grupo)
+// approved = cargo já aprovado (access/{uid}); group = no grupo TELEAUDITORIA HAPVIDA
+// ('coordinator' = membro e coordenador; 'member' = membro; sem group = fora do grupo)
 const PASSWORD = 'Teste@123';
 const USERS = [
-  { email: 'gestor@teste.com', name: 'Ana Gestora', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100200'], role: 'manager' },
-  { email: 'auxiliar1@teste.com', name: 'Carla Auxiliar', categoryId: 'administrativo', role: 'assistant' },
-  { email: 'auxiliar2@teste.com', name: 'Diego Auxiliar', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10001'], role: 'assistant' },
-  { email: 'analista@teste.com', name: 'Elisa Analista', categoryId: 'administrativo', role: 'analyst' },
-  { email: 'observador@teste.com', name: 'Fábio Observador', categoryId: 'administrativo', role: 'observer' },
-  { email: 'plantonista@teste.com', name: 'Bruno Plantonista', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10002'], role: 'staff' },
-  { email: 'plantonista2@teste.com', name: 'Gabriela Souza', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10003'], role: 'staff' },
-  { email: 'plantonista3@teste.com', name: 'Henrique Lima', categoryId: 'medico', specialty: 'Medicina de Família', council: ['CRM', '10004'], role: 'staff' },
-  { email: 'plantonista4@teste.com', name: 'Isabela Rocha', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10005'], role: 'staff' },
-  { email: 'plantonista5@teste.com', name: 'João Pereira', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10006'], role: 'staff' },
-  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100300'], role: 'staff' },
-  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'auxiliar-enfermagem', council: ['COREN', '100400'], role: 'staff' },
-  { email: 'plantonista8@teste.com', name: 'Natália Costa', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10007'], role: 'staff' },
+  // Gestor: vê e altera todos os grupos sem ser membro deles
+  { email: 'gestor@teste.com', name: 'Ana Gestora', categoryId: 'gestor', approved: true },
+  { email: 'coordenador@teste.com', name: 'Carla Coordenadora', categoryId: 'coordenador-escala', approved: true, group: 'coordinator' },
+  // Coordenador aprovado, mas só membro: o Gestor pode marcá-lo como coordenador
+  { email: 'coordenador2@teste.com', name: 'Diego Coordenador', categoryId: 'coordenador-escala', approved: true, group: 'member' },
+  { email: 'administrativo@teste.com', name: 'Elisa Administrativa', categoryId: 'administrativo', approved: true },
+  // Pediu Gestor e ainda não foi aprovado: vê só o grupo em que está
+  { email: 'pendente@teste.com', name: 'Fábio Pendente', categoryId: 'gestor', group: 'member' },
+  { email: 'plantonista@teste.com', name: 'Bruno Plantonista', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10002'], group: 'member' },
+  { email: 'plantonista2@teste.com', name: 'Gabriela Souza', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10003'], group: 'member' },
+  { email: 'plantonista3@teste.com', name: 'Henrique Lima', categoryId: 'medico', specialty: 'Medicina de Família', council: ['CRM', '10004'], group: 'member' },
+  { email: 'plantonista4@teste.com', name: 'Isabela Rocha', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10005'], group: 'member' },
+  { email: 'plantonista5@teste.com', name: 'João Pereira', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10006'], group: 'member' },
+  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10009'], group: 'member' },
+  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10010'], group: 'member' },
+  { email: 'plantonista8@teste.com', name: 'Natália Costa', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10007'], group: 'member' },
   { email: 'novo@teste.com', name: 'Otávio Novo', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10008'] },
 ];
 
@@ -148,18 +152,21 @@ async function main() {
       searchKeywords: normalize(user.name).split(/\s+/),
       signupStep: 4,
       termsAcceptedAt: now,
-      termsVersion: '2026-10',
+      termsVersion: '2026-11-10',
       createdAt: now,
       updatedAt: now,
     });
     await setDoc(`users/${uid}/private/data`, { email: user.email, phone: '85999990000', cpf: null, state: 'CE', updatedAt: now });
+    if (user.approved) {
+      await setDoc(`access/${uid}`, { categoryId: user.categoryId, approved: true, decidedBy: 'seed', decidedAt: now });
+    }
   }
-  console.log(`✔ ${USERS.length} usuários (senha ${PASSWORD})`);
+  console.log(`✔ ${USERS.length} usuários (senha ${PASSWORD}); pendente@teste.com aguarda aprovação de Gestor`);
 
-  // Grupo TELEAUDITORIA HAPVIDA com cargos variados
-  const inGroup = USERS.filter((u) => u.role);
-  const idsOf = (role) => inGroup.filter((u) => u.role === role).map((u) => ids[u.email]);
-  const manager = inGroup.find((u) => u.role === 'manager');
+  // Grupo TELEAUDITORIA HAPVIDA: uma coordenadora e membros (o Gestor não é membro)
+  const inGroup = USERS.filter((u) => u.group);
+  const gestor = USERS.find((u) => u.email === 'gestor@teste.com');
+  const manager = inGroup.find((u) => u.group === 'coordinator'); // quem monta a escala e convida
   await setDoc(`groups/${GROUP_ID}`, {
     name: 'TELEAUDITORIA HAPVIDA',
     type: 'team',
@@ -167,12 +174,9 @@ async function main() {
     unit: { id: 'hapvida-antonio-prudente-ce', name: 'HAPVIDA ANTONIO PRUDENTE', city: 'Fortaleza', state: 'CE' },
     categoryId: 'medico',
     timezone: 'America/Sao_Paulo',
-    ownerId: ids[manager.email],
+    ownerId: ids[gestor.email],
     memberIds: inGroup.map((u) => ids[u.email]),
-    managerIds: idsOf('manager'),
-    assistantIds: idsOf('assistant'),
-    analystIds: idsOf('analyst'),
-    observerIds: idsOf('observer'),
+    coordinatorIds: inGroup.filter((u) => u.group === 'coordinator').map((u) => ids[u.email]),
     setupStep: 'done',
     createdAt: now,
     updatedAt: now,
@@ -180,7 +184,6 @@ async function main() {
   for (const user of inGroup) {
     await setDoc(`groups/${GROUP_ID}/members/${ids[user.email]}`, {
       ...user.profile,
-      role: user.role,
       joinedAt: now,
       addedBy: ids[manager.email],
     });
@@ -197,7 +200,6 @@ async function main() {
   // Convite pendente para novo@teste.com
   await setDoc(`groups/${GROUP_ID}/invites/novo@teste.com`, {
     email: 'novo@teste.com',
-    role: 'staff',
     groupName: 'TELEAUDITORIA HAPVIDA',
     unitName: 'HAPVIDA ANTONIO PRUDENTE',
     invitedBy: ids[manager.email],
@@ -209,7 +211,7 @@ async function main() {
 
   // Escalas: mês atual publicado e o seguinte em rascunho.
   // Plantonistas em rodízio nos turnos M, T e N (sem sobreposição), 1 vaga no N de sábado.
-  const staffIds = inGroup.filter((u) => u.role === 'staff').map((u) => ids[u.email]);
+  const staffIds = inGroup.filter((u) => u.categoryId === 'medico').map((u) => ids[u.email]);
   const rotation = ['m', 't', 'n'];
   const key = (day, shiftId) => `${String(day).padStart(2, '0')}_${shiftId}`;
   const monthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -281,6 +283,48 @@ async function main() {
     });
   }
   console.log(`✔ histórico: ${movements.length} movimentações de exemplo`);
+
+  // Segundo grupo, sem coordenador: Gestor e Administrativo veem; a coordenadora do primeiro não
+  const OTHER_ID = 'uti-adulto';
+  const otherMembers = USERS.filter((u) => ['plantonista7@teste.com', 'plantonista8@teste.com'].includes(u.email));
+  await setDoc(`groups/${OTHER_ID}`, {
+    name: 'UTI ADULTO',
+    type: 'team',
+    color: '#0E7C66',
+    unit: { id: 'hosp-municipal-central-ce', name: 'Hospital Municipal Central', city: 'Fortaleza', state: 'CE' },
+    categoryId: 'medico',
+    timezone: 'America/Sao_Paulo',
+    ownerId: ids[gestor.email],
+    memberIds: otherMembers.map((u) => ids[u.email]),
+    coordinatorIds: [],
+    setupStep: 'done',
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const user of otherMembers) {
+    await setDoc(`groups/${OTHER_ID}/members/${ids[user.email]}`, { ...user.profile, joinedAt: now, addedBy: ids[gestor.email] });
+  }
+  for (const shift of SHIFTS.filter((s) => ['m', 'n'].includes(s.id))) {
+    await setDoc(`groups/${OTHER_ID}/shifts/${shift.id}`, {
+      title: shift.title,
+      startMinute: toMinutes(shift.start),
+      endMinute: toMinutes(shift.end),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  const [o1, o2] = otherMembers.map((u) => ids[u.email]);
+  await setDoc(`groups/${OTHER_ID}/schedules/${monthId(current)}`, {
+    status: 'published',
+    assignments: { [key(5, 'm')]: [o1], [key(5, 'n')]: [o2], [key(6, 'm')]: [o2] },
+    vacancies: {},
+    publishedAt: now,
+    publishedBy: ids[gestor.email],
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: ids[gestor.email],
+  });
+  console.log(`✔ grupo UTI ADULTO: ${otherMembers.length} membros, sem coordenador`);
 }
 
 main().catch((err) => {

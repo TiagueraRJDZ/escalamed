@@ -1,13 +1,14 @@
-// Relatório de Plantões (só gestor): plantões das escalas publicadas num período, por
+// Relatório de Plantões (Gestor, Coordenador de escala e Administrativo): plantões das escalas publicadas num período, por
 // membro, com horas. Os cálculos ficam em shift-report.js; a exportação em report-export.js.
 // A escala de cada mês vem de groups/{g}/schedules/{AAAA-MM} (mapa "dia_turno" → pessoas);
 // meses em rascunho não entram (aparece um aviso).
-import { initLayout, avatarHtml, setManagerFromGroups } from '../layout.js';
+import { initLayout, avatarHtml } from '../layout.js';
 import { isLeaving } from '../firebase.js';
 import { icon, renderIcons } from '../icons.js';
 import { escapeHtml, setupMenu, toast, firebaseErrorMessage } from '../ui.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
 import { loadMyGroups, loadMembers, groupLabel, rememberGroup, lastGroup } from '../my-groups.js';
+import { can } from '../permissions.js';
 import { loadShifts, loadSchedule, scheduleShifts } from '../schedule-data.js';
 import { collectShifts, buildShiftReport, MAX_RANGE_DAYS } from '../shift-report.js';
 import { formatDuration, toTime } from '../shifts.js';
@@ -15,17 +16,17 @@ import { MONTHS, MONTHS_SHORT, WEEKDAYS_SHORT, brDate, daysBetween, monthRange, 
 import { exportXlsx, exportPdf } from '../report-export.js';
 
 renderIcons();
-const { user } = await initLayout({ active: 'reports' });
+const { user, access } = await initLayout({ active: 'reports' });
 const $ = (id) => document.getElementById(id);
 const form = $('report-form');
 const body = $('report-body');
 
-// Só gestor de algum grupo; quem chega pelo endereço sem ser volta para Escalas com aviso
+// Grupos de equipe em que a pessoa vê relatórios (Gestor e Administrativo: todos; Coordenador:
+// os que coordena). Quem chega pelo endereço sem nenhum volta para Escalas com aviso.
 let groups = [];
 try {
-  const mine = await loadMyGroups(user.uid);
-  setManagerFromGroups(user.uid, mine);
-  groups = mine.filter((g) => g.role === 'manager' && g.type === 'team');
+  const mine = await loadMyGroups(user.uid, access.role);
+  groups = mine.filter((g) => g.type === 'team' && can(g.role, 'viewReports'));
 } catch (error) {
   if (isLeaving()) await new Promise(() => {}); // a página está saindo: para aqui
   body.innerHTML = errorState(firebaseErrorMessage(error));

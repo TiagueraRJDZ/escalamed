@@ -1,17 +1,23 @@
-// Categorias profissionais (profissões). O "id" é gravado no banco; o "name" aparece na tela.
+// Cargos da plataforma (o campo continua "categoryId" no banco). O "id" é gravado; o "name" aparece na tela.
 // "council": sigla do conselho de classe (mostrada como rótulo do registro). Sem conselho = null.
 // "specialty": pede especialidade no cadastro. "councilRequired": registro obrigatório.
-// Só estas aparecem para escolher (cadastro, Configurações e criação de grupo).
-// Para incluir uma categoria nova, adicione aqui e também na lista do optCategory no firestore.rules.
+// "needsApproval": o cargo só vale depois de aprovado (Configurações > Usuários) pelo administrador
+// da plataforma ou por um Gestor; até lá a pessoa tem o acesso de um Médico (só os grupos em que está).
+// "hint": explicação curta mostrada na escolha.
+// Só estes aparecem para escolher (cadastro e Configurações).
+// Para incluir um cargo novo, adicione aqui, na lista do optCategory no firestore.rules e no
+// mapa de acesso de permissions.js.
 export const PROFESSIONAL_CATEGORIES = [
-  { id: 'administrativo', name: 'Administrativo', council: null },
-  { id: 'auxiliar-enfermagem', name: 'Auxiliar de Enfermagem', council: 'COREN' },
-  { id: 'medico', name: 'Médico', council: 'CRM', specialty: true, councilRequired: true },
+  { id: 'gestor', name: 'Gestor', council: null, needsApproval: true, hint: 'Diretores, gerentes e coordenadores. Vê e altera todas as escalas.' },
+  { id: 'coordenador-escala', name: 'Coordenador de escala', council: null, needsApproval: true, hint: 'Altera as escalas dos grupos que o Gestor liberar.' },
+  { id: 'administrativo', name: 'Administrativo', council: null, needsApproval: true, hint: 'Vê todas as escalas publicadas, sem alterar.' },
+  { id: 'medico', name: 'Médico', council: 'CRM', specialty: true, councilRequired: true, hint: 'Vê as escalas dos grupos em que está.' },
 ];
 
-// Profissões que saíram da lista: ninguém escolhe mais, mas quem já tinha uma continua
+// Cargos/profissões que saíram da lista: ninguém escolhe mais, mas quem já tinha uma continua
 // com o nome certo na tela até trocar (e o firestore.rules ainda aceita o id gravado)
 const RETIRED_CATEGORIES = [
+  { id: 'auxiliar-enfermagem', name: 'Auxiliar de Enfermagem', council: 'COREN' },
   { id: 'outro', name: 'Outro', council: null },
   { id: 'academico', name: 'Acadêmico', council: null },
   { id: 'assistente-social', name: 'Assistente Social', council: 'CRESS' },

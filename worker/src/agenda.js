@@ -179,7 +179,27 @@ async function meusPlantoes(contexto) {
   return estadoAtual(env, uid);
 }
 
-// Escala de um mês alterada pelo gestor ou auxiliar: atualiza a agenda de todos os escalados
+// Cargo aprovado de quem chamou: 'gestor' | 'coordenador' | 'administrativo' | null.
+// Mesma regra do firestore.rules: administrador da plataforma vale como Gestor; os outros
+// cargos só valem aprovados em access/{uid}.
+const CARGO_DE_ACESSO = { gestor: 'gestor', 'coordenador-escala': 'coordenador', administrativo: 'administrativo' };
+
+async function cargoDe(contexto, quem) {
+  const { env, local } = contexto;
+  if ((await apoio.lerAdmins(env, quem.token, local)).includes(quem.uid)) return 'gestor';
+  const acesso = await apoio.lerDocumento(env, quem.token, `access/${quem.uid}`, local);
+  if (acesso?.approved?.booleanValue !== true) return null;
+  return CARGO_DE_ACESSO[acesso.categoryId?.stringValue] ?? null;
+}
+
+// Pode alterar a escala do grupo: Gestor (equipe), coordenador do grupo ou dono da escala individual
+async function editaEscala(contexto, quem, campos) {
+  if (campos.type?.stringValue === 'personal') return campos.ownerId?.stringValue === quem.uid;
+  const cargo = await cargoDe(contexto, quem);
+  return cargo === 'gestor' || (cargo === 'coordenador' && textos(campos.coordinatorIds).includes(quem.uid));
+}
+
+// Escala de um mês alterada pelo Gestor ou por um coordenador: atualiza a agenda de todos os escalados
 async function grupo(contexto) {
   const { env, corpo, local } = contexto;
   const quem = await apoio.quemChamou(contexto);
@@ -190,9 +210,8 @@ async function grupo(contexto) {
   // Lido com o token de quem chamou: valem as regras do Firestore
   const campos = await apoio.lerDocumento(env, quem.token, `groups/${grupoId}`, local);
   if (!campos) throw new apoio.Falha(403, 'Grupo não encontrado.');
-  const administradores = [...textos(campos.managerIds), ...textos(campos.assistantIds)];
-  if (!administradores.includes(quem.uid)) {
-    throw new apoio.Falha(403, 'Só o gestor e os auxiliares do grupo atualizam a agenda da equipe.');
+  if (!(await editaEscala(contexto, quem, campos))) {
+    throw new apoio.Falha(403, 'Só o Gestor e os coordenadores do grupo atualizam a agenda da equipe.');
   }
   const membros = new Set(textos(campos.memberIds));
   const escala = lerEscala({

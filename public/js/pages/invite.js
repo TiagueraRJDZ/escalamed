@@ -4,7 +4,6 @@ import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase
 import { db, navigate } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
-import { ROLES } from '../permissions.js';
 import { acceptInvite, declineInvite, myInviteFor } from '../members.js';
 import { escapeHtml, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 import { signOutUser } from '../auth.js';
@@ -44,7 +43,7 @@ async function load() {
       'mail',
       invite ? 'Convite vencido' : 'Convite não encontrado',
       `${invite ? 'Este convite venceu.' : `Não há convite para <strong>${escapeHtml(email)}</strong> neste grupo.`}
-       Se você foi convidado(a) com outro e-mail, entre com ele. Se não, peça um novo convite ao gestor do grupo.`,
+       Se você foi convidado(a) com outro e-mail, entre com ele. Se não, peça um novo convite ao Gestor ou ao coordenador do grupo.`,
       `${backButton}<button type="button" class="btn btn-ghost" id="switch-account">Entrar com outro e-mail</button>`,
     );
     document.getElementById('switch-account').addEventListener('click', signOutUser);
@@ -56,7 +55,7 @@ async function load() {
     'users',
     'Você foi convidado(a)!',
     `<strong>${escapeHtml(invite.invitedByName)}</strong> convidou você para o grupo
-     <strong>${escapeHtml(invite.groupName)}</strong>${unit}, como <strong>${ROLES[invite.role]}</strong>.`,
+     <strong>${escapeHtml(invite.groupName)}</strong>${unit}.`,
     `<button type="button" class="btn btn-secondary" id="decline">Recusar</button>
      <button type="button" class="btn btn-primary" id="accept">${icon('check')}Aceitar convite</button>`,
   );

@@ -31,6 +31,30 @@ service cloud.firestore {
       return signedIn() && exists(admins) && get(admins).data.get('uids', []).hasAny([request.auth.uid]);
     }
 
+    // ----- Cargo da plataforma -----
+    // O cargo é escolhido no perfil (users/{uid}.categoryId). Gestor, Coordenador de escala e
+    // Administrativo só valem aprovados em access/{uid} (por administrador ou Gestor).
+    // O administrador da plataforma vale como Gestor. Sem aprovação: acesso de Médico
+    // (só os grupos em que a pessoa está).
+    function accessPath(uid) {
+      return /databases/$(database)/documents/access/$(uid);
+    }
+
+    // 'gestor' | 'coordenador' | 'administrativo' | 'none'
+    function platformRole() {
+      return isPlatformAdmin() ? 'gestor'
+        : !exists(accessPath(me())) ? 'none'
+        : get(accessPath(me())).data.approved != true ? 'none'
+        : get(accessPath(me())).data.categoryId == 'gestor' ? 'gestor'
+        : get(accessPath(me())).data.categoryId == 'coordenador-escala' ? 'coordenador'
+        : get(accessPath(me())).data.categoryId == 'administrativo' ? 'administrativo'
+        : 'none';
+    }
+
+    function isGestor() {
+      return signedIn() && platformRole() == 'gestor';
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -49,9 +73,9 @@ service cloud.firestore {
       return incoming().diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
-    // Mesma lista de public/data/categories.js
+    // Mesma lista de public/data/categories.js (cargos atuais e os que saíram da lista)
     function optCategory(v) {
-      return v == null || v in ['academico', 'administrativo', 'assistente-social', 'auxiliar-enfermagem',
+      return v == null || v in ['gestor', 'coordenador-escala', 'academico', 'administrativo', 'assistente-social', 'auxiliar-enfermagem',
         'auxiliar-laboratorio', 'auxiliar-saude-bucal', 'biomedico', 'bioquimico', 'bombeiro',
         'condutor-socorrista', 'cuidador', 'dentista', 'educador-fisico', 'enfermeiro', 'farmaceutico',
         'fisioterapeuta', 'fonoaudiologo', 'instrumentador-cirurgico', 'maqueiro', 'medico',
@@ -148,6 +172,26 @@ service cloud.firestore {
       }
     }
 
+    // ---------- Aprovação de cargos (Configurações > Usuários) ----------
+    // access/{uid}: { categoryId, approved, decidedBy, decidedAt }. A decisão vale para o cargo
+    // que a pessoa pediu naquele momento (categoryId tem de ser igual ao do perfil dela).
+    // Qualquer logado lê (selo do cargo, quem pode ser coordenador). Só administrador ou Gestor
+    // decidem; ninguém decide sobre si mesmo. A própria pessoa apaga ao trocar de cargo.
+    match /access/{uid} {
+      function validDecision(d) {
+        return d.keys().hasOnly(['categoryId', 'approved', 'decidedBy', 'decidedAt'])
+          && d.categoryId in ['gestor', 'coordenador-escala', 'administrativo']
+          && d.categoryId == get(/databases/$(database)/documents/users/$(uid)).data.get('categoryId', null)
+          && d.approved is bool
+          && d.decidedBy == me()
+          && d.decidedAt == request.time;
+      }
+
+      allow read: if signedIn();
+      allow create, update: if isGestor() && uid != me() && validDecision(incoming());
+      allow delete: if isSelf(uid) || (isGestor() && uid != me());
+    }
+
     // ---------- Unidades de saúde ----------
     // Qualquer usuário logado pode cadastrar uma unidade que ainda não existe.
     match /healthUnits/{unitId} {
@@ -167,9 +211,13 @@ service cloud.firestore {
     }
 
     // ---------- Grupos ----------
-    // Cargos ficam em arrays no próprio grupo (um get() responde "qual o cargo de quem pede"):
-    //   memberIds (todos) · managerIds (exatamente 1) · assistantIds, analystIds, observerIds (até 3 cada)
-    //   Plantonista = está em memberIds e em nenhum dos arrays de cargo.
+    // Equipe (type 'team'): memberIds (quem está na escala) e coordinatorIds (Coordenadores de
+    // escala do grupo, sempre também membros; marcados pelo Gestor).
+    //   Gestor: vê e altera todos os grupos de equipe.
+    //   Coordenador de escala (aprovado) marcado no grupo: escala, convites e membros.
+    //   Administrativo: vê todos os grupos de equipe, só o publicado.
+    //   Membro: vê o grupo e o que está publicado.
+    // Escala individual (type 'personal'): só o dono (memberIds == [dono]).
     match /groups/{groupId} {
       function groupPath() {
         return /databases/$(database)/documents/groups/$(groupId);
@@ -187,18 +235,40 @@ service cloud.firestore {
         return signedIn() && me() in g.memberIds;
       }
 
-      function isManagerOf(g) {
-        return signedIn() && me() in g.managerIds;
+      function isOwnerOf(g) {
+        return signedIn() && g.type == 'personal' && me() == g.ownerId;
       }
 
-      // Gestor ou auxiliar
-      function isAdminOf(g) {
-        return signedIn() && (me() in g.managerIds || me() in g.get('assistantIds', []));
+      // Marcado no grupo e com o cargo de Coordenador de escala aprovado. Sem conferir o tipo:
+      // escala individual nunca tem coordenadores (rolesValid), e assim a consulta
+      // "grupos que eu coordeno" (coordinatorIds array-contains) passa nas regras.
+      function isCoordinatorOf(g) {
+        return signedIn() && me() in g.coordinatorIds && platformRole() == 'coordenador';
       }
 
-      // Quem vê escalas em rascunho (e o histórico delas): gestor, auxiliar e analista
+      function isGestorOf(g) {
+        return g.type == 'team' && isGestor();
+      }
+
+      // Altera a escala, convida e remove membros
+      function editorOf(g) {
+        return isGestorOf(g) || isCoordinatorOf(g) || isOwnerOf(g);
+      }
+
+      // Vê o grupo, os membros, os turnos e o que está publicado
+      function canView(g) {
+        return isMemberOf(g) || editorOf(g)
+          || (g.type == 'team' && signedIn() && platformRole() == 'administrativo');
+      }
+
+      // Vê escalas em rascunho e o histórico delas (o Administrativo não)
       function seesDraftsOf(g) {
-        return isAdminOf(g) || me() in g.get('analystIds', []);
+        return editorOf(g);
+      }
+
+      // Dados do grupo e turnos: Gestor e dono; o coordenador só enquanto o grupo é criado
+      function settingsEditorOf(g) {
+        return isGestorOf(g) || isOwnerOf(g) || (isCoordinatorOf(g) && g.setupStep != 'done');
       }
 
       function unique(list) {
@@ -206,26 +276,17 @@ service cloud.firestore {
       }
 
       function rolesValid(d) {
-        return d.memberIds is list && d.managerIds is list && d.assistantIds is list
-          && d.analystIds is list && d.observerIds is list
-          && d.managerIds.size() == 1
-          && d.assistantIds.size() <= 3 && d.analystIds.size() <= 3 && d.observerIds.size() <= 3
-          && d.memberIds.size() <= 300
-          && unique(d.memberIds) && unique(d.assistantIds) && unique(d.analystIds) && unique(d.observerIds)
-          && d.memberIds.hasAll(d.managerIds) && d.memberIds.hasAll(d.assistantIds)
-          && d.memberIds.hasAll(d.analystIds) && d.memberIds.hasAll(d.observerIds)
-          && !d.managerIds.hasAny(d.assistantIds) && !d.managerIds.hasAny(d.analystIds)
-          && !d.managerIds.hasAny(d.observerIds) && !d.assistantIds.hasAny(d.analystIds)
-          && !d.assistantIds.hasAny(d.observerIds) && !d.analystIds.hasAny(d.observerIds)
-          // Escala individual: só o dono, sem cargos extras
-          && (d.type == 'team' || (d.memberIds == d.managerIds && d.assistantIds.size() == 0
-              && d.analystIds.size() == 0 && d.observerIds.size() == 0));
+        return d.memberIds is list && d.coordinatorIds is list
+          && d.memberIds.size() <= 300 && d.coordinatorIds.size() <= 50
+          && unique(d.memberIds) && unique(d.coordinatorIds)
+          && d.memberIds.hasAll(d.coordinatorIds)
+          // Escala individual: só o dono, sem coordenadores
+          && (d.type == 'team' || (d.memberIds == [d.ownerId] && d.coordinatorIds.size() == 0));
       }
 
       function validGroup(d) {
         return d.keys().hasOnly(['name', 'type', 'color', 'unit', 'categoryId', 'timezone',
-                                 'ownerId', 'managerIds', 'assistantIds', 'analystIds', 'observerIds',
-                                 'memberIds', 'setupStep', 'createdAt', 'updatedAt'])
+                                 'ownerId', 'coordinatorIds', 'memberIds', 'setupStep', 'createdAt', 'updatedAt'])
           && str(d.name, 3, 60)
           && d.type in ['team', 'personal']
           && d.color is string && d.color.matches('^#[0-9A-Fa-f]{6}$')
@@ -241,7 +302,7 @@ service cloud.firestore {
       }
 
       function roleKeys() {
-        return ['memberIds', 'managerIds', 'assistantIds', 'analystIds', 'observerIds', 'updatedAt'];
+        return ['memberIds', 'coordinatorIds', 'updatedAt'];
       }
 
       // ----- Convite da própria pessoa: por e-mail (id = e-mail) ou por pessoa (id = uid) -----
@@ -261,55 +322,51 @@ service cloud.firestore {
         return exists(personInvitePath()) ? get(personInvitePath()).data : get(invitePath()).data;
       }
 
-      // O array do cargo do convite ganha a pessoa; os outros ficam iguais
-      function joinsAs(field, role, inviteRole) {
-        return inviteRole == role
-          ? incoming()[field].toSet() == resource.data[field].toSet().union([me()].toSet())
-          : incoming()[field] == resource.data[field];
-      }
-
       function acceptsInvite(invite) {
         return invite.expiresAt > request.time
           && invite.get('status', 'pending') != 'declined'
           && incoming().memberIds.toSet() == resource.data.memberIds.toSet().union([me()].toSet())
-          && incoming().managerIds == resource.data.managerIds
-          && joinsAs('assistantIds', 'assistant', invite.role)
-          && joinsAs('analystIds', 'analyst', invite.role)
-          && joinsAs('observerIds', 'observer', invite.role);
+          && incoming().coordinatorIds == resource.data.coordinatorIds;
       }
 
-      allow read: if isMemberOf(resource.data);
+      allow read: if canView(resource.data);
 
-      // Quem cria vira dono, gestor e único membro
+      // Equipe: Gestor (entra como membro) ou Coordenador de escala (membro e coordenador).
+      // Escala individual: qualquer pessoa, só para si.
       allow create: if signedIn()
         && validGroup(incoming())
         && incoming().ownerId == me()
-        && incoming().managerIds == [me()]
         && incoming().memberIds == [me()]
-        && incoming().assistantIds == []
-        && incoming().analystIds == []
-        && incoming().observerIds == []
+        && (incoming().type == 'personal'
+            || (isGestor() && incoming().coordinatorIds == [])
+            || (platformRole() == 'coordenador' && incoming().coordinatorIds == [me()]))
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
 
-      // Gestor edita os dados do grupo
-      allow update: if isManagerOf(resource.data)
+      // Dados do grupo
+      allow update: if settingsEditorOf(resource.data)
         && validGroup(incoming())
         && changedOnly(['name', 'color', 'unit', 'categoryId', 'timezone', 'setupStep', 'updatedAt'])
         && incoming().updatedAt == request.time;
 
-      // Gestor ou auxiliar: muda cargos e remove membros. Ninguém é adicionado por aqui
-      // (a entrada é só por convite). O auxiliar não mexe no gestor; o gestor pode
-      // transferir a gestão.
-      allow update: if isAdminOf(resource.data)
-        && resource.data.type == 'team'
+      // Gestor: remove membros e marca/desmarca coordenadores (ninguém é adicionado por aqui:
+      // a entrada é só por convite)
+      allow update: if isGestorOf(resource.data)
         && validGroup(incoming())
         && changedOnly(roleKeys())
         && incoming().memberIds.toSet().difference(resource.data.memberIds.toSet()).size() == 0
-        && (isManagerOf(resource.data) || incoming().managerIds == resource.data.managerIds)
         && incoming().updatedAt == request.time;
 
-      // Aceitar convite: entra só a própria pessoa, só no cargo do convite e antes de vencer
+      // Coordenador: remove membros que não são coordenadores; não mexe nos coordenadores
+      allow update: if isCoordinatorOf(resource.data)
+        && validGroup(incoming())
+        && changedOnly(roleKeys())
+        && incoming().coordinatorIds == resource.data.coordinatorIds
+        && incoming().memberIds.toSet().difference(resource.data.memberIds.toSet()).size() == 0
+        && !resource.data.memberIds.toSet().difference(incoming().memberIds.toSet()).hasAny(resource.data.coordinatorIds)
+        && incoming().updatedAt == request.time;
+
+      // Aceitar convite: entra só a própria pessoa, como membro, e antes de vencer
       allow update: if signedIn()
         && resource.data.type == 'team'
         && !(me() in resource.data.memberIds)
@@ -319,34 +376,22 @@ service cloud.firestore {
         && changedOnly(roleKeys())
         && incoming().updatedAt == request.time;
 
-      // Sair do grupo: a pessoa tira só a si mesma de tudo (o gestor transfere antes)
+      // Sair do grupo: a pessoa tira só a si mesma (de membro e de coordenadora)
       allow update: if isMemberOf(resource.data)
-        && !(me() in resource.data.managerIds)
+        && resource.data.type == 'team'
         && changedOnly(roleKeys())
         && incoming().memberIds == resource.data.memberIds.removeAll([me()])
-        && incoming().assistantIds == resource.data.assistantIds.removeAll([me()])
-        && incoming().analystIds == resource.data.analystIds.removeAll([me()])
-        && incoming().observerIds == resource.data.observerIds.removeAll([me()])
-        && incoming().managerIds == resource.data.managerIds
+        && incoming().coordinatorIds == resource.data.coordinatorIds.removeAll([me()])
         && incoming().updatedAt == request.time;
 
-      allow delete: if signedIn() && me() == resource.data.ownerId;
+      // Excluir: Gestor (equipe) ou o dono (escala individual)
+      allow delete: if isGestorOf(resource.data) || isOwnerOf(resource.data);
 
-      // ----- Membros (cartão: cargo + dados copiados do perfil) -----
+      // ----- Membros (cartão: dados copiados do perfil) -----
       match /members/{memberId} {
-        // Cargo calculado pelos arrays do grupo; o cartão precisa sempre concordar com eles
-        function roleIn(g, id) {
-          return id in g.managerIds ? 'manager'
-            : id in g.assistantIds ? 'assistant'
-            : id in g.analystIds ? 'analyst'
-            : id in g.observerIds ? 'observer'
-            : 'staff';
-        }
-
         function validCard(d) {
-          return d.keys().hasOnly(['role', 'name', 'email', 'photoURL', 'categoryId', 'specialty', 'council',
+          return d.keys().hasOnly(['name', 'email', 'photoURL', 'categoryId', 'specialty', 'council',
                                    'joinedAt', 'addedBy'])
-            && d.role in ['manager', 'assistant', 'analyst', 'observer', 'staff']
             && str(d.name, 2, 80)
             && optStr(d.get('email', null), 254)
             && validPhoto(d.get('photoURL', null))
@@ -360,15 +405,14 @@ service cloud.firestore {
           return d.get('email', null) == null || d.email == request.auth.token.get('email', '').lower();
         }
 
-        allow read: if isMemberOf(groupData());
+        allow read: if canView(groupData());
 
-        // Criação do grupo (mesmo lote): o dono entra como gestor
+        // Criação do grupo (mesmo lote): o dono entra como membro
         allow create: if isSelf(memberId) && signedIn()
           && !exists(groupPath())
           && getAfter(groupPath()).data.ownerId == memberId
           && validCard(incoming())
           && ownEmail(incoming())
-          && incoming().role == 'manager'
           && incoming().joinedAt == request.time;
 
         // Aceitando convite (mesmo lote da entrada no grupo)
@@ -378,15 +422,9 @@ service cloud.firestore {
           && memberId in groupAfter().memberIds
           && validCard(incoming())
           && ownEmail(incoming())
-          && incoming().role == roleIn(groupAfter(), memberId)
           && incoming().joinedAt == request.time;
 
-        // Mudança de cargo (mesmo lote da mudança nos arrays)
-        allow update: if isAdminOf(groupData())
-          && changedOnly(['role'])
-          && incoming().role == roleIn(groupAfter(), memberId);
-
-        // A própria pessoa atualiza o cartão (nome, e-mail, foto, profissão)
+        // A própria pessoa atualiza o cartão (nome, e-mail, foto, cargo)
         allow update: if isSelf(memberId)
           && isMemberOf(groupData())
           && changedOnly(['name', 'email', 'photoURL', 'categoryId', 'specialty', 'council'])
@@ -395,7 +433,7 @@ service cloud.firestore {
 
         // Remover membro, sair do grupo ou excluir o grupo: o cartão sai junto
         allow delete: if signedIn()
-          && (isSelf(memberId) || isAdminOf(groupData()))
+          && (isSelf(memberId) || editorOf(groupData()))
           && (!existsAfter(groupPath()) || !(memberId in groupAfter().memberIds));
       }
 
@@ -408,8 +446,7 @@ service cloud.firestore {
       // ainda não pode ler o grupo.
       match /invites/{key} {
         function inviteCommon(d) {
-          return d.role in ['staff', 'assistant', 'analyst', 'observer']
-            && str(d.groupName, 3, 60)
+          return str(d.groupName, 3, 60)
             && optStr(d.unitName, 120)
             && d.invitedBy == me()
             && str(d.invitedByName, 1, 80)
@@ -420,7 +457,7 @@ service cloud.firestore {
         }
 
         function emailInvite(d) {
-          return d.keys().hasOnly(['email', 'role', 'groupName', 'unitName', 'invitedBy',
+          return d.keys().hasOnly(['email', 'groupName', 'unitName', 'invitedBy',
                                    'invitedByName', 'createdAt', 'expiresAt'])
             && d.email == key
             && key == key.lower()
@@ -429,7 +466,7 @@ service cloud.firestore {
         }
 
         function personInvite(d) {
-          return d.keys().hasOnly(['uid', 'name', 'role', 'groupName', 'unitName', 'invitedBy',
+          return d.keys().hasOnly(['uid', 'name', 'groupName', 'unitName', 'invitedBy',
                                    'invitedByName', 'createdAt', 'expiresAt'])
             && d.uid == key
             && str(d.name, 2, 80)
@@ -441,12 +478,12 @@ service cloud.firestore {
           return key == me() || key == myEmail();
         }
 
-        allow read: if signedIn() && (isMine() || isAdminOf(groupData()));
-        allow create, update: if isAdminOf(groupData())
+        allow read: if signedIn() && (isMine() || editorOf(groupData()));
+        allow create, update: if editorOf(groupData())
           && groupData().type == 'team'
           && (emailInvite(incoming()) || personInvite(incoming()))
           && inviteCommon(incoming());
-        allow delete: if signedIn() && (isMine() || isAdminOf(groupData()));
+        allow delete: if signedIn() && (isMine() || editorOf(groupData()));
 
         // Recusar: a própria pessoa marca o convite como recusado (em vez de apagar), para
         // quem convidou ficar sabendo. Só esses três campos mudam; o resto fica igual.
@@ -470,21 +507,21 @@ service cloud.firestore {
             && d.updatedAt == request.time;
         }
 
-        allow read: if isMemberOf(groupData());
-        allow create: if isManagerOf(groupData())
+        allow read: if canView(groupData());
+        allow create: if settingsEditorOf(groupData())
           && validShift(incoming())
           && incoming().createdAt == request.time;
-        allow update: if isManagerOf(groupData())
+        allow update: if settingsEditorOf(groupData())
           && validShift(incoming())
           && incoming().createdAt == resource.data.createdAt;
-        allow delete: if isManagerOf(groupData());
+        allow delete: if settingsEditorOf(groupData());
       }
 
       // ----- Histórico de movimentações (log imutável: sem update; delete só junto com o grupo) -----
-      // public == false: ação da gestão numa escala em rascunho; só gestor, auxiliar e
-      // analista veem (quem não vê rascunho consulta com where("public", "==", true)).
-      // Trocas, cessões e assumir plantão vago (quando existirem) podem ser gravadas por
-      // qualquer membro; as ações do editor, só por gestor ou auxiliar.
+      // public == false: ação numa escala em rascunho; só quem vê rascunho (Gestor, coordenador
+      // do grupo, dono) vê (os outros consultam com where("public", "==", true)).
+      // Trocas, cessões e assumir plantão vago podem ser gravadas por qualquer membro;
+      // as ações do editor, só por quem altera a escala.
       match /movements/{movementId} {
         function memberTypes() {
           return ['swap', 'cession', 'vacant_taken'];
@@ -534,14 +571,13 @@ service cloud.firestore {
             && d.createdAt == request.time;
         }
 
-        allow read: if isMemberOf(groupData())
+        allow read: if canView(groupData())
           && (resource.data.public == true || seesDraftsOf(groupData()));
-        allow create: if isMemberOf(groupData())
-          && validMovement(incoming())
-          && (incoming().type in memberTypes() || isAdminOf(groupData()));
+        allow create: if validMovement(incoming())
+          && ((isMemberOf(groupData()) && incoming().type in memberTypes()) || editorOf(groupData()));
         allow update: if false;
-        // Excluir o grupo (dono, no mesmo lote) leva o histórico junto
-        allow delete: if signedIn() && me() == groupData().ownerId && !existsAfter(groupPath());
+        // Excluir o grupo (no mesmo lote) leva o histórico junto
+        allow delete: if (isGestorOf(groupData()) || isOwnerOf(groupData())) && !existsAfter(groupPath());
       }
 
       // ----- Escala mensal (id = "YYYY-MM") -----
@@ -562,20 +598,16 @@ service cloud.firestore {
             && d.updatedAt == request.time;
         }
 
-        // Rascunho: só gestor, auxiliar e analista veem
-        function seesDrafts(g) {
-          return isAdminOf(g) || me() in g.get('analystIds', []);
-        }
-
-        allow read: if isMemberOf(groupData())
-          && (resource == null || resource.data.status == 'published' || seesDrafts(groupData()));
-        allow create: if isAdminOf(groupData())
+        // Rascunho: só Gestor, coordenador do grupo e dono veem
+        allow read: if canView(groupData())
+          && (resource == null || resource.data.status == 'published' || seesDraftsOf(groupData()));
+        allow create: if editorOf(groupData())
           && validSchedule(incoming())
           && incoming().createdAt == request.time;
-        allow update: if isAdminOf(groupData())
+        allow update: if editorOf(groupData())
           && validSchedule(incoming())
           && incoming().createdAt == resource.data.createdAt;
-        allow delete: if isManagerOf(groupData());
+        allow delete: if isGestorOf(groupData()) || isOwnerOf(groupData());
       }
     }
 

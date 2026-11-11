@@ -101,6 +101,24 @@ export async function canQueryGroup(token, collectionId, field, value) {
   throw new Error(`Erro inesperado: ${res.status} ${await res.text()}`);
 }
 
+// Consulta numa coleção da raiz com filtros [[campo, op, valor]] (op: EQUAL, ARRAY_CONTAINS)
+export async function canQuery(token, collectionId, filters) {
+  const fieldFilters = filters.map(([field, op, value]) => ({ fieldFilter: { field: { fieldPath: field }, op, value: toValue(value) } }));
+  const res = await fetch(`${DOCS}:runQuery`, {
+    method: 'POST',
+    headers: headers(token),
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId }],
+        where: fieldFilters.length === 1 ? fieldFilters[0] : { compositeFilter: { op: 'AND', filters: fieldFilters } },
+      },
+    }),
+  });
+  if (res.status === 403) return false;
+  if (res.ok) return true;
+  throw new Error(`Erro inesperado: ${res.status} ${await res.text()}`);
+}
+
 // ---------- Limpeza ----------
 export async function clearFirestore() {
   await fetch(`${FS_HOST}/emulator/v1/${DB}/documents`, { method: 'DELETE' });

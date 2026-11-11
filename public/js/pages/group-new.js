@@ -1,4 +1,4 @@
-// Wizard de criação de grupo (gestor) ou escala individual (plantonista).
+// Wizard de criação de grupo (Gestor ou Coordenador de escala) ou escala individual (qualquer pessoa).
 // Etapa 1: informações. Etapa 2: turnos.
 // O grupo é gravado ao sair da etapa 1, então dá para fechar e continuar depois.
 import {
@@ -25,6 +25,7 @@ import { GROUP_COLORS, DEFAULT_GROUP_COLOR, groupColor } from '/data/colors.js';
 import { STATES } from '/data/states.js';
 import { normalize, searchKeywords } from '../validators.js';
 import { memberCard } from '../members.js';
+import { groupRole, canEditSettings, canCreateTeam } from '../permissions.js';
 import { toMinutes, toTime, durationMinutes, endsNextDay, formatDuration, SHIFT_PRESETS } from '../shifts.js';
 import {
   escapeHtml,
@@ -40,7 +41,7 @@ import {
 } from '../ui.js';
 
 renderIcons();
-const { user, profile } = await initLayout({ active: 'schedules' });
+const { user, profile, access } = await initLayout({ active: 'schedules' });
 
 // ---------- Estado ----------
 const params = new URLSearchParams(location.search);
@@ -54,17 +55,26 @@ let stopShifts = null;
 
 const $ = (id) => document.getElementById(id);
 
-// Grupo já existente (continuar configuração)
+function leave(message) {
+  toast(message, 'error');
+  setTimeout(() => navigate('/schedules.html', { replace: true }), 1500);
+  return new Promise(() => {});
+}
+
+// Grupo já existente (continuar configuração ou editar): Gestor, dono da escala individual
+// ou o coordenador enquanto o grupo ainda está sendo criado
 if (groupId) {
   const snapshot = await getDoc(doc(db, 'groups', groupId)).catch(() => null);
-  if (!snapshot?.exists() || !snapshot.data().managerIds?.includes(user.uid)) {
-    toast('Grupo não encontrado ou você não tem permissão para editá-lo.', 'error');
-    setTimeout(() => navigate('/schedules.html', { replace: true }), 1500);
-    await new Promise(() => {});
+  const existing = snapshot?.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+  if (!existing || !canEditSettings(existing, groupRole(existing, user.uid, access.role))) {
+    await leave('Grupo não encontrado ou você não tem permissão para editá-lo.');
   }
-  group = { id: snapshot.id, ...snapshot.data() };
+  group = existing;
   type = group.type;
   selectedUnit = group.unit;
+} else if (type === 'team' && !canCreateTeam(access.role)) {
+  // Grupo de equipe novo: só Gestor e Coordenador de escala (cargo aprovado)
+  await leave('Criar grupo de equipe é para Gestor e Coordenador de escala.');
 }
 
 const isTeam = type === 'team';
@@ -126,9 +136,11 @@ function goTo(step, { focus = true } = {}) {
 // =========================================================
 const infoForm = $('step-info');
 
+// Categoria da equipe: só as profissões (Gestor e Coordenador de escala são cargos de acesso)
+const GROUP_CATEGORIES = PROFESSIONAL_CATEGORIES.filter((c) => !['gestor', 'coordenador-escala'].includes(c.id));
 $('group-category').insertAdjacentHTML(
   'beforeend',
-  PROFESSIONAL_CATEGORIES.map((c) => `<option value="${c.id}">${c.name}</option>`).join(''),
+  GROUP_CATEGORIES.map((c) => `<option value="${c.id}">${c.name}</option>`).join(''),
 );
 $('unit-state').insertAdjacentHTML(
   'beforeend',
@@ -407,7 +419,7 @@ infoForm.addEventListener('submit', async (event) => {
   }
 });
 
-// Cria o grupo e o registro do criador como gestor, juntos
+// Cria o grupo e o cartão de membro de quem cria, juntos
 async function createGroup(data) {
   const ref = doc(collection(db, 'groups'));
 
@@ -416,11 +428,9 @@ async function createGroup(data) {
     type,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
     ownerId: user.uid,
-    managerIds: [user.uid],
-    assistantIds: [],
-    analystIds: [],
-    observerIds: [],
     memberIds: [user.uid],
+    // Coordenador que cria o grupo já fica como coordenador dele (o Gestor vê todos)
+    coordinatorIds: type === 'team' && access.role === 'coordenador' ? [user.uid] : [],
     setupStep: 'shifts',
   };
 
@@ -428,7 +438,6 @@ async function createGroup(data) {
   batch.set(ref, { ...newGroup, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   batch.set(doc(db, 'groups', ref.id, 'members', user.uid), {
     ...memberCard(profile),
-    role: 'manager',
     joinedAt: serverTimestamp(),
   });
   await batch.commit();

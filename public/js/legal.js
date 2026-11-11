@@ -4,7 +4,7 @@
 // no perfil de quem aceita, em termsVersion) e LEGAL_UPDATED.
 import { icon } from './icons.js';
 
-export const TERMS_VERSION = '2026-11';
+export const TERMS_VERSION = '2026-11-10';
 export const LEGAL_UPDATED = '10 de novembro de 2026';
 
 const TERMS = `
@@ -19,7 +19,7 @@ profissionais, abrir vagas, publicar a escala do mês e acompanhar o histórico 
 
 <h3>2. Sua conta</h3>
 <ul>
-  <li>Você precisa informar dados verdadeiros e mantê-los atualizados, inclusive profissão e registro no conselho de classe, quando houver.</li>
+  <li>Você precisa informar dados verdadeiros e mantê-los atualizados, inclusive cargo e registro no conselho de classe, quando houver.</li>
   <li>A conta é pessoal e intransferível. Guarde a sua senha e não a compartilhe; você responde pelo que for feito com o seu acesso.</li>
   <li>Se perceber uso indevido da sua conta, troque a senha em Configurações e avise o administrador da plataforma.</li>
   <li>Para excluir a sua conta, peça ao administrador da plataforma. Antes, é preciso transferir a gestão dos grupos que você administra e não ter plantões a cumprir.</li>
@@ -27,7 +27,8 @@ profissionais, abrir vagas, publicar a escala do mês e acompanhar o histórico 
 
 <h3>3. Grupos, cargos e escalas</h3>
 <ul>
-  <li>Cada grupo tem um gestor, que define quem participa e com qual cargo (auxiliar, analista, observador ou plantonista). O que cada pessoa pode ver e alterar depende do cargo.</li>
+  <li>O seu cargo define o que você pode ver e alterar. O <strong>Gestor</strong> vê e altera as escalas de todos os grupos; o <strong>Coordenador de escala</strong> altera as escalas e os membros dos grupos que o Gestor liberar; o <strong>Administrativo</strong> vê as escalas publicadas de todos os grupos, sem alterar; o <strong>Médico</strong> vê as escalas dos grupos em que está.</li>
+  <li>Gestor, Coordenador de escala e Administrativo só passam a valer depois de aprovados por um Gestor ou pelo administrador da plataforma. Até lá, a pessoa vê só os grupos em que está. Escolher um cargo que não é o seu é uso indevido da plataforma.</li>
   <li>Quem monta ou altera uma escala é responsável pelas informações que registra. As alterações ficam no histórico do grupo, com o nome de quem as fez.</li>
   <li>A escala publicada no EscalaMed é uma ferramenta de organização. Ela não substitui as normas da instituição em que você trabalha, os contratos de trabalho ou de prestação de serviço, nem as regras do seu conselho profissional.</li>
   <li>Confirme com a coordenação da sua equipe qualquer dúvida sobre plantões, trocas, cessões e vagas.</li>
@@ -78,7 +79,7 @@ como você exerce os seus direitos, conforme a Lei Geral de Proteção de Dados 
 <ul>
   <li><strong>Cadastro e acesso:</strong> nome completo, e-mail, senha (guardada de forma criptografada pelo serviço de login, nunca em texto aberto), nome de usuário (opcional) e, se você entrar pelo Google, a foto da sua conta Google.</li>
   <li><strong>Contato e identificação:</strong> telefone, estado e CPF (opcional).</li>
-  <li><strong>Dados profissionais:</strong> profissão, especialidade, número e UF do registro no conselho de classe e, se você preencher, apelido, mini bio, currículo Lattes, certificações, formações e experiências.</li>
+  <li><strong>Dados profissionais:</strong> cargo, especialidade, número e UF do registro no conselho de classe e, se você preencher, apelido, mini bio, currículo Lattes, certificações, formações e experiências.</li>
   <li><strong>Escalas e grupos:</strong> grupos de que você participa e o seu cargo neles, convites enviados e recebidos, plantões em que está escalado, vagas, trocas, cessões e o histórico dessas movimentações.</li>
   <li><strong>Dados técnicos e de segurança:</strong> data do último acesso, data em que aceitou estes documentos e o endereço IP de pedidos ao serviço de contas (usado para limitar tentativas de senha e registrar ações sensíveis, como troca de e-mail e senha provisória).</li>
 </ul>
@@ -88,7 +89,7 @@ como você exerce os seus direitos, conforme a Lei Geral de Proteção de Dados 
 <ul>
   <li>criar e manter a sua conta e permitir o login com segurança;</li>
   <li>montar, publicar e exibir as escalas dos grupos de que você participa;</li>
-  <li>identificar você para a sua equipe (nome, foto, profissão e registro profissional);</li>
+  <li>identificar você para a sua equipe (nome, foto, cargo e registro profissional);</li>
   <li>enviar convites e avisos dentro do aplicativo;</li>
   <li>gerar relatórios de plantões e horas para os gestores do grupo;</li>
   <li>prevenir fraudes e acessos indevidos e manter registros de segurança.</li>
@@ -98,8 +99,10 @@ segurança da plataforma e, quando aplicável, o cumprimento de obrigações leg
 
 <h3>3. Quem vê os seus dados</h3>
 <ul>
-  <li><strong>Outros usuários logados</strong> podem ver o seu perfil profissional: nome, foto, profissão, especialidade, registro no conselho e as informações de "sobre" que você preencher.</li>
+  <li><strong>Outros usuários logados</strong> podem ver o seu perfil profissional: nome, foto, cargo, especialidade, registro no conselho e as informações de "sobre" que você preencher.</li>
   <li><strong>Membros dos seus grupos</strong> veem os seus plantões e as movimentações nas escalas daquele grupo, de acordo com o cargo de cada um.</li>
+  <li><strong>Gestores e Administrativos aprovados</strong> veem as escalas publicadas, o histórico e os relatórios de todos os grupos de equipe; os Gestores e os Coordenadores de escala do grupo veem também as escalas em rascunho.</li>
+  <li><strong>Gestores aprovados</strong> veem a lista de pessoas da plataforma com o cargo de cada uma, para aprovar ou recusar cargos.</li>
   <li><strong>Telefone e CPF</strong> ficam numa área privada da sua conta: só você tem acesso pelo aplicativo.</li>
   <li><strong>O administrador da plataforma</strong> vê a lista de contas (e-mail, situação e último acesso) para dar suporte, gerar senha provisória e inativar ou excluir acessos.</li>
 </ul>

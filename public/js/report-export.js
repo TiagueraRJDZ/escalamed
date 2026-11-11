@@ -30,7 +30,7 @@ const hours = (minutes) => Math.round((minutes / 60) * 100) / 100;
 // Uma linha por plantão, total por membro e total geral
 export async function exportXlsx(report, { groupName, start, end }) {
   const XLSX = await loadSheetJs();
-  const rows = [['Membro', 'Profissão', 'Registro', 'Data', 'Início', 'Fim', 'Turno', 'Período', 'Horas']];
+  const rows = [['Membro', 'Cargo', 'Registro', 'Data', 'Início', 'Fim', 'Turno', 'Período', 'Horas']];
   for (const person of report.people) {
     const profession = professionLabel(person.member);
     const council = councilLabel(person.member.council);
