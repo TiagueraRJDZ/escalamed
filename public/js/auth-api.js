@@ -119,3 +119,7 @@ export const adminSetAccess = (uid, active) => call('admin/acesso', { uid, ativo
 
 // Apaga o login e libera o nome de usuário (o perfil no Firestore é apagado antes, pelo app)
 export const adminDeleteAccount = (uid) => call('admin/excluir', { uid }, { signedIn: true });
+
+// Só Dev (Configurações > Apagar dados): tira todos os plantões das Agendas Google conectadas.
+// Devolve quantas pessoas têm a agenda conectada (o Google é limpo aos poucos, pelo Cron).
+export const devClearCalendars = async () => (await call('agenda/limpar-tudo', {}, { signedIn: true })).pessoas;

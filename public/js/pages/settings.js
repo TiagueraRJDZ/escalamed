@@ -15,9 +15,10 @@ import profissional from '../settings/profissional.js';
 import perfil from '../settings/perfil.js';
 import senha from '../settings/senha.js';
 import usuarios from '../settings/usuarios.js';
+import banco from '../settings/banco.js';
 
-const MODULES = Object.fromEntries([conta, profissional, perfil, senha, usuarios].map((m) => [m.hash, m]));
-const initialHash = location.hash; // "#usuarios" só vale depois de confirmar o cargo
+const MODULES = Object.fromEntries([conta, profissional, perfil, senha, usuarios, banco].map((m) => [m.hash, m]));
+const initialHash = location.hash; // "#usuarios" e "#banco" só valem depois de confirmar o cargo
 
 // Sem login, initLayout manda para a tela de entrada
 const { user, profile, access } = await initLayout({ active: 'settings', search: false });
@@ -60,7 +61,9 @@ if (privateData.email && privateData.email !== ctx.currentEmail()) {
 // Usuários: administrador da plataforma ou Gestor aprovado
 const isApprover = (value) => Boolean(value?.isAdmin || canApprove(value?.role));
 let approver = isApprover(access);
-const visible = () => SETTINGS_SECTIONS.filter((s) => !s.approverOnly || approver);
+// Apagar dados: só Dev
+let dev = Boolean(access?.isDev);
+const visible = () => SETTINGS_SECTIONS.filter((s) => (!s.approverOnly || approver) && (!s.devOnly || dev));
 const mounted = new Map(); // hash → { el, onShow }
 
 function show(section) {
@@ -98,10 +101,13 @@ route();
 // Confere o cargo no servidor (o da sessão pode estar velho): libera ou esconde "Usuários"
 loadMyAccess(user.uid).then((value) => {
   ctx.access = value;
-  const was = approver;
+  const before = `${approver}/${dev}`;
+  const openedHidden = !visible().some((s) => `#${s.hash}` === initialHash);
   approver = isApprover(value);
-  if (approver && !was && initialHash === `#${usuarios.hash}` && current === DEFAULT_SECTION) {
+  dev = Boolean(value?.isDev);
+  // Abriu direto em #usuarios ou #banco e o cargo só agora foi confirmado: volta para lá
+  if (openedHidden && current === DEFAULT_SECTION && visible().some((s) => `#${s.hash}` === initialHash)) {
     history.replaceState(null, '', initialHash);
   }
-  if (approver !== was) route();
+  if (`${approver}/${dev}` !== before) route();
 });

@@ -340,3 +340,13 @@
   .approval-item { flex-wrap: wrap; row-gap: var(--esp-2); }
   .approval-actions { width: 100%; justify-content: flex-end; }
 }
+
+/* ---------- Apagar dados (só Dev) ---------- */
+.wipe-warning { margin-bottom: var(--esp-2); }
+.wipe-counts { margin: 0; padding: 0; list-style: none; border: 1px solid var(--cor-borda); border-radius: var(--raio); }
+.wipe-counts li { display: flex; justify-content: space-between; gap: var(--esp-3); padding: var(--esp-2) var(--esp-3); font-size: var(--texto-sm); }
+.wipe-counts li + li { border-top: 1px solid var(--cor-borda); }
+.wipe-note { margin: var(--esp-2) 0 0; }
+.wipe-form { margin-top: var(--esp-5); max-width: 420px; }
+.wipe-form .btn { margin-top: var(--esp-2); }
+#wipe-status:empty { display: none; }

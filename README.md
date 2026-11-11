@@ -27,7 +27,7 @@ escalamed/
 │  ├─ relatorios.html   Relatório de Plantões por período (só gestor): resumo, por membro, Excel e PDF
 │  ├─ historico.html    Histórico: trocas, cessões, vagas e alterações na escala, por mês
 │  ├─ new-password.html troca obrigatória da senha provisória
-│  ├─ settings.html     Configurações: conta, profissão, perfil, senha, usuários (admin) e exclusão
+│  ├─ settings.html     Configurações: conta, profissão, perfil, senha, usuários (admin) e apagar dados (Dev)
 │  ├─ *.html            demais telas (algumas ainda provisórias)
 │  ├─ css/              base.css (cores e componentes), layout.css e um arquivo por tela
 │  ├─ js/

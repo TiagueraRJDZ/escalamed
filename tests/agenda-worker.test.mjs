@@ -364,6 +364,28 @@ test('acesso tirado na conta Google: fica desconectada', async () => {
   assert.equal(contaDe('ana'), undefined);
 });
 
+test('Dev apaga os dados: plantões saem de todas as agendas (o Cron termina), contas continuam', async () => {
+  await chamar('/agenda/conectar', { codigo: 'c1' }, 'ana');
+  await chamar('/agenda/conectar', { codigo: 'c2' }, 'bia');
+  await chamar('/agenda/meus-plantoes', { meses: ['2026-11'], escalas: [escala({ '07_d': ['ana'] })] }, 'ana');
+  await chamar('/agenda/meus-plantoes', { meses: ['2026-11'], escalas: [escala({ '08_d': ['bia'] })] }, 'bia');
+  assert.equal(eventosDe('ana').size, 1);
+
+  assert.equal((await chamar('/agenda/limpar-tudo', {}, 'gestor')).status, 403); // só Dev
+  devs = ['dev'];
+  const r = await chamar('/agenda/limpar-tudo', {}, 'dev');
+  assert.equal(r.status, 200);
+  assert.equal(r.pessoas, 2);
+  assert.equal(D1.linhas('SELECT * FROM agenda_desejados').length, 0);
+
+  const esperas = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => esperas.push(p) });
+  await Promise.all(esperas);
+  assert.equal(eventosDe('ana').size, 0);
+  assert.equal(eventosDe('bia').size, 0);
+  assert.ok(contaDe('ana'), 'continua conectada');
+});
+
 test('desconectar apaga a agenda do Google, revoga o acesso e limpa o banco', async () => {
   await chamar('/agenda/conectar', { codigo: 'c1' }, 'ana');
   await chamar('/agenda/meus-plantoes', { meses: ['2026-11'], escalas: [escala({ '07_d': ['ana'] })] }, 'ana');

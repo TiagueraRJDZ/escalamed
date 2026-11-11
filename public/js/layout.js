@@ -47,11 +47,11 @@ function saveCollapsed(collapsed) {
 
 // Item com subitens (Configurações): clicar abre e fecha a lista. Começa aberto na
 // própria página. Com o menu recolhido (só ícones), o clique leva direto para a página.
-function navGroup(item, active, { approver }) {
+function navGroup(item, active, { approver, dev }) {
   const open = isCurrent(item, active);
   const subitems = item.children
     .map(
-      (child) => `<li${child.approverOnly && !approver ? ' hidden' : ''} data-approver-only="${Boolean(child.approverOnly)}">
+      (child) => `<li${(child.approverOnly && !approver) || (child.devOnly && !dev) ? ' hidden' : ''} data-approver-only="${Boolean(child.approverOnly)}" data-dev-only="${Boolean(child.devOnly)}">
         <a class="nav-subitem" href="${item.href}#${child.hash}" data-hash="${child.hash}" title="${child.title}">
           ${icon(child.icon)}<span>${child.title}</span>
         </a></li>`,
@@ -114,13 +114,15 @@ function roleLabel(profile, value) {
 const menuOptions = (value) => ({
   reports: seesReports(value?.role),
   approver: Boolean(value?.isAdmin || canApprove(value?.role)),
+  dev: Boolean(value?.isDev),
 });
 
 function paintRole(app, profile, value) {
   app.querySelector('#account-role').textContent = roleLabel(profile, value);
-  const { reports, approver } = menuOptions(value);
+  const { reports, approver, dev } = menuOptions(value);
   app.querySelectorAll('[data-reports-only]').forEach((li) => (li.hidden = !reports));
   app.querySelectorAll('.nav-sub [data-approver-only="true"]').forEach((li) => (li.hidden = !approver));
+  app.querySelectorAll('.nav-sub [data-dev-only="true"]').forEach((li) => (li.hidden = !dev));
 }
 
 async function showRole(app, uid, profile) {

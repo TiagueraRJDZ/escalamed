@@ -8,6 +8,8 @@ export const SETTINGS_SECTIONS = [
   { hash: 'senha', title: 'Alterar senha', icon: 'lock' },
   // Usuários: administrador da plataforma e Gestor aprovado (aprovação de cargos)
   { hash: 'usuarios', title: 'Usuários', icon: 'users', approverOnly: true },
+  // Apagar dados: só Dev
+  { hash: 'banco', title: 'Apagar dados', icon: 'trash', devOnly: true },
 ];
 
 export const DEFAULT_SECTION = 'conta';

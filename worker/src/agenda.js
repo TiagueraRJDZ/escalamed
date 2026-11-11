@@ -26,6 +26,7 @@
  *   /agenda/meus-plantoes   { meses, escalas }
  *   /agenda/grupo           { grupoId, mes, publicada, turnos, celulas }
  *   /agenda/desconectar     {}                          apaga a agenda EscalaMed do Google
+ *   /agenda/limpar-tudo     {}                          só Dev: tira todos os plantões de todas as agendas
  *
  * Configuração (wrangler.toml e segredo):
  *   GOOGLE_CLIENTE  ID do cliente OAuth (o mesmo de googleClientId em public/js/config.js)
@@ -68,6 +69,7 @@ export function rotasDaAgenda(dependencias) {
       '/agenda/meus-plantoes': meusPlantoes,
       '/agenda/grupo': grupo,
       '/agenda/desconectar': desconectar,
+      '/agenda/limpar-tudo': limparTudo,
     },
     cron,
   };
@@ -282,6 +284,19 @@ async function desconectar(contexto) {
     await apagarConta(env, uid);
   }
   return { conectado: false };
+}
+
+// Dev apagou os dados da plataforma (Configurações > Apagar dados): nenhum plantão deve ficar
+// nas agendas. Esvazia o que deveria estar e marca todo mundo como pendente; o Cron apaga os
+// eventos no Google aos poucos. As contas conectadas continuam conectadas.
+async function limparTudo(contexto) {
+  const { env, local } = contexto;
+  const quem = await apoio.quemChamou(contexto);
+  if (!(await apoio.ehDev(env, quem.token, local))) throw new apoio.Falha(403, 'Só o Dev pode fazer isso.');
+  const bd = banco(env, novoOrcamento());
+  await bd.lote([['DELETE FROM agenda_desejados'], ['UPDATE agenda_contas SET pendente = 1']]);
+  const { pessoas } = await bd.um('SELECT COUNT(*) AS pessoas FROM agenda_contas');
+  return { pessoas };
 }
 
 // Cron: termina os envios pendentes, começando por quem esperou mais
