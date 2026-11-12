@@ -259,6 +259,4 @@
 
 /* Convites pendentes acima da lista */
 .my-invites { padding: var(--esp-4) var(--esp-4) 0; }
-/* Cargo aguardando aprovação (acima da lista de grupos) */
-.approval-notice { margin: var(--esp-4) var(--esp-4) 0; }
 .invite-card .group-avatar svg { width: 24px; height: 24px; }

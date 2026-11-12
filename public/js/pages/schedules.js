@@ -9,8 +9,6 @@ import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
 import { isMember, canCreateTeam, canEditSettings } from '../permissions.js';
 import { groupQueries, mergeGroups } from '../my-groups.js';
-import { myApprovalState } from '../access.js';
-import { categoryName } from '/data/categories.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays, dayShifts } from '../schedule-math.js';
 import { loadSchedule, loadShifts, scheduleShifts } from '../schedule-data.js';
@@ -18,18 +16,11 @@ import { formatClock } from '../shifts.js';
 import { isoDate } from '../dates.js';
 
 renderIcons();
-const { user, profile, access } = await initLayout({ active: 'schedules' });
+const { user, access } = await initLayout({ active: 'schedules' });
 const platformRole = access.role;
 
 // "Criar novo grupo" só para Gestor e Coordenador de escala (cargo aprovado)
 document.getElementById('new-team').hidden = !canCreateTeam(platformRole);
-
-// Cargo pedido ainda sem aprovação: avisa que, por enquanto, vale o acesso de membro
-if (myApprovalState(profile, access) === 'pending') {
-  const notice = document.getElementById('approval-notice');
-  notice.textContent = `Seu cargo de ${categoryName(profile.categoryId)} está aguardando aprovação de um Gestor ou do administrador. Até lá, você vê só os grupos em que está.`;
-  notice.hidden = false;
-}
 
 const listEl = document.getElementById('group-list');
 const searchInput = document.getElementById('group-search');

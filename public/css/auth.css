@@ -472,3 +472,21 @@
   98% { transform: translate(0px, 0px); }
   100% { transform: translate(0px, 0px); }
 }
+
+/* ---------- Aguardando aprovação do cargo (aguardando.html) ---------- */
+.pending-box { max-width: 440px; }
+.pending-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--esp-2);
+  border-radius: 50%;
+  color: var(--cor-alerta);
+  background: var(--cor-alerta-suave);
+}
+.pending-icon svg { width: 26px; height: 26px; }
+.pending-icon[data-state='declined'] { color: var(--cor-perigo); background: var(--cor-perigo-suave); }
+.pending-note { margin: 0; font-size: var(--texto-sm); text-align: center; }
+.link-button.pending-logout { color: var(--cor-perigo); }
+.link-button.pending-logout:hover { color: var(--cor-perigo-hover); }

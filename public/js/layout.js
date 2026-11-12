@@ -2,9 +2,9 @@
 // menu da conta, gaveta de Notificações e modal do Google Agenda.
 // Uso na página:  const { user, profile, access } = await initLayout({ active: 'schedules' });
 // access = { isDev, isAdmin, access, role }: cargo que vale (role: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null)
-import { auth } from './firebase.js';
+import { auth, navigate } from './firebase.js';
 import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
-import { pagePath } from './redirect.js';
+import { pagePath, nextParam } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, setupMenu } from './ui.js';
@@ -15,7 +15,7 @@ import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 import { whenActivated } from './prerender.js';
 import { setupNotifications } from './notifications.js';
 import { googleCalendarModalHtml, setupGoogleCalendar } from './gcal.js';
-import { cachedAccess, loadMyAccess, myApprovalState } from './access.js';
+import { cachedAccess, loadMyAccess, myApprovalState, isBarred, PENDING_PAGE } from './access.js';
 import { seesReports, canApprove } from './permissions.js';
 
 const NAV = [
@@ -125,8 +125,17 @@ function paintRole(app, profile, value) {
   app.querySelectorAll('.nav-sub [data-dev-only="true"]').forEach((li) => (li.hidden = !dev));
 }
 
+// Cargo aguardando aprovação (ou recusado): sai da plataforma para a tela de espera, que
+// volta para esta página quando o cargo for aprovado
+function leaveIfBarred(profile, value) {
+  if (!isBarred(profile, value)) return false;
+  navigate(`${PENDING_PAGE}${nextParam()}`, { replace: true });
+  return true;
+}
+
 async function showRole(app, uid, profile) {
   const value = await loadMyAccess(uid);
+  if (leaveIfBarred(profile, value)) return new Promise(() => {});
   paintRole(app, profile, value);
   return value;
 }
@@ -369,7 +378,9 @@ const PAGE_SKELETON = `<div class="page-skeleton" aria-hidden="true">
 export async function initLayout({ active, search = true } = {}) {
   // Com o resumo da sessão, o layout aparece na hora; o login é conferido em seguida
   const cached = readSessionSummary();
-  let app = cached ? mountShell(cached, cached.profile, active, search) : null;
+  // Cargo aguardando aprovação na última consulta: não desenha a plataforma (confere abaixo)
+  const barredBefore = cached && isBarred(cached.profile, cachedAccess(cached.uid));
+  let app = cached && !barredBefore ? mountShell(cached, cached.profile, active, search) : null;
 
   // Página pré-carregada: para aqui até a pessoa abrir. Assim login, leituras,
   // gravações e avisos da página só acontecem quando ela está de fato na tela.
@@ -381,17 +392,29 @@ export async function initLayout({ active, search = true } = {}) {
     location.reload();
     return new Promise(() => {});
   }
+  // Cargo guardado na sessão: serve se já liberava a entrada; senão, espera o servidor
+  // (pode ter acabado de ser aprovado). Sem acesso, vai para a tela de espera.
+  const saved = cachedAccess(user.uid);
+  const fresh = loadMyAccess(user.uid);
+  const access = saved && !isBarred(profile, saved) ? saved : await fresh;
+  if (leaveIfBarred(profile, access)) return new Promise(() => {});
+
   if (!app) app = mountShell(user, profile, active, search);
   shell = { app, user, profile };
   if (cached) paintAccount(shell); // nome ou foto podem ter mudado em outra aba
-  // Perfil do servidor chegou depois do cache (ver requireAuth): atualiza a pílula
-  window.addEventListener('escalamed:perfil', () => paintAccount(shell));
+  // Perfil do servidor chegou depois do cache (ver requireAuth): atualiza a pílula e
+  // confere o cargo de novo (pode ter sido trocado em outra aba)
+  window.addEventListener('escalamed:perfil', () => {
+    paintAccount(shell);
+    leaveIfBarred(profile, cachedAccess(user.uid));
+  });
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
   syncCardEmail(user, profile);
-  // Cargo: o guardado na sessão já serve; sem ele, espera a resposta (a página precisa dele)
-  const fresh = showRole(app, user.uid, profile);
-  const access = cachedAccess(user.uid) ?? (await fresh);
+  // Resposta do servidor (o guardado pode estar velho): atualiza o cargo e os itens do menu
+  fresh.then((value) => {
+    if (!leaveIfBarred(profile, value)) paintRole(app, profile, value);
+  });
   setupNotifications(app, user, profile);
   setupGoogleCalendar(app, user);
 

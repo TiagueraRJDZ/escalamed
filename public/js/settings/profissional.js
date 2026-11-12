@@ -1,16 +1,17 @@
 // Configurações > Informações profissionais: cargo (seletor com busca), especialidade
 // e registro no conselho. Os gestores dos grupos veem estes dados no cartão de membro.
 // Gestor, Coordenador de escala e Administrativo passam por aprovação: ao trocar de cargo, a
-// aprovação anterior (access/{uid}) é apagada e o cargo novo volta a aguardar.
+// aprovação anterior (access/{uid}) é apagada e o cargo novo volta a aguardar. Enquanto aguarda,
+// a pessoa fica sem acesso à plataforma (tela de espera, que também usa esta seção).
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from '../firebase.js';
-import { loadMyAccess, myApprovalState } from '../access.js';
+import { loadMyAccess, myApprovalState, isBarred } from '../access.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
 import { icon } from '../icons.js';
 import { normalize } from '../validators.js';
 import { syncMemberCards } from '../members.js';
-import { escapeHtml, toast, setLoading, clearFormErrors, clearErrorsWhileTyping, showFormAlert, firebaseErrorMessage, setFieldError } from '../ui.js';
+import { escapeHtml, toast, confirmDialog, setLoading, clearFormErrors, clearErrorsWhileTyping, showFormAlert, firebaseErrorMessage, setFieldError } from '../ui.js';
 import { showErrors, trackChanges, rowLinkHtml, setRowLink, createDialog } from './shared.js';
 
 function formHtml() {
@@ -62,12 +63,12 @@ const PICKER_DIALOG = {
     </div>
     <ul class="picker-list" id="profession-list" role="listbox" aria-label="Cargos"></ul>
     <p class="muted picker-empty" id="profession-empty" hidden>Nenhum cargo encontrado.</p>
-    <p class="field-hint picker-note">Gestor, Coordenador de escala e Administrativo passam a valer depois de aprovados por um Gestor ou pelo administrador.</p>`,
+    <p class="field-hint picker-note">Gestor, Coordenador de escala e Administrativo precisam ser aprovados por um Gestor ou pelo administrador. Até lá, a conta fica sem acesso à plataforma.</p>`,
 };
 
 // Situação do cargo salvo (aguardando, aprovado, recusado)
 const APPROVAL_TEXT = {
-  pending: 'Aguardando aprovação de um Gestor ou do administrador. Até lá, você vê só os grupos em que está.',
+  pending: 'Aguardando aprovação de um Gestor ou do administrador.',
   approved: 'Cargo aprovado.',
   declined: 'Pedido recusado. Fale com um Gestor ou com o administrador da plataforma.',
 };
@@ -167,6 +168,22 @@ export default {
       if (number && !/^[0-9A-Z.\-/]{1,20}$/.test(number)) errors.push([form.councilNumber, 'Use só números e letras.']);
       if (number && !councilState) errors.push([form.councilState, 'Escolha a UF.']);
       if (showErrors(errors)) return;
+
+      // Hoje com acesso e trocando para um cargo que passa por aprovação: avisa que a conta
+      // fica sem acesso até lá (o administrador e o Dev não passam por aprovação)
+      const access = ctx.access;
+      const needsApproval = category.needsApproval && category.id !== profile.categoryId && !access?.isDev && !access?.isAdmin;
+      if (
+        needsApproval &&
+        !isBarred(profile, access) &&
+        !(await confirmDialog({
+          title: `Trocar para ${category.name}?`,
+          message: `O cargo de ${category.name} precisa ser aprovado por um Gestor ou pelo administrador. Até a aprovação, você fica sem acesso à plataforma.`,
+          confirmText: 'Trocar e aguardar',
+        }))
+      ) {
+        return;
+      }
 
       changes.setBusy(true);
       setLoading(submit, true);

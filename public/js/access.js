@@ -56,10 +56,18 @@ export async function loadMyAccess(uid) {
     save(uid, value);
     return value;
   } catch {
-    return cachedAccess(uid) ?? { isDev: false, isAdmin: false, access: null, role: null };
+    // unknown: sem resposta do servidor nem nada guardado (não dá para dizer se foi aprovado)
+    return cachedAccess(uid) ?? { isDev: false, isAdmin: false, access: null, role: null, unknown: true };
   }
 }
 
 // Situação do cargo pedido no perfil ('none' | 'pending' | 'approved' | 'declined')
 export const myApprovalState = (profile, value) =>
   value?.isDev || value?.isAdmin ? 'none' : approvalState(profile, value?.access);
+
+// Tela de espera: quem pediu Gestor, Coordenador de escala ou Administrativo só entra na
+// plataforma depois de aprovado. Recusado também fica de fora até trocar de cargo.
+export const PENDING_PAGE = '/aguardando.html';
+
+export const isBarred = (profile, value) =>
+  !value?.unknown && ['pending', 'declined'].includes(myApprovalState(profile, value));

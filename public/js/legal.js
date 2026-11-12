@@ -28,7 +28,7 @@ profissionais, abrir vagas, publicar a escala do mês e acompanhar o histórico 
 <h3>3. Grupos, cargos e escalas</h3>
 <ul>
   <li>O seu cargo define o que você pode ver e alterar. O <strong>Gestor</strong> vê e altera as escalas de todos os grupos; o <strong>Coordenador de escala</strong> altera as escalas e os membros dos grupos que o Gestor liberar; o <strong>Administrativo</strong> vê as escalas publicadas de todos os grupos, sem alterar; o <strong>Médico</strong> vê as escalas dos grupos em que está.</li>
-  <li>Gestor, Coordenador de escala e Administrativo só passam a valer depois de aprovados por um Gestor ou pelo administrador da plataforma. Até lá, a pessoa vê só os grupos em que está. Escolher um cargo que não é o seu é uso indevido da plataforma.</li>
+  <li>Gestor, Coordenador de escala e Administrativo só passam a valer depois de aprovados por um Gestor ou pelo administrador da plataforma. Até lá, a conta fica sem acesso à plataforma (o mesmo vale para um pedido recusado). Escolher um cargo que não é o seu é uso indevido da plataforma.</li>
   <li>Quem monta ou altera uma escala é responsável pelas informações que registra. As alterações ficam no histórico do grupo, com o nome de quem as fez.</li>
   <li>A escala publicada no EscalaMed é uma ferramenta de organização. Ela não substitui as normas da instituição em que você trabalha, os contratos de trabalho ou de prestação de serviço, nem as regras do seu conselho profissional.</li>
   <li>Confirme com a coordenação da sua equipe qualquer dúvida sobre plantões, trocas, cessões e vagas.</li>

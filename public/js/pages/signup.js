@@ -224,11 +224,11 @@ $('signup-council-state').insertAdjacentHTML(
 $('specialty-options').innerHTML = SPECIALTIES.map((s) => `<option value="${s}"></option>`).join('');
 
 // Explica o cargo escolhido e mostra especialidade e registro conforme ele
-const APPROVAL_NOTE = 'Gestor, Coordenador de escala e Administrativo passam a valer depois de aprovados por um Gestor ou pelo administrador.';
+const APPROVAL_NOTE = 'Gestor, Coordenador de escala e Administrativo precisam ser aprovados por um Gestor ou pelo administrador antes de entrar na plataforma.';
 function updateProfessionalFields() {
   const category = getCategory($('signup-category').value);
   $('category-hint').textContent = category
-    ? `${category.hint ?? ''}${category.needsApproval ? ' Precisa de aprovação: até lá, você vê só os grupos em que está.' : ''}`.trim()
+    ? `${category.hint ?? ''}${category.needsApproval ? ' Precisa de aprovação: até lá, você fica sem acesso à plataforma.' : ''}`.trim()
     : APPROVAL_NOTE;
   $('specialty-field').hidden = !category?.specialty;
   $('council-fields').hidden = !category?.council;

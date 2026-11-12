@@ -2,7 +2,7 @@
 // "council": sigla do conselho de classe (mostrada como rótulo do registro). Sem conselho = null.
 // "specialty": pede especialidade no cadastro. "councilRequired": registro obrigatório.
 // "needsApproval": o cargo só vale depois de aprovado (Configurações > Usuários) pelo administrador
-// da plataforma ou por um Gestor; até lá a pessoa tem o acesso de um Médico (só os grupos em que está).
+// da plataforma ou por um Gestor; até lá a pessoa fica na tela de espera, sem entrar na plataforma.
 // "hint": explicação curta mostrada na escolha.
 // Só estes aparecem para escolher (cadastro e Configurações).
 // Para incluir um cargo novo, adicione aqui, na lista do optCategory no firestore.rules e no

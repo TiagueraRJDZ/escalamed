@@ -4,7 +4,8 @@
 //
 // O cargo é escolhido no cadastro (users/{uid}.categoryId). Gestor, Coordenador de escala e
 // Administrativo só valem depois de aprovados (access/{uid}); o administrador da plataforma
-// (config/admins) vale como Gestor. Sem cargo aprovado, a pessoa vê só os grupos em que está.
+// (config/admins) vale como Gestor. Pedido aguardando ou recusado: a pessoa nem entra na plataforma
+// (tela de espera, access.js); as regras, por segurança, dão a ela só o acesso de Médico.
 //   Dev (desenvolvedor, pelo e-mail no firestore.rules): acima de todos. Vê e altera tudo,
 //   inclusive as escalas individuais dos outros, e tem os poderes do administrador.
 //   Gestor: vê e altera todos os grupos de equipe; aprova cargos.

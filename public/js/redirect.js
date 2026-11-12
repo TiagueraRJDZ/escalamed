@@ -8,7 +8,7 @@ export const HOME = '/schedules.html';
 export const pagePath = (path) => path.replace(/\.html$/, '').replace(/^\/index$/, '/');
 
 // Páginas do fluxo de entrada: elas repassam o "next" em vez de virar o destino
-const AUTH_PAGES = ['/', '/signup', '/new-password'];
+const AUTH_PAGES = ['/', '/signup', '/new-password', '/aguardando'];
 
 // Para onde ir depois de entrar (só caminhos internos, para evitar redirecionamento malicioso)
 export function nextUrl() {
