@@ -466,6 +466,76 @@ a:hover {
   to { transform: rotate(360deg); }
 }
 
+/* ---------- Carregando com o ícone do EscalaMed ----------
+   "Cube Grid" adaptado ao ícone: grade 2x2 com as cores do logo, num painel azul da marca.
+   Cada quadrado encolhe e volta (1 → 0 → 1) em onda diagonal: começa no de baixo à
+   esquerda (0s), passa pela diagonal do meio (cima à esquerda e o verde com "+", 0.2s) e
+   termina no de cima à direita (0.4s). Proporções do logo: quadrado 12, espaço 2 e margem 7
+   (numa caixa de 40). Usado no login (.app-loader, loader.js) e no carregar das páginas
+   internas (.boot-spinner): o mesmo desenho do clique em Entrar até a página abrir. */
+/* view-transition-name: na troca de página (login → app) o painel fica parado no lugar */
+.cube-loader {
+  view-transition-name: carregando;
+  padding: 17px;
+  border-radius: var(--raio-lg);
+  background: #0e3bab;
+  box-shadow: 0 12px 32px rgb(10 22 70 / 0.28);
+}
+
+.cube-loader-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  width: 64px;
+  height: 64px;
+}
+
+.cube-loader-cube {
+  display: grid;
+  place-items: center;
+  border-radius: 29%;
+  background: #ffffff;
+  animation: cube-loader 1.3s infinite ease-in-out;
+}
+.cube-loader-cube:nth-child(1) { animation-delay: 0.2s; }                                        /* cima, esquerda */
+.cube-loader-cube:nth-child(2) { animation-delay: 0.4s; background: rgb(255 255 255 / 0.35); } /* cima, direita */
+.cube-loader-cube:nth-child(3) { animation-delay: 0s; background: rgb(255 255 255 / 0.35); }   /* baixo, esquerda */
+.cube-loader-cube:nth-child(4) { animation-delay: 0.2s; background: #2fd3b5; }                 /* baixo, direita: verde com "+" */
+.cube-loader-cube svg { width: 100%; height: 100%; }
+.cube-loader-cube path { fill: none; stroke: #0b4f45; stroke-width: 1.6; stroke-linecap: round; }
+
+@keyframes cube-loader {
+  0%, 70%, 100% { transform: scale(1); }
+  35% { transform: scale(0); }
+}
+
+/* Véu sobre a tela de login durante o envio (loader.js) */
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgb(10 22 70 / 0.28);
+  -webkit-backdrop-filter: var(--desfoque-modal);
+  backdrop-filter: var(--desfoque-modal);
+  animation: app-loader-in 160ms ease;
+}
+.app-loader[hidden] { display: none; }
+@keyframes app-loader-in {
+  from { opacity: 0; }
+}
+
+/* Movimento reduzido: sem encolher; os quadrados só piscam devagar, na mesma ordem */
+@media (prefers-reduced-motion: reduce) {
+  .app-loader { animation: none; }
+  .cube-loader-cube { animation-name: cube-loader-fade; animation-duration: 2.6s; }
+}
+@keyframes cube-loader-fade {
+  0%, 70%, 100% { opacity: 1; }
+  35% { opacity: 0.4; }
+}
+
 @keyframes brilho {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }

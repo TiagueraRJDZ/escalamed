@@ -6,6 +6,7 @@ import { nextUrl, nextParam } from '../redirect.js';
 import { renderIcons } from '../icons.js';
 import { mountCredits } from '../version.js';
 import { setupCarousel, setupPasswordToggles, setupGoogleButtons } from '../auth-ui.js';
+import { showLoader, hideLoader } from '../loader.js';
 import {
   setLoading,
   setFieldError,
@@ -62,11 +63,13 @@ function setupLogin() {
 
     const button = form.querySelector('[type=submit]');
     setLoading(button, true);
+    showLoader();
     try {
       const { signIn, navigate } = await firebaseReady;
       const { mustChangePassword } = await signIn(identifier, password);
       navigate(mustChangePassword ? `/new-password.html${nextParam()}` : nextUrl(), { replace: true });
     } catch (error) {
+      hideLoader();
       showFormAlert(form, firebaseErrorMessage(error));
       setLoading(button, false);
     }

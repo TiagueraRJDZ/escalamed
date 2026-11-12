@@ -5,6 +5,7 @@ import { icon } from './icons.js';
 import { PASSWORD_RULES } from './validators.js';
 import { nextUrl, nextParam } from './redirect.js';
 import { setLoading, toast, firebaseErrorMessage } from './ui.js';
+import { showLoader, hideLoader } from './loader.js';
 
 const SLIDES = [
   {
@@ -154,9 +155,11 @@ export function setupGoogleButtons() {
       try {
         const { navigate, loadProfile, isProfileComplete, signInWithGoogle } = deps ?? (await loading);
         const { user } = await signInWithGoogle();
+        showLoader(); // depois da janela do Google: carregando até abrir a próxima página
         const profile = await loadProfile(user.uid).catch(() => null);
         navigate(isProfileComplete(profile) ? nextUrl() : `/signup.html${nextParam()}`, { replace: true });
       } catch (error) {
+        hideLoader();
         const message = firebaseErrorMessage(error); // null quando a pessoa fechou a janela
         if (message) toast(message, 'error', 6000);
         setLoading(button, false);
