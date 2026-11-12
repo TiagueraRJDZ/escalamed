@@ -8,7 +8,7 @@ import { icon, renderIcons } from '../icons.js';
 import { escapeHtml, setupMenu, toast, firebaseErrorMessage } from '../ui.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
 import { loadMyGroups, loadMembers, groupLabel, rememberGroup, lastGroup } from '../my-groups.js';
-import { can } from '../permissions.js';
+import { can, seesReports } from '../permissions.js';
 import { loadShifts, loadSchedule, scheduleShifts } from '../schedule-data.js';
 import { collectShifts, buildShiftReport, MAX_RANGE_DAYS } from '../shift-report.js';
 import { formatDuration, toTime } from '../shifts.js';
@@ -22,7 +22,7 @@ const form = $('report-form');
 const body = $('report-body');
 
 // Grupos de equipe em que a pessoa vê relatórios (Gestor e Administrativo: todos; Coordenador:
-// os que coordena). Quem chega pelo endereço sem nenhum volta para Escalas com aviso.
+// os que coordena). Quem chega pelo endereço sem nenhum e sem cargo volta para Escalas com aviso.
 let groups = [];
 try {
   const mine = await loadMyGroups(user.uid, access.role);
@@ -32,10 +32,12 @@ try {
   body.innerHTML = errorState(firebaseErrorMessage(error));
   throw error;
 }
-if (!groups.length) {
+if (!groups.length && !seesReports(access.role)) {
   location.replace('/schedules.html?aviso=relatorios');
   await new Promise(() => {}); // a página está saindo: não monta o resto
 }
+// Tem cargo com Relatórios, mas ainda não há grupo de equipe: filtros na tela, sem gerar
+const noGroups = !groups.length;
 
 // ---------- Estados ----------
 function infoState(iconName, title, text = '') {
@@ -47,13 +49,19 @@ function errorState(message) {
 const initialState = () =>
   infoState('fileText', 'Selecione um grupo e um período para gerar o relatório', 'O relatório mostra os plantões das escalas publicadas, por membro, com as horas.');
 
-body.innerHTML = initialState();
+const noGroupsState = () =>
+  infoState('fileText', 'Nenhum grupo de equipe ainda', 'Os relatórios aparecem aqui quando houver um grupo de equipe com escala.');
+
+body.innerHTML = noGroups ? noGroupsState() : initialState();
 
 // ---------- Filtros ----------
 const groupSelect = $('report-group');
-groupSelect.innerHTML = groups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(groupLabel(g))}</option>`).join('');
+groupSelect.innerHTML = noGroups
+  ? '<option value="">Nenhum grupo de equipe</option>'
+  : groups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(groupLabel(g))}</option>`).join('');
+groupSelect.disabled = noGroups;
 const remembered = lastGroup('relatorios');
-groupSelect.value = groups.some((g) => g.id === remembered) ? remembered : groups[0].id;
+groupSelect.value = groups.some((g) => g.id === remembered) ? remembered : (groups[0]?.id ?? '');
 
 const selectedGroup = () => groups.find((g) => g.id === groupSelect.value);
 let members = [];
@@ -61,6 +69,7 @@ let members = [];
 async function fillMembers() {
   const select = $('report-member');
   select.disabled = true;
+  if (noGroups) return; // sem grupo: fica só "Todos os membros", desativado
   members = await loadMembers(groupSelect.value).catch(() => []);
   select.innerHTML =
     '<option value="">Todos os membros</option>' +
@@ -83,7 +92,7 @@ function validate() {
   else if (end.value < start.value) message = 'A data final precisa ser igual ou depois da inicial.';
   else if (daysBetween(start.value, end.value) + 1 > MAX_RANGE_DAYS) message = `Escolha um período de até ${MAX_RANGE_DAYS} dias.`;
   $('range-error').textContent = start.value && end.value ? message : '';
-  $('report-submit').disabled = Boolean(message);
+  $('report-submit').disabled = Boolean(message) || noGroups;
   markRange();
   return !message;
 }
@@ -183,6 +192,7 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!validate()) return;
   const group = selectedGroup();
+  if (!group) return;
   const start = form.start.value;
   const end = form.end.value;
   const uid = form.member.value || null;

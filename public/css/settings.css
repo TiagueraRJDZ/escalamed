@@ -316,7 +316,7 @@
 .settings-section .alert { font-size: var(--texto-md); }
 
 /* ---------- Cargo: explicação no seletor e situação da aprovação ---------- */
-.picker-option small { display: block; margin-top: 2px; color: var(--cor-texto-3); font-size: var(--texto-sm); font-weight: 400; }
+.picker-option small { display: block; margin-top: 2px; color: var(--cor-texto-3); font-size: var(--texto-xs); font-weight: 400; line-height: 1.4; }
 .picker-note { margin: var(--esp-3) 0 0; }
 .approval-status { display: block; margin-top: var(--esp-1); }
 .approval-status[data-state='pending'] { color: var(--cor-alerta); }

@@ -298,6 +298,11 @@ let loadId = 0;
 
 async function load() {
   const id = ++loadId;
+  if (!groups.length) {
+    list.setAttribute('aria-busy', 'false');
+    list.innerHTML = emptyState('Você ainda não participa de grupos', 'O histórico mostra as movimentações das escalas dos seus grupos.');
+    return;
+  }
   list.setAttribute('aria-busy', 'true');
   list.innerHTML = skeleton();
   limit = PAGE;
@@ -332,15 +337,13 @@ try {
   throw error;
 }
 
-if (!groups.length) {
-  list.setAttribute('aria-busy', 'false');
-  list.innerHTML = emptyState('Você ainda não participa de grupos', 'O histórico mostra as movimentações das escalas dos seus grupos.');
-  document.querySelector('.report-filters').hidden = true;
-} else {
+// Sem grupos, os filtros continuam na tela: o de grupo fica desativado e a lista mostra o aviso
+{
   const select = $('history-group');
   select.innerHTML =
     `<option value="${ALL}">Todos os meus grupos</option>` +
     groups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(groupLabel(g))}</option>`).join('');
+  select.disabled = !groups.length;
   const remembered = lastGroup('historico');
   state.group = remembered && (remembered === ALL || groups.some((g) => g.id === remembered)) ? remembered : ALL;
   select.value = state.group;
