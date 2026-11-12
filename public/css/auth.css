@@ -23,7 +23,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
-  background: var(--cor-superficie);
+  /* Off-white do brandbook Hapvida (o mesmo fundo do app) */
+  background: var(--cor-fundo);
 }
 
 /* Painel branco mais estreito: o lado azul fica com o resto da tela */
@@ -345,7 +346,7 @@
 .signup-progress-bar {
   height: 6px;
   border-radius: var(--raio-total);
-  background: var(--cor-superficie-2);
+  background: var(--cor-borda);
   overflow: hidden;
 }
 .signup-progress-bar span {
@@ -474,6 +475,8 @@
 }
 
 /* ---------- Aguardando aprovação do cargo (aguardando.html) ---------- */
+/* Telas sem o lado azul (aguardando.html, new-password.html): fundo off-white do brandbook */
+.solo-page { min-height: 100vh; background: var(--cor-fundo); }
 .pending-box { max-width: 440px; }
 .pending-icon {
   display: grid;
