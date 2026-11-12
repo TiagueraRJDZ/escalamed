@@ -268,6 +268,14 @@
 .user-actions { display: flex; flex-shrink: 0; gap: var(--esp-1); }
 .user-actions .btn-icon[data-action='delete'] { color: var(--cor-perigo); }
 .user-actions .btn-icon[data-action='delete']:hover:not(:disabled) { background: var(--cor-perigo-suave); }
+/* Inativar acesso em vermelho; reativar em verde */
+.user-actions .btn-icon.is-deactivate { color: var(--cor-perigo); }
+.user-actions .btn-icon.is-deactivate:hover:not(:disabled) { background: var(--cor-perigo-suave); }
+.user-actions .btn-icon.is-activate { color: var(--cor-sucesso); }
+.user-actions .btn-icon.is-activate:hover:not(:disabled) { background: var(--cor-sucesso-suave); }
+/* Redefinir senha: chave amarela (tom dourado, legível sobre o branco) */
+.user-actions .btn-icon[data-action='password'] { color: #ca8a04; }
+.user-actions .btn-icon[data-action='password']:hover:not(:disabled) { background: #fef6d8; }
 .user-item.is-inactive .avatar,
 .user-item.is-inactive .member-info { opacity: 0.55; }
 

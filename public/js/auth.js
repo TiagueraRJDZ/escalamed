@@ -162,7 +162,7 @@ export async function signOutUser() {
 // Sai na hora, mostra o aviso por alguns segundos e leva para a tela de entrada, que repete o
 // aviso (?sessao=encerrada). Sem o layout do app (ex.: tela de espera), vai direto.
 const EXPIRED_URL = '/?sessao=encerrada';
-const EXPIRED_SECONDS = 5;
+const EXPIRED_SECONDS = 2; // curto: a sessão já caiu, o aviso só confirma (a tela de entrada repete)
 
 function showExpiredDialog() {
   if (!document.querySelector('.app')) return false;

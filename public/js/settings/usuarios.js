@@ -143,8 +143,8 @@ export default {
       const off = me || p.semLogin ? ' disabled' : '';
       const name = escapeHtml(p.name);
       const accessButton = p.inativa
-        ? `<button type="button" class="btn-icon" data-action="access" title="Reativar acesso" aria-label="Reativar acesso de ${name}"${off}>${icon('userCheck')}</button>`
-        : `<button type="button" class="btn-icon" data-action="access" title="Inativar acesso" aria-label="Inativar acesso de ${name}"${off}>${icon('ban')}</button>`;
+        ? `<button type="button" class="btn-icon is-activate" data-action="access" title="Reativar acesso" aria-label="Reativar acesso de ${name}"${off}>${icon('userCheck')}</button>`
+        : `<button type="button" class="btn-icon is-deactivate" data-action="access" title="Inativar acesso" aria-label="Inativar acesso de ${name}"${off}>${icon('ban')}</button>`;
       const classes = ['member-item', 'user-item', p.inativa ? 'is-inactive' : '', barred ? `is-barred is-${state}` : ''];
       return `<li class="${classes.filter(Boolean).join(' ')}" data-uid="${escapeHtml(p.uid)}">
         ${avatarHtml(profile ?? { name: p.name }, 'avatar member-avatar')}
