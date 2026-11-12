@@ -4,6 +4,7 @@ import {
   doc,
   getDoc,
   getDocFromCache,
+  onSnapshot,
   terminate,
   clearIndexedDbPersistence,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -130,13 +131,125 @@ export async function requireAuth({ profileComplete = true, allowTemporaryPasswo
   return { user, profile };
 }
 
-export async function signOutUser() {
+// ---------- Saída ----------
+let signingOut = false;
+// "Sair" clicado nesta ou em outra aba: as outras abas saem sem o aviso de acesso expirado
+const LOGOUT_KEY = 'escalamed:saiu';
+
+// Encerra a sessão neste aparelho: login, respostas guardadas e cache local do Firestore
+async function endLocalSession() {
   clearSession();
-  await signOut(auth);
-  // Apaga o cache local do Firestore (dados da conta não ficam no aparelho).
-  // Com outra aba do app aberta não dá para apagar agora; fica para a próxima saída.
+  await signOut(auth).catch(() => {});
+  // Com outra aba do app aberta não dá para apagar o cache agora; fica para a próxima saída.
   markLeaving(); // as listas em tempo real vão receber "shutting down": não é erro
   await terminate(db).catch(() => {});
   await clearIndexedDbPersistence(db).catch(() => {});
+}
+
+export async function signOutUser() {
+  if (signingOut) return;
+  signingOut = true;
+  try {
+    localStorage.setItem(LOGOUT_KEY, String(Date.now()));
+  } catch {
+    // sem armazenamento: as outras abas mostram o aviso de acesso expirado
+  }
+  await endLocalSession();
   navigate('/', { replace: true });
+}
+
+// ---------- Acesso expirado (sessão encerrada pelo administrador) ----------
+// Sai na hora, mostra o aviso por alguns segundos e leva para a tela de entrada, que repete o
+// aviso (?sessao=encerrada). Sem o layout do app (ex.: tela de espera), vai direto.
+const EXPIRED_URL = '/?sessao=encerrada';
+const EXPIRED_SECONDS = 5;
+
+function showExpiredDialog() {
+  if (!document.querySelector('.app')) return false;
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  const dialog = document.createElement('dialog');
+  dialog.className = 'modal modal-center session-expired';
+  dialog.setAttribute('aria-labelledby', 'session-expired-title');
+  dialog.setAttribute('aria-describedby', 'session-expired-text');
+  dialog.innerHTML = `
+    <div class="dialog-body">
+      <span class="session-expired-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+      <h2 id="session-expired-title">Seu acesso expirou</h2>
+      <p class="muted" id="session-expired-text">A sua sessão foi encerrada pelo administrador da plataforma. Se precisar de acesso, fale com ele.</p>
+      <p class="muted text-sm" aria-live="polite">Indo para a tela de entrada em <span data-seconds>${EXPIRED_SECONDS}</span> s…</p>
+    </div>
+    <div class="dialog-footer"><button type="button" class="btn btn-primary">Ir para a tela de entrada</button></div>`;
+  document.body.append(dialog);
+  const go = () => location.replace(EXPIRED_URL);
+  dialog.addEventListener('cancel', (event) => event.preventDefault()); // Esc não fecha
+  dialog.querySelector('button').addEventListener('click', go);
+  dialog.showModal();
+  dialog.querySelector('button').focus();
+  let left = EXPIRED_SECONDS;
+  const timer = setInterval(() => {
+    left -= 1;
+    dialog.querySelector('[data-seconds]').textContent = String(Math.max(left, 0));
+    if (left <= 0) {
+      clearInterval(timer);
+      go();
+    }
+  }, 1000);
+  return true;
+}
+
+async function expireSession() {
+  if (signingOut) return;
+  signingOut = true;
+  const shown = showExpiredDialog();
+  await endLocalSession();
+  if (!shown) location.replace(EXPIRED_URL);
+}
+
+// Inativar, gerar senha provisória ou excluir o acesso derruba as sessões no Firebase, mas o
+// app só perceberia ao abrir outra página. Aqui ele sai na hora:
+//  1. sessions/{uid}.endedAt (gravado por Configurações > Usuários no clique) depois do login
+//     desta sessão: chega em tempo real;
+//  2. ao voltar para a aba, confere a conta no Firebase;
+//  3. o Firebase desconectou sozinho (não conseguiu renovar o login).
+// Sair pelo botão (nesta ou em outra aba) não conta como acesso expirado.
+const ENDED_CODES = ['auth/user-disabled', 'auth/user-token-expired', 'auth/user-not-found', 'auth/invalid-user-token'];
+
+function loggedOutOnPurpose() {
+  try {
+    return Date.now() - Number(localStorage.getItem(LOGOUT_KEY) || 0) < 15000;
+  } catch {
+    return false;
+  }
+}
+
+export async function watchSession(user) {
+  // Conferindo a conta: se ela caiu, o próprio Firebase desconecta antes de devolver o erro;
+  // quem decide a saída é o catch abaixo
+  let checking = false;
+  onAuthStateChanged(auth, (current) => {
+    if (current || signingOut || checking) return;
+    if (loggedOutOnPurpose()) signOutUser();
+    else expireSession();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || signingOut || checking) return;
+    checking = true;
+    user
+      .reload()
+      .catch((error) => {
+        if (ENDED_CODES.includes(error?.code) || !auth.currentUser) expireSession();
+      })
+      .finally(() => (checking = false));
+  });
+
+  const authTime = Date.parse((await user.getIdTokenResult().catch(() => null))?.authTime ?? '') || 0;
+  onSnapshot(
+    doc(db, 'sessions', user.uid),
+    (snapshot) => {
+      const endedAt = snapshot.data()?.endedAt?.toMillis?.() ?? 0;
+      if (endedAt > authTime) expireSession();
+    },
+    () => {}, // regras ainda não publicadas ou sem conexão: ficam os outros dois avisos
+  );
 }

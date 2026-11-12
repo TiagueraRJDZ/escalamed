@@ -124,6 +124,21 @@ test('ninguém lê os dados pessoais de outra pessoa', async () => {
   assert.ok(!(await canRead(gestor.token, `users/${medico.uid}/private/data`)));
 });
 
+// ---------- Sessão encerrada pelo administrador (sessions/{uid}) ----------
+const endSession = (actor, target, extra = {}) =>
+  commit(actor.token, [w.set(`sessions/${target.uid}`, { endedAt: NOW, endedBy: actor.uid, ...extra })]);
+
+test('sessão encerrada: só o administrador grava (nunca sobre si); só a própria pessoa lê', async () => {
+  assert.ok(!(await endSession(gestor, medico)));
+  assert.ok(!(await endSession(medico, medico)));
+  assert.ok(!(await endSession(platformAdmin, platformAdmin)));
+  assert.ok(!(await endSession(platformAdmin, medico, { endedBy: gestor.uid })));
+  assert.ok(!(await endSession(platformAdmin, medico, { motivo: 'x' })));
+  assert.ok(await endSession(platformAdmin, medico));
+  assert.ok(await canRead(medico.token, `sessions/${medico.uid}`));
+  assert.ok(!(await canRead(gestor.token, `sessions/${medico.uid}`)));
+});
+
 // ---------- Aprovação de cargos ----------
 const approve = (actor, target, categoryId, approved = true) =>
   commit(actor.token, [w.set(`access/${target.uid}`, { categoryId, approved, decidedBy: actor.uid, decidedAt: NOW })]);

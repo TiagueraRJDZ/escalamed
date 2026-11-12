@@ -627,6 +627,17 @@ service cloud.firestore {
       allow read: if signedIn();
     }
 
+    // Sessão encerrada pelo administrador (inativar, senha provisória, excluir acesso):
+    // sessions/{uid} = { endedAt, endedBy }. A própria pessoa lê: o app dela escuta este
+    // documento e sai na hora. Só o administrador grava, nunca sobre si mesmo.
+    match /sessions/{uid} {
+      allow read: if isSelf(uid);
+      allow create, update: if isPlatformAdmin() && uid != me()
+        && incoming().keys().hasOnly(['endedAt', 'endedBy'])
+        && incoming().endedAt == request.time
+        && incoming().endedBy == me();
+    }
+
     // Dev: lê e grava qualquer documento (soma-se às regras acima; para os outros nada muda).
     // config/dev (pode nem existir) só o Dev lê: é assim que o app e o serviço de contas
     // sabem que a conta é Dev.

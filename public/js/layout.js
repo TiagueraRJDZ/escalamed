@@ -3,7 +3,7 @@
 // Uso na página:  const { user, profile, access } = await initLayout({ active: 'schedules' });
 // access = { isDev, isAdmin, access, role }: cargo que vale (role: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null)
 import { auth, navigate } from './firebase.js';
-import { requireAuth, signOutUser, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
+import { requireAuth, signOutUser, watchSession, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { pagePath, nextParam } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
@@ -398,6 +398,8 @@ export async function initLayout({ active, search = true } = {}) {
   const fresh = loadMyAccess(user.uid);
   const access = saved && !isBarred(profile, saved) ? saved : await fresh;
   if (leaveIfBarred(profile, access)) return new Promise(() => {});
+  // Inativado, senha redefinida ou acesso excluído pelo administrador: sai na hora
+  watchSession(user);
 
   if (!app) app = mountShell(user, profile, active, search);
   shell = { app, user, profile };

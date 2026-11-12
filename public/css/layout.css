@@ -830,3 +830,21 @@ dialog {
   --texto-lg: 1.25rem;
   --texto-xl: 1.5rem;
 }
+
+/* ---------- Acesso expirado (auth.js): aviso antes de ir para a tela de entrada ---------- */
+.session-expired { width: min(420px, calc(100vw - 2rem)); }
+.session-expired .dialog-body { display: flex; flex-direction: column; align-items: center; gap: var(--esp-2); padding-top: var(--esp-6); }
+.session-expired h2 { font-size: var(--texto-lg); }
+.session-expired p { margin: 0; }
+.session-expired .dialog-footer { padding-bottom: var(--esp-5); }
+.session-expired-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--esp-2);
+  border-radius: 50%;
+  color: var(--cor-perigo);
+  background: var(--cor-perigo-suave);
+}
+.session-expired-icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

@@ -1,6 +1,7 @@
 // Configurações > Usuários: administrador da plataforma (uid em config/admins) e Gestor aprovado.
-// No topo, os cargos aguardando aprovação (Gestor, Coordenador de escala e Administrativo):
-// aprovar ou recusar grava access/{uid}. Cada linha mostra o selo do cargo.
+// Quem pediu Gestor, Coordenador de escala ou Administrativo e ainda não foi aprovado (ou foi
+// recusado) está sem acesso à plataforma: aparece no topo da lista, com a linha destacada e
+// os botões Aprovar/Recusar (gravam access/{uid}). Cada linha mostra o selo do cargo.
 // Só o administrador vê o login (e-mail, usuário, situação), que vem do serviço de contas, e as
 // ações de senha provisória, inativar e excluir (o serviço confere em config/admins).
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -76,10 +77,17 @@ async function loadPlatformUsers(ui, isAdmin) {
 // Situação do cargo de alguém (o administrador da plataforma não passa por aprovação)
 const stateOf = (p) => (p.isAdmin ? 'none' : approvalState(p.profile, p.access));
 
+// Sem acesso à plataforma por causa do cargo: aguardando aprovação ou recusado
+const isWaiting = (p) => Boolean(p.profile) && stateOf(p) === 'pending';
+const isBarred = (p) => Boolean(p.profile) && ['pending', 'declined'].includes(stateOf(p));
+
 const APPROVAL_BADGE = {
-  pending: '<span class="badge badge-warning">Aguardando aprovação</span>',
-  declined: '<span class="badge badge-danger">Cargo recusado</span>',
+  pending: `<span class="badge badge-warning">${icon('lock')}Sem acesso · aguardando aprovação</span>`,
+  declined: `<span class="badge badge-danger">${icon('lock')}Sem acesso · cargo recusado</span>`,
 };
+
+// Na lista: primeiro quem aguarda aprovação, depois os recusados, depois o resto (por nome)
+const listOrder = (p) => (isWaiting(p) ? 0 : isBarred(p) ? 1 : 2);
 
 export default {
   hash: 'usuarios',
@@ -89,11 +97,6 @@ export default {
     // Administrador: tudo. Gestor: só aprovar cargos (a lista vem só dos perfis).
     const isAdmin = () => Boolean(ctx.access?.isAdmin);
     container.innerHTML = `
-      <section class="approvals" id="approvals" aria-labelledby="approvals-title" hidden>
-        <h2 class="settings-label" id="approvals-title">Aguardando aprovação</h2>
-        <p class="muted approvals-intro">Cargos que dão acesso além dos próprios grupos. Confira se a pessoa é mesmo desse cargo antes de aprovar.</p>
-        <ul class="member-list" id="approvals-list"></ul>
-      </section>
       <div class="users-header">
         <p class="muted users-intro" id="users-intro"></p>
         <span class="muted text-sm" id="users-count"></span>
@@ -106,8 +109,6 @@ export default {
       <ul class="member-list" id="users-list" aria-live="polite"></ul>
       <p class="muted users-empty" id="users-empty" hidden></p>`;
     const ui = {
-      approvals: container.querySelector('#approvals'),
-      approvalsList: container.querySelector('#approvals-list'),
       intro: container.querySelector('#users-intro'),
       list: container.querySelector('#users-list'),
       empty: container.querySelector('#users-empty'),
@@ -121,8 +122,14 @@ export default {
       const me = p.uid === user.uid;
       const profile = p.profile;
       const state = stateOf(p);
+      const barred = isBarred(p);
       const login = [p.usuario ? `@${p.usuario}` : '', p.email ?? ''].filter(Boolean).join(' · ');
       const work = profile ? [professionLabel(profile), councilLabel(profile.council)].filter(Boolean).join(' · ') : '';
+      // Sem acesso: o cargo pedido vem primeiro, em destaque
+      const details = barred
+        ? `Pediu o cargo <strong>${escapeHtml(categoryName(profile.categoryId))}</strong>` +
+          escapeHtml([login, councilLabel(profile.council)].filter(Boolean).map((t) => ` · ${t}`).join(''))
+        : escapeHtml([login, work].filter(Boolean).join(' · ') || 'Sem dados de login');
       const badges = [
         me ? '<span class="badge badge-primary">Você</span>' : '',
         // Só dá para saber se a própria conta é Dev (a lista fica no firestore.rules)
@@ -138,13 +145,15 @@ export default {
       const accessButton = p.inativa
         ? `<button type="button" class="btn-icon" data-action="access" title="Reativar acesso" aria-label="Reativar acesso de ${name}"${off}>${icon('userCheck')}</button>`
         : `<button type="button" class="btn-icon" data-action="access" title="Inativar acesso" aria-label="Inativar acesso de ${name}"${off}>${icon('ban')}</button>`;
-      return `<li class="member-item user-item${p.inativa ? ' is-inactive' : ''}" data-uid="${escapeHtml(p.uid)}">
+      const classes = ['member-item', 'user-item', p.inativa ? 'is-inactive' : '', barred ? `is-barred is-${state}` : ''];
+      return `<li class="${classes.filter(Boolean).join(' ')}" data-uid="${escapeHtml(p.uid)}">
         ${avatarHtml(profile ?? { name: p.name }, 'avatar member-avatar')}
         <div class="member-info">
           <strong>${name}${badges}</strong>
-          <span>${escapeHtml([login, work].filter(Boolean).join(' · ') || 'Sem dados de login')}</span>
+          <span>${details}</span>
         </div>
         <div class="user-actions">
+          ${decisionButtons(p)}
           ${roleButton(p, name)}
           ${
             isAdmin()
@@ -174,44 +183,31 @@ export default {
       return '';
     }
 
-    // Bloco "Aguardando aprovação"
-    function approvalHtml(p) {
-      const name = escapeHtml(p.name);
-      const role = escapeHtml(categoryName(p.profile?.categoryId));
-      const work = [p.usuario ? `@${p.usuario}` : '', p.email ?? '', councilLabel(p.profile?.council)].filter(Boolean).join(' · ');
-      const mine = p.uid === user.uid;
-      return `<li class="member-item user-item approval-item" data-uid="${escapeHtml(p.uid)}">
-        ${avatarHtml(p.profile ?? { name: p.name }, 'avatar member-avatar')}
-        <div class="member-info">
-          <strong>${name}${mine ? '<span class="badge badge-primary">Você</span>' : ''}</strong>
-          <span>Pediu o cargo <strong>${role}</strong>${work ? ` · ${escapeHtml(work)}` : ''}</span>
-        </div>
-        <div class="approval-actions">
-          ${
-            !decidesFor(p)
-              ? '<span class="muted text-sm">Outro Gestor ou o administrador precisa aprovar</span>'
-              : `<button type="button" class="btn btn-secondary" data-action="decline">Recusar</button>
-          <button type="button" class="btn btn-primary" data-action="approve">${icon('check')}Aprovar</button>`
-          }
-        </div>
-      </li>`;
+    // Aguardando aprovação: Recusar e Aprovar na própria linha
+    function decisionButtons(p) {
+      if (!isWaiting(p) || !decidesFor(p)) return '';
+      return `<span class="user-decision">
+          <button type="button" class="btn btn-secondary" data-action="decline">Recusar</button>
+          <button type="button" class="btn btn-primary" data-action="approve">${icon('check')}Aprovar</button>
+        </span>`;
     }
 
     function renderUsers() {
       ui.intro.textContent = isAdmin()
         ? 'Todas as contas da plataforma. Ao fim de cada linha: aprovar cargo, redefinir senha, inativar acesso e excluir acesso.'
         : 'Pessoas da plataforma e o cargo de cada uma. Aprove ou recuse os pedidos de Gestor, Coordenador de escala e Administrativo.';
-      const pending = platformUsers.filter((p) => p.profile && stateOf(p) === 'pending');
-      ui.approvals.hidden = !pending.length;
-      ui.approvalsList.innerHTML = pending.map(approvalHtml).join('');
       const term = normalize(ui.search.value);
-      const shown = platformUsers.filter((p) => !term || normalize(`${p.name} ${p.usuario ?? ''} ${p.email ?? ''}`).includes(term));
+      const shown = platformUsers
+        .filter((p) => !term || normalize(`${p.name} ${p.usuario ?? ''} ${p.email ?? ''}`).includes(term))
+        .sort((a, b) => listOrder(a) - listOrder(b)); // estável: dentro de cada grupo, segue por nome
       ui.list.innerHTML = shown.map(rowHtml).join('');
       ui.empty.hidden = shown.length > 0;
       ui.empty.textContent = platformUsers.length ? 'Ninguém encontrado.' : 'Nenhum usuário na plataforma.';
       const inactive = platformUsers.filter((p) => p.inativa).length;
+      const waiting = platformUsers.filter(isWaiting).length;
       ui.count.textContent =
         `${platformUsers.length} ${platformUsers.length === 1 ? 'usuário' : 'usuários'}` +
+        (waiting ? ` · ${waiting} aguardando aprovação` : '') +
         (inactive ? ` · ${inactive} ${inactive === 1 ? 'inativo' : 'inativos'}` : '');
     }
 
@@ -241,6 +237,12 @@ export default {
       }
     });
 
+    // Avisa o app da pessoa que a sessão foi encerrada (auth.js: watchSession): a tela dela sai
+    // na hora, com o aviso de acesso expirado. Quem derruba o login de verdade é o serviço de contas.
+    function endSession(person) {
+      setDoc(doc(db, 'sessions', person.uid), { endedAt: serverTimestamp(), endedBy: user.uid }).catch(() => {});
+    }
+
     async function resetPassword(person) {
       const ok = await confirmDialog({
         title: 'Redefinir senha?',
@@ -248,6 +250,7 @@ export default {
         confirmText: 'Gerar senha provisória',
       });
       if (!ok) return;
+      endSession(person); // sai na hora, sem esperar o serviço de contas
       const password = await adminTemporaryPassword(person.uid);
       tempDialog.querySelector('#temp-password-text').innerHTML = `Passe esta senha para <strong>${escapeHtml(person.name)}</strong> por um canal seguro. Ela não fica guardada: anote antes de fechar.`;
       tempDialog.querySelector('#temp-password').value = password;
@@ -271,9 +274,18 @@ export default {
             },
       );
       if (!ok) return;
-      await adminSetAccess(person.uid, activate);
+      // Na hora: a pessoa sai já com o aviso (sessions/{uid}) e a linha muda, sem esperar o
+      // serviço de contas (que leva alguns segundos). Se ele falhar, a linha volta como estava.
+      if (!activate) endSession(person);
       person.inativa = !activate;
       renderUsers();
+      try {
+        await adminSetAccess(person.uid, activate);
+      } catch (error) {
+        person.inativa = activate;
+        renderUsers();
+        throw error;
+      }
       toast(activate ? `Acesso de ${person.name} reativado.` : `Acesso de ${person.name} inativado.`, 'success');
     }
 
@@ -285,6 +297,7 @@ export default {
         danger: true,
       });
       if (!ok) return;
+      if (!person.semLogin) endSession(person); // sai na hora, antes de o perfil sumir
       // Primeiro o perfil (pelas regras: só o administrador ou a própria pessoa); depois o login
       if (person.profile) {
         const batch = writeBatch(db);
@@ -307,8 +320,8 @@ export default {
         const ok = await confirmDialog({
           title: revoking ? 'Retirar aprovação?' : 'Recusar cargo?',
           message: revoking
-            ? `${person.name} deixa de ter o acesso de ${role} e passa a ver só os grupos em que está.`
-            : `${person.name} continua com o acesso de membro (só os grupos em que está). Se mudar de cargo, o pedido volta para a lista.`,
+            ? `${person.name} deixa de ter o acesso de ${role} e fica sem acesso à plataforma até ser aprovado(a) de novo.`
+            : `${person.name} continua sem acesso à plataforma. Dá para aprovar depois, pela linha na lista de usuários.`,
           confirmText: revoking ? 'Retirar' : 'Recusar',
           danger: true,
         });

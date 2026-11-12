@@ -3,7 +3,7 @@
 // em tempo real (access/{uid}) e a pessoa segue para a página que tinha aberto.
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate } from '../firebase.js';
-import { requireAuth, nextUrl, signOutUser } from '../auth.js';
+import { requireAuth, nextUrl, signOutUser, watchSession } from '../auth.js';
 import { loadMyAccess, myApprovalState, isBarred } from '../access.js';
 import { categoryName } from '/data/categories.js';
 import { renderIcons } from '../icons.js';
@@ -52,6 +52,7 @@ function paint() {
 
 if (!enterIfAllowed()) {
   paint();
+  watchSession(user); // acesso inativado ou excluído enquanto espera: sai na hora
 
   // O documento access/{uid} muda quando um Gestor ou o administrador decide
   onSnapshot(

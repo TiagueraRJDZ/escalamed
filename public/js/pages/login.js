@@ -76,8 +76,20 @@ function setupLogin() {
   });
 }
 
+// ---------- Sessão encerrada pelo administrador (auth.js: watchSession) ----------
+// Mostra o aviso e tira o "?sessao=" do endereço (recarregar não mostra de novo)
+function showSessionEnded() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('sessao') !== 'encerrada') return;
+  document.getElementById('session-ended').hidden = false;
+  params.delete('sessao');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+}
+
 // ---------- Início ----------
 renderIcons();
+showSessionEnded();
 setupCarousel();
 mountCredits();
 setupPasswordToggles();

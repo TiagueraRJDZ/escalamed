@@ -493,3 +493,6 @@
 .pending-note { margin: 0; font-size: var(--texto-sm); text-align: center; }
 .link-button.pending-logout { color: var(--cor-perigo); }
 .link-button.pending-logout:hover { color: var(--cor-perigo-hover); }
+
+/* Aviso de sessão encerrada pelo administrador (index.html) */
+.session-ended { margin-bottom: var(--esp-4); font-size: var(--texto-sm); }

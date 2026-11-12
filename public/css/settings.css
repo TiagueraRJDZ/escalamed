@@ -323,23 +323,24 @@
 .approval-status[data-state='approved'] { color: var(--cor-sucesso); }
 .approval-status[data-state='declined'] { color: var(--cor-perigo); }
 
-/* ---------- Usuários: cargos aguardando aprovação ---------- */
-.approvals {
-  margin-bottom: var(--esp-5);
-  padding: var(--esp-4);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+/* ---------- Usuários: sem acesso por causa do cargo (aguardando aprovação ou recusado) ----------
+   Linha em destaque no topo da lista: fundo suave, faixa na esquerda e foto apagada,
+   para bater o olho e saber que a pessoa ainda não entra na plataforma. */
+#users-list .user-item.is-barred {
+  margin: var(--esp-1) calc(var(--esp-3) * -1);
+  padding-inline: var(--esp-3);
+  border-bottom: 0;
+  border-radius: var(--raio);
   background: var(--cor-alerta-suave);
+  box-shadow: inset 4px 0 0 var(--cor-alerta);
 }
-.approvals .settings-label { margin-top: 0; }
-.approvals-intro { margin: var(--esp-1) 0 var(--esp-3); font-size: var(--texto-sm); }
-.approval-item { background: var(--cor-superficie); }
-.approval-item .member-info strong strong { font-weight: 600; }
-.approval-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; gap: var(--esp-2); }
-@media (max-width: 560px) {
-  .approval-item { flex-wrap: wrap; row-gap: var(--esp-2); }
-  .approval-actions { width: 100%; justify-content: flex-end; }
-}
+#users-list .user-item.is-declined { background: var(--cor-perigo-suave); box-shadow: inset 4px 0 0 var(--cor-perigo); }
+#users-list .user-item.is-barred .avatar { filter: grayscale(1); opacity: 0.6; }
+#users-list .user-item.is-barred .member-info span strong { font-weight: 600; color: var(--cor-texto); }
+#users-list .member-info .badge svg { width: 12px; height: 12px; }
+.user-decision { display: flex; align-items: center; gap: var(--esp-2); margin-right: var(--esp-2); }
+.user-decision .btn { min-height: 36px; padding: 0 var(--esp-3); }
+.user-decision .btn-secondary { background: var(--cor-superficie); }
 
 /* ---------- Apagar dados (só Dev) ---------- */
 .wipe-warning { margin-bottom: var(--esp-2); }
