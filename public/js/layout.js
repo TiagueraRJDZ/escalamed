@@ -14,6 +14,7 @@ import { syncMemberCards } from './members.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
 import { whenActivated } from './prerender.js';
 import { setupNotifications } from './notifications.js';
+import { registerServiceWorker, syncPush } from './push.js';
 import { googleCalendarModalHtml, setupGoogleCalendar } from './gcal.js';
 import { cachedAccess, loadMyAccess, myApprovalState, isBarred, PENDING_PAGE } from './access.js';
 import { seesReports, canApprove } from './permissions.js';
@@ -224,6 +225,8 @@ function dialogsHtml() {
     <dialog class="drawer" id="drawer-notifications" aria-labelledby="drawer-notifications-title">
       <div class="dialog-header"><h2 id="drawer-notifications-title">Notificações</h2>${closeButton}</div>
       <div class="dialog-body">
+        <!-- Notificações push neste aparelho: ativar, situação e passo a passo do iPhone (notifications.js) -->
+        <div class="push-panel" id="push-panel" aria-live="polite"></div>
         <div class="chips" role="group" aria-label="Filtrar notificações">
           <button type="button" class="chip" data-filter="management" aria-pressed="false">Gestão</button>
           <button type="button" class="chip" data-filter="shifts" aria-pressed="false">Plantões</button>
@@ -424,8 +427,11 @@ export async function initLayout({ active, search = true } = {}) {
   fresh.then((value) => {
     if (!leaveIfBarred(profile, value)) paintRole(app, profile, value);
   });
-  setupNotifications(app, user, profile);
+  setupNotifications(app, user, profile, access); // access.isDev: teste do push em todos os aparelhos
   setupGoogleCalendar(app, user);
+  // Notificações push: o service worker vale em todas as telas; com o push ativado, confere a inscrição
+  registerServiceWorker();
+  syncPush(user.uid);
 
   mountCredits(app);
   app.querySelector('.page-skeleton')?.remove();

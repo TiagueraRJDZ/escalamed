@@ -3,8 +3,11 @@
 //  - convites que ela mandou e foram recusados (Dispensar).
 // O sininho mostra quantas há; o que chega com a página aberta também vira um aviso.
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
+// No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
+// chegarem no celular com o app fechado.
 import { icon } from './icons.js';
-import { escapeHtml, toast, setLoading, firebaseErrorMessage } from './ui.js';
+import { pushStatus, enablePush, disablePush, dismissPush, resetPushChoice, sendTestPush, sendTestPushToAll, setAppBadge } from './push.js';
+import { escapeHtml, toast, setLoading, firebaseErrorMessage, confirmDialog } from './ui.js';
 import {
   watchMyInvites,
   watchDeclinedInvites,
@@ -76,6 +79,7 @@ function renderBell() {
   }
   badge.textContent = count > 9 ? '9+' : String(count);
   badge.hidden = count === 0;
+  setAppBadge(count); // o mesmo número no ícone do app (celular), onde o sistema suporta
   const label = count ? `Notificações (${count} ${count === 1 ? 'nova' : 'novas'})` : 'Notificações';
   bell.setAttribute('aria-label', label);
   bell.title = label;
@@ -163,8 +167,175 @@ function tracker(onNew) {
   };
 }
 
-export function setupNotifications(app, user, profile) {
-  session = { app, user, profile };
+// ---------- Notificações push neste aparelho (topo da gaveta) ----------
+const onPhone = () => window.matchMedia('(pointer: coarse)').matches;
+
+function pushCard({ tone = '', iconName, title, text, body = '', actions = '' }) {
+  return `<div class="push-card${tone ? ` is-${tone}` : ''}">
+    <span class="push-card-icon" aria-hidden="true">${icon(iconName)}</span>
+    <div class="push-card-text">
+      <strong>${title}</strong>
+      ${text ? `<span>${text}</span>` : ''}
+      ${body}
+    </div>
+    ${actions ? `<div class="push-card-actions">${actions}</div>` : ''}
+  </div>`;
+}
+
+// Linha discreta (já decidido: ativo, dispensado ou bloqueado)
+function pushLine({ tone = '', iconName, text, actions = '' }) {
+  return `<div class="push-line${tone ? ` is-${tone}` : ''}">
+    ${icon(iconName)}<span>${text}</span>${actions ? `<span class="push-line-actions">${actions}</span>` : ''}
+  </div>`;
+}
+
+function pushPanelHtml(state) {
+  const where = onPhone() ? 'no celular' : 'neste computador';
+  if (state.support === 'unsupported') return '';
+  const apple = /iPhone|iPod/.test(navigator.userAgent) ? 'iPhone' : 'iPad';
+  if (state.support === 'ios-old') {
+    return pushLine({ iconName: 'smartphone', text: `Para receber as notificações no ${apple}, atualize o sistema (iOS 16.4 ou mais novo).` });
+  }
+  if (state.support === 'ios-install') {
+    if (state.dismissed) {
+      return pushLine({
+        iconName: 'smartphone',
+        text: `Notificações no ${apple}: adicione o EscalaMed à Tela de Início.`,
+        actions: '<button type="button" class="btn-link" data-push="howto">Como fazer</button>',
+      });
+    }
+    return pushCard({
+      iconName: 'smartphone',
+      title: `Receba os avisos no seu ${apple}`,
+      text: `No ${apple}, as notificações chegam pelo EscalaMed instalado na Tela de Início:`,
+      body: `<ol class="push-steps">
+        <li>No Safari, toque em ${icon('share')}<b>Compartilhar</b>.</li>
+        <li>Escolha ${icon('plusSquare')}<b>Adicionar à Tela de Início</b>.</li>
+        <li>Abra o EscalaMed pela Tela de Início e ative as notificações aqui no sininho.</li>
+      </ol>`,
+      actions: '<button type="button" class="btn btn-ghost" data-push="later">Agora não</button>',
+    });
+  }
+  if (state.permission === 'denied') {
+    return pushLine({
+      tone: 'warning',
+      iconName: 'bellOff',
+      text: `Notificações bloqueadas ${where}. Libere nas configurações do navegador (permissões do site) e volte aqui.`,
+    });
+  }
+  if (state.enabled) {
+    return pushLine({
+      tone: 'success',
+      iconName: 'checkCircle',
+      text: `Notificações ativas ${where}.`,
+      actions: `<button type="button" class="btn-link" data-push="test">Testar</button>
+        <button type="button" class="btn-link is-muted" data-push="disable">Desativar</button>`,
+    });
+  }
+  if (state.dismissed) {
+    return pushLine({
+      iconName: 'bellOff',
+      text: `Notificações ${where} desativadas.`,
+      actions: '<button type="button" class="btn-link" data-push="enable">Ativar</button>',
+    });
+  }
+  return pushCard({
+    tone: 'primary',
+    iconName: 'bellRing',
+    title: `Receba os avisos ${where}`,
+    text: 'Convites e respostas chegam na hora, mesmo com o EscalaMed fechado.',
+    actions: `<button type="button" class="btn btn-primary" data-push="enable">${icon('bellRing')}Ativar notificações</button>
+      <button type="button" class="btn btn-ghost" data-push="later">Agora não</button>`,
+  });
+}
+
+// Só Dev: teste para todos os aparelhos ativos da plataforma (aparece mesmo sem push neste aparelho)
+const devTestHtml = () =>
+  session.isDev
+    ? `<div class="push-dev">
+        <span>${icon('megaphone')}Dev: testar o push em todas as contas ativas (celular e computador).</span>
+        <button type="button" class="btn btn-secondary" data-push="test-all">${icon('bellRing')}Testar em todos os aparelhos</button>
+      </div>`
+    : '';
+
+async function renderPushPanel() {
+  const panel = document.getElementById('push-panel');
+  if (!panel || !session) return;
+  const state = await pushStatus(session.user.uid).catch(() => ({ support: 'unsupported' }));
+  panel.innerHTML = pushPanelHtml(state) + devTestHtml();
+  panel.hidden = !panel.innerHTML.trim();
+}
+
+async function testAllDevices() {
+  const ok = await confirmDialog({
+    title: 'Testar em todos os aparelhos?',
+    message: 'Todas as pessoas com as notificações ativas vão receber "Teste de notificações", no celular e no computador.',
+    confirmText: 'Enviar teste',
+  });
+  if (!ok) return;
+  const { aparelhos, contas, enviados } = await sendTestPushToAll();
+  if (!aparelhos) {
+    toast('Nenhum aparelho está com as notificações ativas ainda.');
+    return;
+  }
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const falhas = aparelhos - enviados;
+  toast(
+    `Teste enviado para ${plural(enviados, 'aparelho', 'aparelhos')} de ${plural(contas, 'conta', 'contas')}` +
+      (falhas ? ` (${plural(falhas, 'aparelho não aceitou', 'aparelhos não aceitaram')}; os que saíram do serviço foram removidos).` : '.'),
+    falhas ? 'info' : 'success',
+    8000,
+  );
+}
+
+function setupPushPanel() {
+  const panel = document.getElementById('push-panel');
+  if (!panel) return;
+  renderPushPanel();
+  // Abrir o sininho confere de novo (a permissão pode ter mudado nas configurações do aparelho)
+  session.app.querySelector('#notifications-button')?.addEventListener('click', renderPushPanel);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && renderPushPanel());
+
+  panel.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-push]');
+    if (!button) return;
+    const { uid } = session.user;
+    const action = button.dataset.push;
+    if (action === 'later') {
+      dismissPush(uid);
+      renderPushPanel();
+      return;
+    }
+    if (action === 'howto') {
+      resetPushChoice(uid);
+      renderPushPanel();
+      return;
+    }
+    setLoading(button, true);
+    try {
+      if (action === 'enable') {
+        await enablePush(uid);
+        toast('Pronto! Os avisos do sininho vão chegar neste aparelho.', 'success');
+      } else if (action === 'disable') {
+        await disablePush(uid);
+        toast('Este aparelho não vai mais receber as notificações.');
+      } else if (action === 'test') {
+        await sendTestPush();
+        toast('Notificação de teste enviada. Ela deve aparecer em alguns segundos.', 'success');
+      } else if (action === 'test-all') {
+        await testAllDevices();
+      }
+    } catch (error) {
+      toast(error.message || 'Não foi possível concluir. Tente de novo.', 'error', 6000);
+    }
+    if (button.isConnected) setLoading(button, false);
+    renderPushPanel();
+  });
+}
+
+export function setupNotifications(app, user, profile, access = {}) {
+  session = { app, user, profile, isDev: Boolean(access?.isDev) };
+  setupPushPanel();
 
   const receivedChanged = tracker((inv) => toast(`Novo convite para ${inv.groupName}. Veja no sininho.`, 'info', 6000));
   watchMyInvites(user, (list, meta) => {

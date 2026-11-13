@@ -39,6 +39,10 @@ export const authApiUrl = useEmulators
 // Passo a passo em "Agenda Google" no README.
 export const googleClientId = '227779900020-24293hkjt0ie4j6sfr64m3ab06h0ciql.apps.googleusercontent.com';
 
+// Notificações push no celular: chave pública VAPID (não é senha). A mesma de VAPID_PUBLICA
+// no worker/wrangler.toml; a privada fica só no Worker (segredo VAPID_PRIVADA).
+export const vapidPublicKey = 'BAG8ACs0CJM8BN9Ezty2Z0oIvVIO1L8uO1WSmG-uItdyv8YYCFoIcvEuKhzoTQwCPnb5EZ8SdfuFx1f1LgO5SD0';
+
 // App Check com reCAPTCHA v3 (invisível): bloqueia robôs no login, no cadastro e no banco.
 // Vazio = desligado. Para ligar, veja "App Check" no README e cole aqui a chave do site.
 export const appCheckSiteKey = '';

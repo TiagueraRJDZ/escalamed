@@ -419,6 +419,109 @@ body.is-booting.has-shell .page-skeleton {
 .notification-item.is-declined { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
 .notification-item.is-declined .notification-icon { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
 
+/* ---------- Notificações push neste aparelho (topo da gaveta do sininho) ---------- */
+.push-panel { margin-bottom: var(--esp-4); }
+.push-panel:empty,
+.push-panel[hidden] { display: none; }
+
+/* Convite (ativar) e passo a passo do iPhone */
+.push-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+  padding: var(--esp-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: var(--cor-superficie-2);
+}
+.push-card.is-primary { border-color: var(--cor-primaria-borda); background: var(--cor-primaria-suave); }
+.push-card-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px 10px 16px 10px;
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+}
+.push-card-icon svg { width: 20px; height: 20px; }
+.push-card-text { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--esp-1); min-width: 0; }
+.push-card-text strong { font-weight: 500; color: var(--cor-primaria); }
+.push-card-text > span { color: var(--cor-texto-2); font-size: var(--texto-sm); }
+/* Botões embaixo do ícone e do texto, na largura toda: o principal em cima, "Agora não" embaixo
+   (lado a lado não cabem na gaveta do celular) */
+.push-card-actions { display: flex; flex: 1 1 100%; flex-direction: column; gap: var(--esp-1); }
+.push-card-actions .btn { width: 100%; }
+.push-card-actions .btn-ghost { min-height: 38px; }
+.push-card-actions .btn-primary svg { width: 18px; height: 18px; }
+
+/* Passo a passo (iPhone): ícones do Safari no meio do texto */
+.push-steps {
+  display: grid;
+  gap: var(--esp-2);
+  margin: var(--esp-1) 0 0;
+  padding-left: 1.25rem;
+  color: var(--cor-texto);
+  font-size: var(--texto-sm);
+}
+.push-steps svg {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0 4px -3px 2px;
+  color: var(--cor-primaria);
+}
+.push-steps b { font-weight: 500; }
+
+/* Linha discreta: ativo, dispensado, bloqueado */
+.push-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-2);
+  font-size: var(--texto-sm);
+}
+.push-line > svg { flex-shrink: 0; width: 18px; height: 18px; }
+.push-line > span { flex: 1 1 12rem; min-width: 0; }
+/* Ações juntas, à direita (se faltar espaço, descem juntas para a linha de baixo) */
+.push-line > .push-line-actions { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: var(--esp-1); margin-left: auto; }
+.push-line.is-success { background: var(--cor-sucesso-suave); color: var(--cor-sucesso); }
+.push-line.is-warning { background: var(--cor-alerta-suave); color: var(--cor-alerta); }
+.push-line .btn-link {
+  min-height: 32px;
+  padding: 0 var(--esp-2);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: none;
+  color: var(--cor-primaria);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.push-line .btn-link:hover { background: rgb(21 57 170 / 0.08); }
+.push-line .btn-link.is-muted { color: var(--cor-texto-2); }
+.push-line .btn-link.is-loading { opacity: 0.6; pointer-events: none; }
+
+/* Só Dev: teste do push em todos os aparelhos ativos */
+.push-dev {
+  display: grid;
+  gap: var(--esp-2);
+  margin-top: var(--esp-2);
+  padding: var(--esp-3);
+  border: 1px dashed var(--cor-borda-forte);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  color: var(--cor-texto-2);
+  font-size: var(--texto-sm);
+}
+.push-dev > span { display: flex; align-items: flex-start; gap: var(--esp-2); }
+.push-dev > span svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 2px; color: var(--cor-primaria); }
+.push-dev .btn { width: 100%; }
+
 /* Bolinha de "tem notificação nova" */
 .has-dot { position: relative; }
 .has-dot::after {

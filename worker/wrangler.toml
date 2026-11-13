@@ -20,10 +20,15 @@ ORIGENS = "https://escalamed-hapvida.web.app,https://escalamed-hapvida.firebasea
 # googleClientId em public/js/config.js); a chave secreta vai como segredo:
 #   npx wrangler secret put GOOGLE_SEGREDO
 GOOGLE_CLIENTE = "227779900020-24293hkjt0ie4j6sfr64m3ab06h0ciql.apps.googleusercontent.com"
-# Link "Ver no EscalaMed" nos eventos
+# Link "Ver no EscalaMed" nos eventos (e contato do VAPID e links das notificações push)
 APP = "https://escalamed-hapvida.web.app"
+# Notificações push (ver worker/src/push.js e o README). Chave pública VAPID: a mesma de
+# vapidPublicKey em public/js/config.js. A privada vai como segredo:
+#   npx wrangler secret put VAPID_PRIVADA
+VAPID_PUBLICA = "BAG8ACs0CJM8BN9Ezty2Z0oIvVIO1L8uO1WSmG-uItdyv8YYCFoIcvEuKhzoTQwCPnb5EZ8SdfuFx1f1LgO5SD0"
 
-# Termina os envios pendentes ao Google Agenda (o que não coube na chamada do app)
+# Termina os envios pendentes ao Google Agenda (o que não coube na chamada do app) e
+# esquece os avisos de push antigos
 [triggers]
 crons = ["*/5 * * * *"]
 

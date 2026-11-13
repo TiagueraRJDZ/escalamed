@@ -15,7 +15,7 @@ const ORIGEM = 'http://localhost:5000';
 class D1Falso {
   constructor() {
     this.db = new DatabaseSync(':memory:');
-    for (const arquivo of ['0001_contas.sql', '0002_agenda.sql']) {
+    for (const arquivo of ['0001_contas.sql', '0002_agenda.sql', '0003_push.sql']) {
       this.db.exec(readFileSync(new URL(`../worker/migrations/${arquivo}`, import.meta.url), 'utf8'));
     }
   }

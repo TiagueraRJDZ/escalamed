@@ -19,6 +19,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { auth, db, isLeaving } from './firebase.js';
 import { coordinatorPatch, removeMemberPatch } from './permissions.js';
+import { notifyPush } from './push.js';
 
 export const INVITE_DAYS = 7;
 
@@ -60,7 +61,8 @@ export async function removeMember(group, uid) {
 export async function createInvite(group, target, inviter) {
   const now = Date.now();
   const who = target.uid ? { uid: target.uid, name: target.name } : { email: target.email.toLowerCase() };
-  await setDoc(inviteRef(group.id, inviteKey(who)), {
+  const key = inviteKey(who);
+  await setDoc(inviteRef(group.id, key), {
     ...who,
     groupName: group.name,
     unitName: group.unit?.name ?? null,
@@ -69,6 +71,8 @@ export async function createInvite(group, target, inviter) {
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(now + INVITE_DAYS * 24 * 60 * 60 * 1000),
   });
+  // Notificação no celular de quem foi convidado (o Worker confere o convite no Firestore)
+  notifyPush('convite', group.id, key);
 }
 
 export const cancelInvite = (groupId, key) => deleteDoc(inviteRef(groupId, key));
@@ -77,12 +81,16 @@ export const cancelInvite = (groupId, key) => deleteDoc(inviteRef(groupId, key))
 export const isDeclined = (invite) => invite?.status === 'declined';
 
 // Recusar: marca o convite como recusado (não apaga), com o nome de quem recusou
-export const declineInvite = (groupId, invite, name) =>
-  updateDoc(inviteRef(groupId, inviteKey(invite)), {
+export async function declineInvite(groupId, invite, name) {
+  const key = inviteKey(invite);
+  await updateDoc(inviteRef(groupId, key), {
     status: 'declined',
     respondedAt: serverTimestamp(),
     respondedByName: String(name || 'Convidado').slice(0, 80),
   });
+  // Notificação no celular de quem convidou
+  notifyPush('recusa', groupId, key);
+}
 
 export async function listInvites(groupId) {
   const snapshot = await getDocs(collection(db, 'groups', groupId, 'invites'));

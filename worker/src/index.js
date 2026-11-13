@@ -28,6 +28,7 @@
  *   /admin/acesso            { uid, ativo }   ativo=false inativa (e derruba as sessões)
  *   /admin/excluir           { uid }          apaga o login e libera o nome de usuário
  *   Agenda Google (/agenda/...): ver agenda.js. O Cron (wrangler.toml) termina os envios pendentes.
+ *   Notificações push no celular (/push/...): ver push.js.
  * Falhas respondem { erro } com a mensagem pronta para mostrar.
  *
  * Configuração (wrangler.toml e segredo):
@@ -38,12 +39,14 @@
  *   CONTA_SERVICO  (segredo) JSON da chave de serviço, com o papel
  *                  "Administrador do Firebase Authentication"
  *   GOOGLE_CLIENTE, GOOGLE_SEGREDO (segredo), APP   Agenda Google (ver agenda.js)
+ *   VAPID_PUBLICA, VAPID_PRIVADA (segredo)          notificações push (ver push.js)
  *   EMULADOR       "1" só em teste local: usa os emuladores do Firebase
  *   EMULADOR_AUTH / EMULADOR_FIRESTORE  endereços dos emuladores (padrão 127.0.0.1:9099 / :8080)
  * ===================================================================== */
 
 import { gerarSenhaProvisoria, emailValido, motivoUsuarioInvalido } from './senhas.js';
 import { rotasDaAgenda } from './agenda.js';
+import { rotasDoPush } from './push.js';
 
 const LIMITE_POR_MINUTO = 10; // logins por nome de usuário, por endereço IP
 const LOGIN_RECENTE_S = 5 * 60; // troca de e-mail: login (ou senha conferida) há até 5 min
@@ -67,9 +70,11 @@ class Falha extends Error {
 const LOGIN_INVALIDO = 'Usuário, e-mail ou senha inválidos.';
 
 const agenda = rotasDaAgenda({ Falha, quemChamou, lerDocumento, lerAdmins, ehDev });
+const push = rotasDoPush({ Falha, quemChamou, lerDocumento, authAdmin, limitar, ehDev });
 
 const ROTAS = {
   ...agenda.rotas,
+  ...push.rotas,
   '/entrar-usuario': entrarComUsuario,
   '/trocar-usuario': trocarUsuario,
   '/trocar-email': trocarEmail,
@@ -100,9 +105,10 @@ export default {
     }
   },
 
-  // Cron (wrangler.toml): envia ao Google Agenda o que ficou pendente
+  // Cron (wrangler.toml): envia ao Google Agenda o que ficou pendente e esquece os avisos de push antigos
   async scheduled(_evento, env, ctx) {
     ctx.waitUntil(agenda.cron(env));
+    ctx.waitUntil(push.cron(env));
   },
 };
 

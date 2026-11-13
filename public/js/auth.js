@@ -154,6 +154,12 @@ export async function signOutUser() {
   } catch {
     // sem armazenamento: as outras abas mostram o aviso de acesso expirado
   }
+  // Este aparelho para de receber as notificações push desta conta (ainda com o login
+  // valendo). No máximo 2 s: sem internet, sai assim mesmo.
+  await Promise.race([
+    import('./push.js').then((push) => push.forgetPushOnSignOut()).catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 2000)),
+  ]);
   await endLocalSession();
   navigate('/', { replace: true });
 }

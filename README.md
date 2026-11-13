@@ -48,12 +48,13 @@ escalamed/
 │  │  ├─ ui.js          avisos, erros de formulário, menus e confirmação
 │  │  ├─ gcal.js        Agenda Google: conectar, lembrete, desconectar e envio dos plantões ao Worker
 │  │  ├─ gcal-data.js   Agenda Google: monta os plantões no formato do Worker (sem Firebase, com testes)
+│  │  ├─ push.js        notificações push no celular: ativar, desativar e avisar o Worker (os avisos do sininho)
 │  │  ├─ settings/      uma seção das Configurações por arquivo; menu.js lista as seções (subitens do menu lateral)
 │  │  └─ pages/         código de cada tela
 │  ├─ fonts/            fonte Pitanga (woff2)
 │  ├─ data/             listas fixas: categorias, cores e UFs (não gastam leituras do banco)
 │  └─ img/              logo e imagens
-├─ worker/              serviço de contas (Cloudflare Worker + D1): login por usuário, senha provisória, troca de e-mail e Agenda Google
+├─ worker/              serviço de contas (Cloudflare Worker + D1): login por usuário, senha provisória, troca de e-mail, Agenda Google e notificações push
 ├─ scripts/             utilitários de desenvolvimento (dados de teste)
 ├─ tests/               testes (node --test) e testes das regras (tests/rules)
 ├─ docs/                especificações
@@ -180,13 +181,38 @@ O ícone de calendário na barra do topo conecta a conta Google da pessoa. O Esc
 
 Sem o `googleClientId`, o botão Conectar avisa que a integração ainda não foi configurada. Trocar o `GOOGLE_SEGREDO` desconecta todo mundo (os tokens guardados deixam de abrir).
 
+## Notificações push no celular
+
+Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado) e **convite recusado** (para quem convidou). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
+
+- **Onde ativar:** no topo da gaveta do sininho (`notifications.js`), por aparelho e por conta. Ali também ficam Testar (os aparelhos da própria conta) e Desativar. O Dev tem ainda **Testar em todos os aparelhos**: manda "Teste de notificações" para todas as contas com push ativo, celular e computador (`/push/teste-geral`, em lotes de 40 por causa do limite de requisições do plano gratuito do Cloudflare). Quem sai da conta deixa de receber naquele aparelho (e volta a receber sozinho se entrar de novo).
+- **iPhone/iPad:** só no EscalaMed adicionado à Tela de Início (iOS 16.4 ou mais novo); no Safari comum, a gaveta mostra o passo a passo. O app da Tela de Início tem login próprio (entra uma vez nele). Android, computador (Chrome, Edge, Firefox) e Safari do Mac funcionam direto no navegador.
+- **Como sai um aviso:** o app grava no Firestore e chama `/push/avisar` (`notifyPush`, em `public/js/push.js`). O Worker lê o documento no Firestore **com o token de quem pediu** (valem as regras), confere que é recente e que combina com quem pediu, e manda uma vez só (tabela `push_avisos`). Ninguém consegue disparar notificação falsa para outra pessoa.
+- **No aparelho:** `public/sw.js` (service worker só de notificações, sem cache de páginas) mostra a notificação; tocar nela abre a tela certa (o convite ou a aba Membros do grupo). O número do sininho também aparece no ícone do app, onde o sistema suporta.
+- **App instalável:** `public/manifest.webmanifest` e os ícones `img/icon-512.png`, `img/icon-maskable-512.png` (Android) e `img/badge-96.png` (barra de status do Android).
+- **Novo tipo de aviso:** acrescente uma entrada em `AVISOS` (`worker/src/push.js`), que confere o documento e monta a mensagem, e chame `notifyPush(tipo, grupo, chave)` logo depois de gravar.
+
+### Configurar (uma vez)
+
+A chave pública VAPID fica em `VAPID_PUBLICA` (`worker/wrangler.toml`) e em `vapidPublicKey` (`public/js/config.js`); as duas precisam ser iguais. A privada é segredo do Worker. Na pasta `worker/`:
+
+```powershell
+npx wrangler d1 migrations apply escalamed-contas --remote   # tabelas push_inscricoes e push_avisos
+npx wrangler secret put VAPID_PRIVADA                         # o "d" da chave privada (base64url)
+npx wrangler deploy
+```
+
+Para gerar um par novo: `node -e "const k=require('crypto').generateKeyPairSync('ec',{namedCurve:'P-256'}).privateKey.export({format:'jwk'});console.log('publica', Buffer.concat([Buffer.from([4]),Buffer.from(k.x,'base64url'),Buffer.from(k.y,'base64url')]).toString('base64url'));console.log('privada', k.d)"`. Trocar a chave desliga as inscrições antigas: cada pessoa precisa ativar de novo no sininho.
+
+Testar localmente (emuladores + Worker local): crie `worker/.dev.vars` com `EMULADOR=1`, `PROJETO=demo-escalamed` e `VAPID_PRIVADA=...`, rode `npx wrangler d1 migrations apply escalamed-contas --local` e `npx wrangler dev --local --port 8787`.
+
 ## Testes
 
 ```bash
 node --test "tests/*.test.mjs"
 ```
 
-Inclui o teste da Agenda Google no Worker (`tests/agenda-worker.test.mjs`), com o SQLite do Node no lugar do D1 e o Google simulado; não precisa de emulador.
+Inclui o teste da Agenda Google no Worker (`tests/agenda-worker.test.mjs`), com o SQLite do Node no lugar do D1 e o Google simulado; não precisa de emulador. E o das notificações push (`tests/push-worker.test.mjs`): um aparelho de mentira, com chaves de verdade, abre a mensagem cifrada e confere a assinatura VAPID; também cobre os avisos falsos recusados.
 
 Teste completo do serviço de contas (roda o código do Worker no Node, com o SQLite do Node no lugar do D1, o emulador de Authentication e a leitura do grupo simulada):
 
@@ -238,7 +264,7 @@ firebase deploy --project prod --only firestore        # só regras e índices
 
 ### Versões dos arquivos (cache)
 
-Os `.js` e `.css` ficam no navegador por 1 ano (`immutable`, em `firebase.json`). Para a versão
+Os arquivos de `js/`, `css/` e `data/` ficam no navegador por 1 ano (`immutable`, em `firebase.json`); o `sw.js` e o manifesto, na raiz, não (o celular precisa pegar a versão nova do service worker). Para a versão
 nova chegar a todos, cada HTML aponta para os arquivos com `?v=<hash do conteúdo>`: o import map
 (módulos), os `modulepreload`, o script de entrada e os `<link rel="stylesheet">`. Quem escreve
 isso é `node scripts/write-preloads.mjs`, que roda sozinho antes de publicar.
