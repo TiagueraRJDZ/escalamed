@@ -315,8 +315,21 @@
   .report-header h1 { font-size: 1.625rem; }
   .report-body { padding: var(--esp-3) var(--esp-4) var(--esp-5); }
   .report-filters > * { flex: 1 1 100%; }
+  /* Datas lado a lado; atalhos de período antes do botão, que fica na largura toda no fim */
+  .report-filters .filter-date { flex: 1 1 calc(50% - var(--esp-4)); min-width: 0; }
+  .report-chips,
+  .report-range-error { order: 1; }
+  .filter-submit { order: 2; }
+  .filter-submit .btn { width: 100%; }
   .month-nav { justify-content: space-between; }
-  .report-summary { grid-template-columns: minmax(0, 1fr); }
+  /* Resumo: cada número numa linha compacta, rótulo à esquerda e valor à direita
+     (os três cartões altos empilhados ocupavam a tela inteira) */
+  .report-summary { grid-template-columns: minmax(0, 1fr); gap: var(--esp-2); }
+  .summary-card { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--esp-3); padding: var(--esp-2) var(--esp-4); }
+  .summary-card strong { font-size: 1.375rem; }
+  /* Expandir/Recolher todos numa linha, dividindo a largura */
+  .report-toolbar > div { display: flex; flex: 1 1 100%; gap: var(--esp-2); }
+  .report-toolbar > div .btn { flex: 1; min-width: 0; padding-inline: var(--esp-2); white-space: normal; }
   .person-head { flex-wrap: wrap; }
   .person-meta { flex-basis: 100%; align-items: flex-start; text-align: left; padding-left: calc(18px + 40px + var(--esp-3) * 2); }
   .export-bar { padding: 0 var(--esp-4) var(--esp-3); }

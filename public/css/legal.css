@@ -86,9 +86,14 @@
 .legal-tab:hover { background: var(--cor-superficie-2); text-decoration: none; }
 .legal-tab[aria-pressed='true'],
 .legal-tab[aria-current='true'] { border-color: var(--cor-primaria); background: var(--cor-primaria-suave); color: var(--cor-primaria); }
+/* Celular: as duas abas dividem a largura na mesma linha; em tela muito estreita (≈320px),
+   cada uma ocupa a linha toda (sem a aba solta e desalinhada embaixo) */
+@media (max-width: 480px) {
+  .legal-tab { flex: 1 1 auto; padding-inline: var(--esp-2); text-align: center; white-space: nowrap; }
+}
 
 /* ---------- Texto dos documentos ---------- */
-.legal-doc { max-width: 72ch; color: var(--cor-texto); font-size: var(--texto-md); line-height: 1.6; }
+.legal-doc { max-width: 72ch; color: var(--cor-texto); font-size: var(--texto-md); line-height: 1.6; overflow-wrap: break-word; }
 .legal-doc h2 { margin-bottom: var(--esp-1); color: var(--cor-primaria); }
 .legal-doc h3 { margin: var(--esp-5) 0 var(--esp-2); font-size: var(--texto-md); color: var(--cor-primaria); }
 .legal-doc p,
@@ -105,7 +110,16 @@
   margin: 0 auto;
   padding: var(--esp-4) var(--esp-4) var(--esp-6);
 }
+/* Itens do grid podem encolher abaixo da maior palavra (senão a página vaza em telas de 320px) */
+.legal-page > * { min-width: 0; }
 .legal-page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-3); }
+/* Celular bem estreito (≈320px): marca e "Voltar" mais justos para caberem na mesma linha */
+@media (max-width: 360px) {
+  .legal-page-header { gap: var(--esp-2); }
+  .legal-page-header .brand { gap: 8px; }
+  .legal-page-header .brand-tagline { letter-spacing: 1px; }
+  .legal-page-header .btn { flex-shrink: 0; gap: var(--esp-1); padding-inline: var(--esp-2); }
+}
 .legal-page-card { padding: clamp(var(--esp-4), 4vw, var(--esp-6)); }
 .legal-page-card h1 { margin-bottom: var(--esp-3); font-size: clamp(1.375rem, 4vw, 1.75rem); color: var(--cor-primaria); }
 .legal-page-card .legal-switch {

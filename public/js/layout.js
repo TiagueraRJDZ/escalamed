@@ -206,6 +206,10 @@ ${search ? searchHtml() : ''}
               </div>
               <a class="menu-item" role="menuitem" href="/settings.html#conta">${icon('user')}Minha conta</a>
               <a class="menu-item" role="menuitem" href="/settings.html#perfil">${icon('edit')}Editar perfil</a>
+              <!-- Celular estreito: a Agenda Google fica aqui (o ícone sai da barra do topo) -->
+              <button type="button" class="menu-item menu-gcal" role="menuitem" data-open="modal-gcal" aria-haspopup="dialog">
+                <img src="/img/google-agenda.svg" alt="" width="20" height="20" />Google Agenda
+              </button>
               <button type="button" class="menu-item is-danger" role="menuitem" id="logout">${icon('logOut')}Sair</button>
             </div>
           </div>
@@ -354,6 +358,9 @@ function mountShell(user, profile, active, search) {
   const app = document.createElement('div');
   app.className = `app${collapsed ? ' is-collapsed' : ''}`;
   app.innerHTML = shellHtml(user, profile, active, collapsed, search);
+  // Celular: o texto da busca do topo inteiro não cabe ("Quem gostaria d…"); fica o curto
+  const searchInput = app.querySelector('#global-search-input');
+  if (searchInput && window.matchMedia('(max-width: 640px)').matches) searchInput.placeholder = 'Buscar pessoas';
   app.querySelector('.app-main').append(page);
   // Página sem busca: o título dela (data-topbar-title) fica na faixa branca do topo
   const topbarTitle = !search && page.querySelector('[data-topbar-title]');

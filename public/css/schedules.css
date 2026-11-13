@@ -14,6 +14,7 @@
 
 /* ---------- Lista de grupos ---------- */
 .groups-card { min-height: 420px; }
+.groups-header h1 { overflow-wrap: break-word; }
 
 /* Tela larga: a lista ocupa a altura da tela (menos a barra superior e as margens) */
 @media (min-width: 1100px) {
@@ -100,10 +101,32 @@
 .group-skeleton .skeleton:first-child { width: 52px; height: 52px; border-radius: 12px 12px 22px 12px; }
 .group-skeleton div { flex: 1; display: grid; gap: var(--esp-2); }
 
-.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--esp-2); margin-top: var(--esp-2); }
-
 /* Celular: selos vão para baixo do nome, para o nome não ser cortado */
 @media (max-width: 599px) {
+  /* Sem altura mínima: com poucos grupos, o calendário sobe em vez de sobrar um vazio */
+  .groups-card { min-height: 0; }
+  .groups-header { padding: var(--esp-5) var(--esp-4) var(--esp-4); }
+  .groups-header h1 { font-size: 1.625rem; }
+  .group-list { padding: var(--esp-2); }
+  .group-item { padding: var(--esp-3); }
+  /* Nome do grupo em até 2 linhas (em vez de "TELEAUDITORI…") */
+  .group-info strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+  .my-invites { padding: var(--esp-3) var(--esp-3) 0; }
+  /* Convite: texto inteiro (quebra linha) e botões dividindo a largura embaixo */
+  .invite-card { padding: var(--esp-3); }
+  .invite-card .group-info { min-width: 0 !important; }
+  .invite-card .group-info strong,
+  .invite-card .group-info span { white-space: normal; overflow-wrap: anywhere; }
+  .invite-card .empty-actions { flex: 1 1 100%; flex-wrap: nowrap; }
+  .invite-card .empty-actions .btn { flex: 1; }
   .group-item {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr) 18px;

@@ -748,11 +748,19 @@ dialog::backdrop {
     inset: 0 auto 0 0;
     z-index: 40;
     width: min(var(--sidebar-w), 85vw);
+    /* Altura da área visível (no celular, 100vh passa da barra do navegador) */
+    height: auto;
     transform: translateX(-100%);
-    transition: transform 220ms ease;
-    box-shadow: var(--sombra-lg);
+    /* Fechado fica sem sombra: senão ela "vaza" como uma faixa clara na borda esquerda da tela */
+    visibility: hidden;
+    transition: transform 220ms ease, visibility 0s linear 220ms;
   }
-  .app.is-menu-open .sidebar { transform: none; }
+  .app.is-menu-open .sidebar {
+    transform: none;
+    visibility: visible;
+    box-shadow: var(--sombra-lg);
+    transition: transform 220ms ease;
+  }
   .app.is-menu-open .sidebar-backdrop {
     display: block;
     position: fixed;
@@ -788,12 +796,32 @@ dialog::backdrop {
   .sidebar-toggle { display: none; }
 
   .topbar { padding: 0 var(--esp-3); gap: var(--esp-2); }
-  .topbar-menu { display: inline-grid; }
+  .topbar-menu { display: inline-grid; flex-shrink: 0; }
+  .topbar-search { min-width: 0; }
   .page { padding: var(--esp-4); }
 }
 
+/* Celular: gavetas e modais com margem interna menor (sobra largura para o conteúdo) */
+@media (max-width: 520px) {
+  .dialog-header,
+  .dialog-body,
+  .dialog-footer { padding-inline: var(--esp-4); }
+  .modal { width: calc(100vw - 1.5rem); }
+}
+
+/* Celular estreito: o ícone da Agenda Google sai da barra (falta espaço) e vira item do menu da conta */
+.account-menu .menu-gcal { display: none; }
+.account-menu .menu-gcal img { width: 20px; height: 20px; }
 @media (max-width: 520px) {
   .gcal-button { display: none; }
+  .account-menu .menu-gcal { display: flex; }
+}
+
+/* Altura da área visível no celular (100vh inclui a barra do navegador e corta o fim) */
+@supports (height: 100dvh) {
+  body,
+  .app { min-height: 100dvh; }
+  .drawer { height: 100dvh; max-height: 100dvh; }
 }
 
 /* Alternância de duas ou mais opções (ex.: Dinâmica | Fixa) */

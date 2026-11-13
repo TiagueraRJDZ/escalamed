@@ -287,11 +287,18 @@
 
 /* Usuários no celular: nome e dados quebram linha (sem cortar) e os botões descem para baixo */
 @media (max-width: 560px) {
+  #users-count { white-space: normal; }
   #users-list .user-item { flex-wrap: wrap; row-gap: 0; }
   #users-list .member-info { flex-basis: calc(100% - 44px - var(--esp-3)); }
   #users-list .member-info strong,
   #users-list .member-info span { white-space: normal; overflow-wrap: break-word; }
-  #users-list .user-actions { width: 100%; justify-content: flex-end; }
+  /* Botões embaixo, alinhados com o texto (não soltos no canto direito) */
+  #users-list .user-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; padding-left: calc(44px + var(--esp-3)); }
+  /* Só um botão (ex.: Gestor, sem as ações de administrador): fica na mesma linha, à direita */
+  #users-list .user-item:has(.user-actions > .btn-icon:only-child) { flex-wrap: nowrap; }
+  #users-list .user-item:has(.user-actions > .btn-icon:only-child) .member-info { flex-basis: auto; }
+  #users-list .user-item:has(.user-actions > .btn-icon:only-child) .user-actions { width: auto; padding-left: 0; }
+  #users-list .user-actions:empty { display: none; }
 }
 
 /* ---------- Tamanho do texto: um passo acima do resto do app ---------- */

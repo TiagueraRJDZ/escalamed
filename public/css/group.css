@@ -186,6 +186,26 @@
   /* O cargo já está no título de cada seção (Gestor, Auxiliares...): sem o selo, sobra espaço para o nome */
   .member-item > .badge { display: none; }
   .invite-actions { width: 100%; }
+  /* Membros: busca na linha toda e "Convidar" logo abaixo, também na largura toda */
+  .members-toolbar .input-icon { min-width: 0; flex-basis: 100%; }
+  .members-toolbar .btn { flex: 1 1 100%; }
+  /* Editar escala: mês e situação à esquerda (um embaixo do outro), botão à direita, na mesma linha */
+  .months-head h2 { flex: 1 1 100%; }
+  .month-item { flex-wrap: nowrap; }
+  .month-item > div { display: flex; flex-direction: column; align-items: flex-start; gap: var(--esp-1); min-width: 0; }
+  .month-item > div .badge { margin-left: 0; }
+  /* Cabeçalho: ícone do grupo alinhado com o nome (não no meio do bloco de texto) */
+  .group-header-card { align-items: flex-start; }
+  .month-item .btn { flex-shrink: 0; padding-inline: var(--esp-3); }
+}
+
+/* Página do convite (invite.html): cartão centralizado, mais justo no celular */
+.invite-panel { max-width: 720px; margin: var(--esp-6) auto; padding: var(--esp-6); }
+@media (max-width: 640px) {
+  .invite-panel { margin: var(--esp-2) 0; padding: var(--esp-4); }
+  .invite-panel .empty-state { padding-inline: 0; }
+  .invite-panel .empty-actions { width: 100%; flex-wrap: nowrap; }
+  .invite-panel .empty-actions .btn { flex: 1; padding-inline: var(--esp-3); }
 }
 
 /* ---------- Convidar: busca de pessoas da plataforma ---------- */
@@ -211,7 +231,9 @@
 }
 
 /* ---------- Calendário do grupo ---------- */
+/* Painel sem cartão (os cartões estão dentro): sem recuo, para alinhar com o cabeçalho do grupo */
 .group-calendar-panel {
+  padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--esp-4);
@@ -270,6 +292,15 @@
 .week-day.has-shift span { color: rgb(255 255 255 / 0.8); }
 .week-day[aria-pressed='true'] { border-color: var(--cor-primaria-hover); box-shadow: 0 0 0 2px var(--cor-primaria-suave); }
 .day-title { margin-bottom: var(--esp-3); font-weight: 500; }
+
+/* Celular: 7 dias + setas numa gaveta estreita; letras menores para "Sáb"/"Dom" não encostarem na borda */
+@media (max-width: 480px) {
+  .week-strip { gap: 0; }
+  .week-strip .btn-icon { width: 32px; flex-shrink: 0; }
+  .week-days { gap: 2px; }
+  .week-day { padding: var(--esp-1) 0; border-radius: var(--raio-sm) var(--raio-sm) 10px var(--raio-sm); }
+  .week-day span { font-size: 0.75rem; }
+}
 
 
 .day-shift { padding: var(--esp-3); border: 1px solid var(--cor-borda); border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio); }

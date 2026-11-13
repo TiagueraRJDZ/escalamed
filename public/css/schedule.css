@@ -92,7 +92,8 @@
 
 .member-cell { display: flex; align-items: center; gap: var(--esp-2); }
 .member-cell-avatar { width: 32px; height: 32px; font-size: var(--texto-xs); }
-.member-cell span { display: flex; flex-direction: column; min-width: 0; }
+/* Nome e horas (o avatar também é um span: fica de fora, senão perdia o display próprio) */
+.member-cell > span:not(.member-cell-avatar) { display: flex; flex-direction: column; min-width: 0; }
 .member-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--texto-sm); }
 .member-cell small { color: var(--cor-primaria-hover); font-weight: 500; }
 
@@ -157,7 +158,7 @@
 .replicate-arrow svg { width: 18px; height: 18px; }
 
 /* Revisar: o mês em grade de calendário (Dom a Sáb), só com rolagem vertical */
-.modal-wide { width: min(1200px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); }
+.modal-wide { width: min(1200px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); }
 .modal-wide[open] { display: flex; flex-direction: column; }
 .review-body { overflow-y: auto; }
 .review-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--esp-2); }
@@ -252,7 +253,36 @@
 /* Celular: a barra vai para o fim da página e a grade fica com a tela */
 @media (max-width: 600px) {
   .schedule-head { padding: var(--esp-3) var(--esp-4); }
-  .schedule-scroll { max-height: calc(100vh - 120px); }
+  .schedule-head-info,
+  .schedule-head-month { flex: 1 1 100%; }
+  .schedule-head h1 { overflow-wrap: break-word; }
+  .schedule-month-nav { justify-content: space-between; }
+  .schedule-month-nav h2 { min-width: 0; }
+  .schedule-scroll { max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); }
+  /* Colunas fixas mais estreitas (sobram mais dias à vista) e o nome em até 2 linhas, sem "Brun…" */
+  .schedule-grid .col-name { width: 96px; min-width: 96px; max-width: 96px; padding: var(--esp-1) 6px; }
+  .schedule-grid .col-shift { left: 96px; min-width: 44px; padding: 0 var(--esp-1); }
+  .col-shift strong { min-width: 0; margin-right: 0; }
+  .member-cell strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: var(--texto-xs);
+    line-height: 1.2;
+  }
+  .block-label { line-height: 1.2; }
+  /* Revisar: escolha da escala na linha toda; "Fechar" embaixo */
+  .review-footer { flex-wrap: wrap; }
+  .review-footer .segmented { display: flex; flex: 1 1 100%; }
+  .review-footer .segmented button { flex: 1; white-space: nowrap; padding-inline: var(--esp-2); }
+  .review-footer > .btn { flex: 1 1 100%; }
+  /* Replicar: "de" e "para" um embaixo do outro (lado a lado o mês ficava cortado) */
+  .replicate-months { flex-direction: column; align-items: stretch; }
+  .replicate-months .field { flex: none; }
+  .replicate-arrow { align-self: center; padding: 0; transform: rotate(90deg); }
   .schedule-bar { position: static; }
   .schedule-find { max-width: none; flex-basis: 100%; }
   .schedule-actions { width: 100%; margin-left: 0; }
