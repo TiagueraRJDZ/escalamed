@@ -276,13 +276,15 @@ function pushPanelHtml(state) {
       text: `Notificações bloqueadas ${where}. Libere nas configurações do navegador (permissões do site) e volte aqui.`,
     });
   }
+  // Ativas: o aviso (com Testar e Desativar) só aparece para o Dev, que testa as notificações;
+  // para os demais não aparece nada
   if (state.enabled) {
+    if (!session.isDev) return '';
     return pushLine({
       tone: 'success',
       iconName: 'checkCircle',
       text: `Notificações ativas ${where}.`,
-      // Testar: só para o Dev (conta de teste das notificações); os demais só desativam
-      actions: `${session.isDev ? '<button type="button" class="btn-link" data-push="test">Testar</button>' : ''}
+      actions: `<button type="button" class="btn-link" data-push="test">Testar</button>
         <button type="button" class="btn-link is-muted" data-push="disable">Desativar</button>`,
     });
   }

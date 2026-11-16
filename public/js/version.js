@@ -13,6 +13,31 @@ export function loadVersion() {
   return cached;
 }
 
+// Versão nova publicada: o app instalado no celular (tela inicial) não recarrega ao voltar para
+// ele, continua com o código antigo. Ao voltar para o app (ou para a aba), confere /version.json
+// e, se mudou, recarrega. Não recarrega com uma janela aberta ou alguém digitando: espera a
+// próxima volta. No máximo uma conferência por minuto.
+const CHECK_EVERY = 60_000;
+
+const busy = () =>
+  Boolean(document.querySelector('dialog[open]')) || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+
+export async function watchForUpdates() {
+  const { version: current } = await loadVersion();
+  if (!current) return;
+  let lastCheck = Date.now();
+  const check = async () => {
+    if (document.visibilityState !== 'visible' || Date.now() - lastCheck < CHECK_EVERY) return;
+    lastCheck = Date.now();
+    const { version } = await fetch('/version.json', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : {}))
+      .catch(() => ({}));
+    if (version && version !== current && !busy()) location.reload();
+  };
+  document.addEventListener('visibilitychange', check);
+  window.addEventListener('pageshow', (event) => event.persisted && check()); // voltou pelo "voltar"
+}
+
 export async function mountCredits(root = document) {
   const targets = root.querySelectorAll('[data-credits]');
   if (!targets.length) return;

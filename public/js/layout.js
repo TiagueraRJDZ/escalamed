@@ -8,7 +8,7 @@ import { pagePath, nextParam } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
 import { escapeHtml, initials, setupMenu, toast } from './ui.js';
-import { mountCredits } from './version.js';
+import { mountCredits, watchForUpdates } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
 import { SETTINGS_SECTIONS, DEFAULT_SECTION } from './settings/menu.js';
@@ -470,6 +470,7 @@ export async function initLayout({ active, search = true } = {}) {
   syncPush(user.uid);
 
   mountCredits(app);
+  watchForUpdates(); // versão nova publicada: recarrega ao voltar para o app
   app.querySelector('.page-skeleton')?.remove();
   document.body.classList.remove('is-booting');
   return { user, profile, access };
