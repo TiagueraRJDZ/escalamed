@@ -281,7 +281,8 @@ function pushPanelHtml(state) {
       tone: 'success',
       iconName: 'checkCircle',
       text: `Notificações ativas ${where}.`,
-      actions: `<button type="button" class="btn-link" data-push="test">Testar</button>
+      // Testar: só para o Dev (conta de teste das notificações); os demais só desativam
+      actions: `${session.isDev ? '<button type="button" class="btn-link" data-push="test">Testar</button>' : ''}
         <button type="button" class="btn-link is-muted" data-push="disable">Desativar</button>`,
     });
   }
