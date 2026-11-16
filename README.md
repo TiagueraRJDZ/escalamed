@@ -183,7 +183,7 @@ Sem o `googleClientId`, o botão Conectar avisa que a integração ainda não fo
 
 ## Notificações push no celular
 
-Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado) e **convite recusado** (para quem convidou). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
+Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado) e **convite aceito** ou **recusado** (para quem convidou). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
 
 - **Onde ativar:** no topo da gaveta do sininho (`notifications.js`), por aparelho e por conta. Ali também ficam Testar (os aparelhos da própria conta) e Desativar. O Dev tem ainda **Testar em todos os aparelhos**: manda "Teste de notificações" para todas as contas com push ativo, celular e computador (`/push/teste-geral`, em lotes de 40 por causa do limite de requisições do plano gratuito do Cloudflare). Quem sai da conta deixa de receber naquele aparelho (e volta a receber sozinho se entrar de novo).
 - **iPhone/iPad:** só no EscalaMed adicionado à Tela de Início (iOS 16.4 ou mais novo); no Safari comum, a gaveta mostra o passo a passo. O app da Tela de Início tem login próprio (entra uma vez nele). Android, computador (Chrome, Edge, Firefox) e Safari do Mac funcionam direto no navegador.

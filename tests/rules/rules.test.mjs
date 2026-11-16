@@ -74,6 +74,9 @@ beforeEach(async () => {
     w.set(`users/${adm.uid}`, profile('administrativo')),
     w.set(`users/${medico.uid}`, profile('medico')),
     w.set(`users/${pending.uid}`, profile('gestor')),
+    w.set(`users/${invited.uid}`, profile('medico', { name: 'Convidado Silva' })),
+    w.set(`access/${medico.uid}`, decision('medico')),
+    w.set(`access/${invited.uid}`, decision('medico')),
     w.set(`access/${gestor.uid}`, decision('gestor')),
     w.set(`access/${coord.uid}`, decision('coordenador-escala')),
     w.set(`access/${coordOther.uid}`, decision('coordenador-escala')),
@@ -155,8 +158,50 @@ test('aprovação: Gestor e administrador aprovam; os demais não; ninguém apro
 
 test('aprovação: precisa ser o cargo que a pessoa pediu, com quem decidiu e quando', async () => {
   assert.ok(!(await approve(gestor, pending, 'administrativo'))); // pediu Gestor
-  assert.ok(!(await approve(gestor, medico, 'medico'))); // Médico não passa por aprovação
+  assert.ok(await approve(gestor, medico, 'medico')); // Médico também passa por aprovação
+  assert.ok(!(await approve(gestor, medico, 'gestor')));
   assert.ok(!(await commit(gestor.token, [w.set(`access/${pending.uid}`, { categoryId: 'gestor', approved: true, decidedBy: medico.uid, decidedAt: NOW })])));
+});
+
+test('conta sem aprovação: não lê perfis, não cria escala nem unidade e não entra em grupo', async () => {
+  // Conta nova de Médico, ainda sem aprovação, convidada para o g1
+  await admin([
+    w.delete(`access/${invited.uid}`),
+    w.set(`${G}/invites/${invited.email}`, invite(invited.email)),
+  ]);
+  const personal = { ...newGroup(invited, { type: 'personal', name: 'Meus plantões' }) };
+  const unit = {
+    name: 'Hospital Novo', nameLower: 'hospital novo', city: 'Fortaleza', cityLower: 'fortaleza', state: 'CE',
+    keywords: ['hospital', 'novo'], createdBy: invited.uid, createdAt: NOW,
+  };
+  const tryAll = async () => ({
+    ownProfile: await canRead(invited.token, `users/${invited.uid}`),
+    otherProfile: await canRead(invited.token, `users/${gestor.uid}`),
+    personal: await createGroup(invited, personal, 'groups/p9'),
+    unit: await commit(invited.token, [w.set('healthUnits/u9', unit)]),
+    join: await join(invited),
+  });
+  assert.deepEqual(await tryAll(), { ownProfile: true, otherProfile: false, personal: false, unit: false, join: false });
+
+  // Recusada: continua sem
+  assert.ok(await approve(gestor, invited, 'medico', false));
+  assert.equal((await tryAll()).otherProfile, false);
+
+  // Aprovada: tudo liberado
+  assert.ok(await approve(gestor, invited, 'medico'));
+  assert.deepEqual(await tryAll(), { ownProfile: true, otherProfile: true, personal: true, unit: true, join: true });
+});
+
+test('aprovação entre profissões segue valendo; para cargo de acesso, não', async () => {
+  // Médico aprovado que vira Enfermeiro continua aprovado
+  await admin([w.update(`users/${medico.uid}`, { categoryId: 'enfermeiro' })]);
+  assert.ok(await canRead(medico.token, `users/${gestor.uid}`));
+  // Aprovado como Médico não vale para Gestor (nem lê perfis até aprovarem)
+  await admin([w.update(`users/${medico.uid}`, { categoryId: 'gestor' })]);
+  assert.ok(!(await canRead(medico.token, `users/${gestor.uid}`)));
+  // Aprovado como Gestor que vira Médico precisa de nova aprovação
+  await admin([w.update(`users/${gestor.uid}`, { categoryId: 'medico' })]);
+  assert.ok(!(await canRead(gestor.token, `users/${medico.uid}`)));
 });
 
 test('aprovação: pendente ganha acesso só depois de aprovado; recusado continua sem', async () => {
@@ -293,11 +338,12 @@ test('sair do grupo: a pessoa tira só a si mesma (inclusive coordenador)', asyn
 });
 
 // ---------- Convites ----------
-const join = (user, extra = {}) =>
+const accepted = { status: 'accepted', respondedAt: NOW, respondedByName: 'Convidado Silva' };
+const join = (user, extra = {}, key = user.email) =>
   commit(user.token, [
     w.update(G, { memberIds: [...baseGroup().memberIds, user.uid], ...extra, updatedAt: NOW }),
     w.set(`${G}/members/${user.uid}`, { ...card('Convidado Silva'), joinedAt: NOW }),
-    w.delete(`${G}/invites/${user.email}`),
+    w.update(`${G}/invites/${key}`, accepted),
   ]);
 
 test('sem convite, ninguém entra', async () => {
@@ -365,13 +411,29 @@ test('convite por pessoa: só ela vê e entra', async () => {
   assert.ok(await canRead(invited.token, `${G}/invites/${invited.uid}`));
   assert.ok(!(await canRead(outsider.token, `${G}/invites/${invited.uid}`)));
   assert.ok(await canQueryGroup(invited.token, 'invites', 'uid', invited.uid));
-  const joinByPerson = () =>
-    commit(invited.token, [
-      w.update(G, { memberIds: [...baseGroup().memberIds, invited.uid], updatedAt: NOW }),
-      w.set(`${G}/members/${invited.uid}`, { ...card('Convidado Silva'), joinedAt: NOW }),
-      w.delete(`${G}/invites/${invited.uid}`),
-    ]);
-  assert.ok(await joinByPerson());
+  assert.ok(await join(invited, {}, invited.uid));
+});
+
+test('convite aceito: fica marcado só junto com a entrada; não vale de novo; quem convidou acompanha e dispensa', async () => {
+  await admin([w.set(`${G}/invites/${invited.email}`, invite(invited.email))]);
+  // Marcar como aceito sem entrar no grupo não vale
+  assert.ok(!(await commit(invited.token, [w.update(`${G}/invites/${invited.email}`, accepted)])));
+  // Outra pessoa não marca
+  assert.ok(!(await commit(medico.token, [w.update(`${G}/invites/${invited.email}`, accepted)])));
+  assert.ok(await join(invited));
+  assert.ok(await canQueryGroup(gestor.token, 'invites', 'invitedBy', gestor.uid));
+  // Saiu do grupo: o convite aceito não serve para entrar de novo
+  assert.ok(await commit(invited.token, [w.update(G, { memberIds: baseGroup().memberIds, updatedAt: NOW }), w.delete(`${G}/members/${invited.uid}`)]));
+  assert.ok(!(await commit(invited.token, [
+    w.update(G, { memberIds: [...baseGroup().memberIds, invited.uid], updatedAt: NOW }),
+    w.set(`${G}/members/${invited.uid}`, { ...card('Convidado Silva'), joinedAt: NOW }),
+  ])));
+  // Nem dá para recusar depois de aceito
+  assert.ok(!(await commit(invited.token, [
+    w.update(`${G}/invites/${invited.email}`, { status: 'declined', respondedAt: NOW, respondedByName: 'Convidado Silva' }),
+  ])));
+  // Quem convidou dispensa (apaga)
+  assert.ok(await commit(gestor.token, [w.delete(`${G}/invites/${invited.email}`)]));
 });
 
 test('convite recusado: só a pessoa marca; não dá para aceitar depois; quem convidou acompanha', async () => {

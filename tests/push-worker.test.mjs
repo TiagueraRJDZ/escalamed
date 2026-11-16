@@ -166,7 +166,7 @@ async function chamar(rota, corpo, uid) {
 const texto = (v) => ({ stringValue: v });
 const momento = (msAtras = 0) => ({ timestampValue: new Date(Date.now() - msAtras).toISOString() });
 
-function conviteFirestore({ uid, email, invitedBy = 'gestora', criadoHa = 0, recusado = false, recusadoHa = 0 }) {
+function conviteFirestore({ uid, email, invitedBy = 'gestora', criadoHa = 0, recusado = false, recusadoHa = 0, aceito = false }) {
   return {
     ...(uid ? { uid: texto(uid), name: texto('Bruno') } : { email: texto(email) }),
     groupName: texto('UTI Adulto'),
@@ -175,6 +175,7 @@ function conviteFirestore({ uid, email, invitedBy = 'gestora', criadoHa = 0, rec
     invitedByName: texto('Ana Gestora'),
     createdAt: momento(criadoHa),
     ...(recusado ? { status: texto('declined'), respondedAt: momento(recusadoHa), respondedByName: texto('Bruno Plantonista') } : {}),
+    ...(aceito ? { status: texto('accepted'), respondedAt: momento(), respondedByName: texto('Bruno Plantonista') } : {}),
   };
 }
 
@@ -352,6 +353,31 @@ test('recusa: quem convidou recebe', async () => {
   convites['g1/carla'] = conviteFirestore({ uid: 'carla' });
   leitores['g1/carla'] = ['carla'];
   assert.equal((await chamar('/push/avisar', { tipo: 'recusa', grupo: 'g1', chave: 'carla' }, 'carla')).enviados, 0);
+});
+
+test('aceite: quem convidou recebe; convite pendente ou recusado não vira aceite', async () => {
+  const aparelho = await novoAparelho('gestora');
+  await chamar('/push/inscrever', { inscricao: aparelho.inscricao }, 'gestora');
+  convites['g1/bruno'] = conviteFirestore({ uid: 'bruno', criadoHa: 60 * 60 * 1000, aceito: true });
+  leitores['g1/bruno'] = ['gestora', 'bruno'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'aceite', grupo: 'g1', chave: 'bruno' }, 'bruno')).enviados, 1);
+  const mensagem = await abrir(aparelho, entregues[0].corpo);
+  assert.equal(mensagem.titulo, 'Convite aceito');
+  assert.equal(mensagem.corpo, 'Bruno Plantonista aceitou o convite para UTI Adulto.');
+  assert.equal(mensagem.url, '/group.html?id=g1#membros');
+  // Pedido repetido não manda de novo
+  assert.equal((await chamar('/push/avisar', { tipo: 'aceite', grupo: 'g1', chave: 'bruno' }, 'bruno')).enviados, 0);
+
+  convites['g1/carla'] = conviteFirestore({ uid: 'carla' });
+  leitores['g1/carla'] = ['carla'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'aceite', grupo: 'g1', chave: 'carla' }, 'carla')).enviados, 0);
+  convites['g1/dani'] = conviteFirestore({ uid: 'dani', recusado: true });
+  leitores['g1/dani'] = ['dani'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'aceite', grupo: 'g1', chave: 'dani' }, 'dani')).enviados, 0);
+  // Convite já aceito não é reenviado como convite novo
+  leitores['g1/bruno'] = ['gestora'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'convite', grupo: 'g1', chave: 'bruno' }, 'gestora')).enviados, 0);
+  assert.equal(entregues.length, 1);
 });
 
 // ---------- Teste geral (só Dev) ----------

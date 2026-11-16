@@ -1,5 +1,5 @@
-// Tela de espera: quem pediu Gestor, Coordenador de escala ou Administrativo fica aqui (sem
-// entrar na plataforma) até um Gestor ou o administrador aprovar o cargo. A aprovação chega
+// Tela de espera: toda conta nova fica aqui (sem entrar na plataforma) até um Gestor ou o
+// administrador aprovar (ou depois de trocar para um cargo de acesso). A aprovação chega
 // em tempo real (access/{uid}) e a pessoa segue para a página que tinha aberto.
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate } from '../firebase.js';

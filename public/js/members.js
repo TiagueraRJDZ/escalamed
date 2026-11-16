@@ -77,8 +77,11 @@ export async function createInvite(group, target, inviter) {
 
 export const cancelInvite = (groupId, key) => deleteDoc(inviteRef(groupId, key));
 
-// Recusado pela pessoa convidada (fica guardado para quem convidou ver; ver watchSentInvites)
+// Respondido pela pessoa convidada: recusado ou aceito. O convite fica guardado para quem
+// convidou ver no sininho (ver watchAnsweredInvites) até ser dispensado.
 export const isDeclined = (invite) => invite?.status === 'declined';
+export const isAccepted = (invite) => invite?.status === 'accepted';
+export const isPending = (invite) => Boolean(invite) && (invite.status ?? 'pending') === 'pending';
 
 // Recusar: marca o convite como recusado (não apaga), com o nome de quem recusou
 export async function declineInvite(groupId, invite, name) {
@@ -112,7 +115,7 @@ export async function myInvites(user) {
     .filter((r) => r.status === 'fulfilled')
     .flatMap((r) => r.value.docs)
     .map((d) => ({ groupId: d.ref.parent.parent.id, ...d.data() }))
-    .filter((invite) => !isDeclined(invite) && invite.expiresAt?.toMillis() > Date.now());
+    .filter((invite) => isPending(invite) && invite.expiresAt?.toMillis() > Date.now());
 }
 
 // Escuta uma consulta em tempo real e, se ela falhar (ex.: índice ainda sendo criado logo
@@ -159,7 +162,7 @@ export function watchMyInvites(user, onChange) {
     results.forEach((r) => r?.docs.forEach((d) => byPath.set(d.ref.path, d)));
     const list = [...byPath.values()]
       .map((d) => ({ id: d.ref.path, groupId: d.ref.parent.parent.id, ...d.data() }))
-      .filter((invite) => !isDeclined(invite) && invite.expiresAt?.toMillis() > Date.now())
+      .filter((invite) => isPending(invite) && invite.expiresAt?.toMillis() > Date.now())
       .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
     // Uma consulta falhando não esconde os convites da outra (ela tenta de novo sozinha)
     onChange(list, { synced: results.every((r) => r && !r.fromCache) });
@@ -178,19 +181,19 @@ export function watchMyInvites(user, onChange) {
   return () => stops.forEach((stop) => stop());
 }
 
-// Convites recusados que quem está logado mandou, em tempo real (para o sininho).
-// onChange(lista, { synced }). Devolve a função que para de escutar.
-export function watchDeclinedInvites(uid, onChange) {
+// Convites que quem está logado mandou e já foram respondidos (aceitos ou recusados), em
+// tempo real (para o sininho). onChange(lista, { synced }). Devolve a função que para de escutar.
+export function watchAnsweredInvites(uid, onChange) {
   return listenWithRetry(
     query(collectionGroup(db, 'invites'), where('invitedBy', '==', uid)),
     (snapshot) => {
       const list = snapshot.docs
         .map((d) => ({ id: d.ref.path, groupId: d.ref.parent.parent.id, ...d.data() }))
-        .filter(isDeclined)
+        .filter((invite) => isDeclined(invite) || isAccepted(invite))
         .sort((a, b) => (b.respondedAt?.toMillis?.() ?? 0) - (a.respondedAt?.toMillis?.() ?? 0));
       onChange(list, { synced: !snapshot.metadata.fromCache });
     },
-    'Convites recusados',
+    'Convites respondidos',
   );
 }
 
@@ -199,13 +202,15 @@ export async function myInviteFor(groupId, user) {
   const keys = [user.uid, user.email?.toLowerCase()].filter(Boolean);
   for (const key of keys) {
     const snapshot = await getDoc(inviteRef(groupId, key)).catch(() => null);
-    if (snapshot?.exists() && !isDeclined(snapshot.data())) return snapshot.data();
+    if (snapshot?.exists() && isPending(snapshot.data())) return snapshot.data();
   }
   return null;
 }
 
-// Aceitar: entra no grupo como membro, cria o cartão e apaga o convite
+// Aceitar: entra no grupo como membro, cria o cartão e marca o convite como aceito
+// (quem convidou vê no sininho e dispensa; ver watchAnsweredInvites)
 export async function acceptInvite(groupId, invite, user, profile) {
+  const key = inviteKey(invite);
   const batch = writeBatch(db);
   batch.update(groupRef(groupId), {
     memberIds: arrayUnion(user.uid),
@@ -216,8 +221,14 @@ export async function acceptInvite(groupId, invite, user, profile) {
     joinedAt: serverTimestamp(),
     addedBy: invite.invitedBy,
   });
-  batch.delete(inviteRef(groupId, inviteKey(invite)));
+  batch.update(inviteRef(groupId, key), {
+    status: 'accepted',
+    respondedAt: serverTimestamp(),
+    respondedByName: String(profile?.name || 'Convidado').slice(0, 80),
+  });
   await batch.commit();
+  // Notificação no celular de quem convidou
+  notifyPush('aceite', groupId, key);
 }
 
 export const inviteLink = (groupId) => `${location.origin}/invite.html?g=${encodeURIComponent(groupId)}`;

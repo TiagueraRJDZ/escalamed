@@ -9,6 +9,7 @@
  *
  * Avisos de hoje (os do sininho):
  *   convite  alguém foi convidado para um grupo     → para a pessoa convidada
+ *   aceite   o convidado aceitou e entrou no grupo  → para quem convidou
  *   recusa   o convidado recusou                    → para quem convidou
  *
  * Rotas (POST, com "Authorization: Bearer <token do Firebase>"):
@@ -179,7 +180,7 @@ const AVISOS = {
   // Convite novo: quem pediu precisa ser quem convidou. Convite por e-mail só chega
   // se a pessoa já tem conta (o e-mail vira o uid pelo Authentication).
   async convite({ env, local, quem, grupo, convite }) {
-    if (convite.invitedBy !== quem.uid || convite.status === 'declined') return null;
+    if (convite.invitedBy !== quem.uid || (convite.status ?? 'pending') !== 'pending') return null;
     const destino = convite.uid || (convite.email ? await uidDoEmail(env, local, convite.email) : null);
     const unidade = convite.unitName ? ` · ${convite.unitName}` : '';
     return {
@@ -190,6 +191,20 @@ const AVISOS = {
         corpo: `${convite.invitedByName || 'Alguém'} convidou você para o grupo${unidade}. Toque para aceitar ou recusar.`,
         url: `/invite.html?g=${encodeURIComponent(grupo)}`,
         tag: `convite:${grupo}`,
+      },
+    };
+  },
+  // Convite aceito: avisa quem convidou (o convite fica marcado como aceito até ser dispensado)
+  async aceite({ grupo, convite }) {
+    if (convite.status !== 'accepted') return null;
+    return {
+      momento: Date.parse(convite.respondedAt || ''),
+      destino: convite.invitedBy,
+      mensagem: {
+        titulo: 'Convite aceito',
+        corpo: `${convite.respondedByName || convite.name || convite.email || 'Alguém'} aceitou o convite para ${convite.groupName || 'o grupo'}.`,
+        url: `/group.html?id=${encodeURIComponent(grupo)}#membros`,
+        tag: `aceite:${grupo}`,
       },
     };
   },

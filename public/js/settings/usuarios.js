@@ -1,6 +1,6 @@
 // Configurações > Usuários: administrador da plataforma (uid em config/admins) e Gestor aprovado.
-// Quem pediu Gestor, Coordenador de escala ou Administrativo e ainda não foi aprovado (ou foi
-// recusado) está sem acesso à plataforma: aparece no topo da lista, com a linha destacada e
+// Toda conta espera aprovação: quem ainda não foi aprovado (ou foi recusado) está sem acesso
+// à plataforma e aparece no topo da lista, com a linha destacada e
 // os botões Aprovar/Recusar (gravam access/{uid}). Cada linha mostra o selo do cargo.
 // Só o administrador vê o login (e-mail, usuário, situação), que vem do serviço de contas, e as
 // ações de senha provisória, inativar e excluir (o serviço confere em config/admins).
@@ -77,9 +77,10 @@ async function loadPlatformUsers(ui, isAdmin) {
 // Situação do cargo de alguém (o administrador da plataforma não passa por aprovação)
 const stateOf = (p) => (p.isAdmin ? 'none' : approvalState(p.profile, p.access));
 
-// Sem acesso à plataforma por causa do cargo: aguardando aprovação ou recusado
-const isWaiting = (p) => Boolean(p.profile) && stateOf(p) === 'pending';
-const isBarred = (p) => Boolean(p.profile) && ['pending', 'declined'].includes(stateOf(p));
+// Sem acesso à plataforma: aguardando aprovação ou recusado (só depois de escolher o cargo,
+// no fim do cadastro; antes disso a linha mostra "Cadastro incompleto")
+const isWaiting = (p) => Boolean(p.profile?.categoryId) && stateOf(p) === 'pending';
+const isBarred = (p) => Boolean(p.profile?.categoryId) && ['pending', 'declined'].includes(stateOf(p));
 
 const APPROVAL_BADGE = {
   pending: `<span class="badge badge-warning">${icon('lock')}Sem acesso · aguardando aprovação</span>`,
@@ -135,7 +136,7 @@ export default {
         // Só dá para saber se a própria conta é Dev (a lista fica no firestore.rules)
         me && ctx.access?.isDev ? '<span class="badge badge-primary">Dev</span>' : '',
         p.isAdmin && !(me && ctx.access?.isDev) ? '<span class="badge badge-primary">Administrador</span>' : '',
-        APPROVAL_BADGE[state] ?? '',
+        barred ? APPROVAL_BADGE[state] : '',
         p.inativa ? '<span class="badge badge-danger">Inativo</span>' : '',
         !isProfileComplete(profile) && !p.semLogin ? '<span class="badge badge-muted">Cadastro incompleto</span>' : '',
         p.semLogin ? '<span class="badge badge-muted">Sem login</span>' : '',
@@ -195,7 +196,7 @@ export default {
     function renderUsers() {
       ui.intro.textContent = isAdmin()
         ? 'Todas as contas da plataforma. Ao fim de cada linha: aprovar cargo, redefinir senha, inativar acesso e excluir acesso.'
-        : 'Pessoas da plataforma e o cargo de cada uma. Aprove ou recuse os pedidos de Gestor, Coordenador de escala e Administrativo.';
+        : 'Pessoas da plataforma e o cargo de cada uma. Aprove ou recuse as contas novas e os pedidos de cargo.';
       const term = normalize(ui.search.value);
       const shown = platformUsers
         .filter((p) => !term || normalize(`${p.name} ${p.usuario ?? ''} ${p.email ?? ''}`).includes(term))

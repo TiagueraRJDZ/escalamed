@@ -2,10 +2,11 @@
 // Sem Firebase: testado com `node --test`. A garantia de verdade fica no firestore.rules,
 // que repete estas regras; aqui é só para mostrar ou esconder botões, abas e grupos.
 //
-// O cargo é escolhido no cadastro (users/{uid}.categoryId). Gestor, Coordenador de escala e
-// Administrativo só valem depois de aprovados (access/{uid}); o administrador da plataforma
-// (config/admins) vale como Gestor. Pedido aguardando ou recusado: a pessoa nem entra na plataforma
-// (tela de espera, access.js); as regras, por segurança, dão a ela só o acesso de Médico.
+// O cargo é escolhido no cadastro (users/{uid}.categoryId). Toda conta espera aprovação
+// (access/{uid}, por um Gestor ou pelo administrador) antes de entrar na plataforma; Gestor,
+// Coordenador de escala e Administrativo são aprovados para aquele cargo. O administrador da
+// plataforma (config/admins) vale como Gestor e não espera. Aguardando ou recusado: a pessoa nem
+// entra (tela de espera, access.js); as regras não deixam ela ler perfis, criar nada nem entrar em grupo.
 //   Dev (desenvolvedor, pelo e-mail no firestore.rules): acima de todos. Vê e altera tudo,
 //   inclusive as escalas individuais dos outros, e tem os poderes do administrador.
 //   Gestor: vê e altera todos os grupos de equipe; aprova cargos.
@@ -13,7 +14,7 @@
 //   Administrativo: vê todos os grupos de equipe, só o que está publicado, sem alterar.
 //   Médico (e quem ainda não foi aprovado): vê os grupos em que está, só o publicado.
 
-// Cargo escolhido (categoryId) → cargo de acesso, para os que passam por aprovação
+// Cargo escolhido (categoryId) → cargo de acesso (a aprovação vale só para aquele cargo)
 export const ACCESS_OF_CATEGORY = {
   gestor: 'gestor',
   'coordenador-escala': 'coordenador',
@@ -28,12 +29,19 @@ export function platformRoleOf({ isDev = false, isAdmin = false, access = null }
   return null;
 }
 
-// Situação do cargo pedido: 'none' (não precisa aprovar), 'pending', 'approved' ou 'declined'.
-// A decisão vale para o cargo daquele momento: trocou de cargo, volta a aguardar.
+export const isAccessCategory = (categoryId) => Boolean(ACCESS_OF_CATEGORY[categoryId]);
+
+// A decisão sobre approvedId vale para quem hoje tem currentId? Vale para o mesmo cargo e, entre
+// profissões (Médico, Enfermeiro...), segue valendo. Trocar para ou de um cargo de acesso, não.
+// (o mesmo que sameApproval() no firestore.rules)
+export const sameApproval = (approvedId, currentId) =>
+  Boolean(currentId) &&
+  (approvedId === currentId || (Boolean(approvedId) && !isAccessCategory(approvedId) && !isAccessCategory(currentId)));
+
+// Situação da conta: 'pending' (aguardando), 'approved' ou 'declined'. Toda conta passa por
+// aprovação (o administrador e o Dev, não: ver myApprovalState em access.js).
 export function approvalState(profile, access) {
-  const categoryId = profile?.categoryId;
-  if (!ACCESS_OF_CATEGORY[categoryId]) return 'none';
-  if (access?.categoryId !== categoryId) return 'pending';
+  if (!access || !sameApproval(access.categoryId, profile?.categoryId)) return 'pending';
   return access.approved === true ? 'approved' : 'declined';
 }
 

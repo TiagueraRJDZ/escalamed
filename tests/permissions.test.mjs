@@ -49,7 +49,15 @@ test('Dev: acima de todos, mesmo com outro cargo pedido ou aprovado', () => {
 });
 
 test('situação da aprovação segue o cargo pedido naquele momento', () => {
-  assert.equal(approvalState({ categoryId: 'medico' }, null), 'none');
+  // Toda conta espera aprovação, inclusive Médico
+  assert.equal(approvalState({ categoryId: 'medico' }, null), 'pending');
+  assert.equal(approvalState({ categoryId: 'medico' }, approved('medico')), 'approved');
+  assert.equal(approvalState({ categoryId: 'medico' }, { categoryId: 'medico', approved: false }), 'declined');
+  assert.equal(approvalState(null, approved('medico')), 'pending');
+  // Entre profissões a aprovação segue valendo; de cargo de acesso para profissão (ou o contrário), não
+  assert.equal(approvalState({ categoryId: 'enfermeiro' }, approved('medico')), 'approved');
+  assert.equal(approvalState({ categoryId: 'medico' }, approved('gestor')), 'pending');
+  assert.equal(approvalState({ categoryId: 'gestor' }, approved('medico')), 'pending');
   assert.equal(approvalState({ categoryId: 'gestor' }, null), 'pending');
   assert.equal(approvalState({ categoryId: 'gestor' }, approved('gestor')), 'approved');
   assert.equal(approvalState({ categoryId: 'gestor' }, { categoryId: 'gestor', approved: false }), 'declined');

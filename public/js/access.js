@@ -61,12 +61,12 @@ export async function loadMyAccess(uid) {
   }
 }
 
-// Situação do cargo pedido no perfil ('none' | 'pending' | 'approved' | 'declined')
+// Situação da conta ('none' | 'pending' | 'approved' | 'declined'): Dev e administrador não esperam
 export const myApprovalState = (profile, value) =>
   value?.isDev || value?.isAdmin ? 'none' : approvalState(profile, value?.access);
 
-// Tela de espera: quem pediu Gestor, Coordenador de escala ou Administrativo só entra na
-// plataforma depois de aprovado. Recusado também fica de fora até trocar de cargo.
+// Tela de espera: toda conta só entra na plataforma depois de aprovada por um Gestor ou pelo
+// administrador. Recusada também fica de fora.
 export const PENDING_PAGE = '/aguardando.html';
 
 export const isBarred = (profile, value) =>

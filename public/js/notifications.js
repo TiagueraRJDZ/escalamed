@@ -1,6 +1,6 @@
 // Notificações (sininho do topo), em tempo real em todas as páginas:
 //  - convites para grupos que a pessoa recebeu (Aceitar / Recusar);
-//  - convites que ela mandou e foram recusados (Dispensar).
+//  - convites que ela mandou e foram aceitos ou recusados (Dispensar).
 // O sininho mostra quantas há; o que chega com a página aberta também vira um aviso.
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 // No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
@@ -10,15 +10,16 @@ import { pushStatus, enablePush, disablePush, dismissPush, resetPushChoice, send
 import { escapeHtml, toast, setLoading, firebaseErrorMessage, confirmDialog } from './ui.js';
 import {
   watchMyInvites,
-  watchDeclinedInvites,
+  watchAnsweredInvites,
   acceptInvite,
   declineInvite,
   cancelInvite,
   inviteKey,
+  isAccepted,
 } from './members.js';
 
 let invites = []; // recebidos, pendentes
-let declined = []; // mandados e recusados
+let answered = []; // mandados e respondidos (aceitos ou recusados)
 let ready = false;
 let session = null; // { app, user, profile }
 const listeners = new Set();
@@ -57,9 +58,11 @@ export async function respondInvite(invite, accept) {
 export const inviteText = (invite) =>
   `${escapeHtml(invite.invitedByName)} convidou você para o grupo${invite.unitName ? ` · ${escapeHtml(invite.unitName)}` : ''}`;
 
-// "Otávio Novo recusou o convite para UTI Adulto"
-const declinedText = (inv) =>
-  `<strong>${escapeHtml(inv.respondedByName ?? inv.name ?? inv.email ?? 'Alguém')}</strong> recusou o convite para
+// "Otávio Novo aceitou o convite para UTI Adulto" / "... recusou o convite ..."
+const answerer = (inv) => inv.respondedByName ?? inv.name ?? inv.email ?? 'Alguém';
+const answerVerb = (inv) => (isAccepted(inv) ? 'aceitou' : 'recusou');
+const answeredText = (inv) =>
+  `<strong>${escapeHtml(answerer(inv))}</strong> ${answerVerb(inv)} o convite para
   <strong>${escapeHtml(inv.groupName)}</strong>`;
 
 const whenText = (ts) => {
@@ -69,7 +72,7 @@ const whenText = (ts) => {
 
 function renderBell() {
   const bell = session.app.querySelector('#notifications-button');
-  const count = invites.length + declined.length;
+  const count = invites.length + answered.length;
   let badge = bell.querySelector('.bell-count');
   if (!badge) {
     badge = document.createElement('span');
@@ -85,7 +88,8 @@ function renderBell() {
   bell.title = label;
 }
 
-// Filtros da gaveta: convites recebidos contam como "Grupos"; recusas, como "Gestão" e "Grupos"
+// Filtros da gaveta: convites recebidos contam como "Grupos"; respostas (aceite ou recusa),
+// como "Gestão" e "Grupos"
 function pressedFilters() {
   return [...document.querySelectorAll('#drawer-notifications .chip[aria-pressed="true"]')].map((c) => c.dataset.filter);
 }
@@ -95,9 +99,9 @@ function renderDrawer() {
   if (!list) return;
   const filters = pressedFilters();
   const showInvites = !filters.length || filters.includes('groups');
-  const showDeclined = !filters.length || filters.includes('groups') || filters.includes('management');
+  const showAnswered = !filters.length || filters.includes('groups') || filters.includes('management');
   const received = showInvites ? invites : [];
-  const refused = showDeclined ? declined : [];
+  const replies = showAnswered ? answered : [];
 
   const receivedHtml = received.length
     ? `<h3 class="section-title">Convites para grupos</h3>
@@ -118,14 +122,14 @@ function renderDrawer() {
         .join('')}</ul>`
     : '';
 
-  const refusedHtml = refused.length
-    ? `<h3 class="section-title">Convites recusados</h3>
-      <ul class="notification-list">${refused
+  const repliesHtml = replies.length
+    ? `<h3 class="section-title">Respostas aos seus convites</h3>
+      <ul class="notification-list">${replies
         .map(
-          (inv) => `<li class="notification-item is-declined" data-id="${escapeHtml(inv.id)}">
-          <span class="notification-icon" aria-hidden="true">${icon('x')}</span>
+          (inv) => `<li class="notification-item ${isAccepted(inv) ? 'is-accepted' : 'is-declined'}" data-id="${escapeHtml(inv.id)}">
+          <span class="notification-icon" aria-hidden="true">${icon(isAccepted(inv) ? 'check' : 'x')}</span>
           <div class="notification-text">
-            <span class="notification-sentence">${declinedText(inv)}</span>
+            <span class="notification-sentence">${answeredText(inv)}</span>
             <small>${whenText(inv.respondedAt)}</small>
             <div class="notification-actions">
               <button type="button" class="btn btn-ghost" data-dismiss>Dispensar</button>
@@ -137,8 +141,8 @@ function renderDrawer() {
     : '';
 
   list.innerHTML =
-    receivedHtml || refusedHtml
-      ? receivedHtml + refusedHtml
+    receivedHtml || repliesHtml
+      ? receivedHtml + repliesHtml
       : `<h3 class="section-title">Não lidas</h3>
       <div class="empty-state">
         ${icon('bell')}
@@ -347,12 +351,12 @@ export function setupNotifications(app, user, profile, access = {}) {
     listeners.forEach((cb) => cb(invites));
   });
 
-  const declinedChanged = tracker((inv) =>
-    toast(`${inv.respondedByName ?? inv.name ?? inv.email} recusou o convite para ${inv.groupName}.`, 'info', 6000),
+  const answeredChanged = tracker((inv) =>
+    toast(`${answerer(inv)} ${answerVerb(inv)} o convite para ${inv.groupName}.`, isAccepted(inv) ? 'success' : 'info', 6000),
   );
-  watchDeclinedInvites(user.uid, (list, meta) => {
-    if (!declinedChanged(list, meta)) return;
-    declined = list;
+  watchAnsweredInvites(user.uid, (list, meta) => {
+    if (!answeredChanged(list, meta)) return;
+    answered = list;
     render();
   });
 
@@ -365,8 +369,8 @@ export function setupNotifications(app, user, profile, access = {}) {
     setLoading(button, true);
     let ok = true;
     if (button.hasAttribute('data-dismiss')) {
-      // Dispensar a recusa: apaga o convite recusado
-      const inv = declined.find((item) => item.id === id);
+      // Dispensar a resposta: apaga o convite aceito ou recusado
+      const inv = answered.find((item) => item.id === id);
       try {
         if (inv) await cancelInvite(inv.groupId, inviteKey(inv));
       } catch (error) {

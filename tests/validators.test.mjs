@@ -44,7 +44,8 @@ test('cargos para escolher: Gestor, Coordenador de escala, Administrativo e Méd
     PROFESSIONAL_CATEGORIES.map((c) => c.name),
     ['Gestor', 'Coordenador de escala', 'Administrativo', 'Médico'],
   );
-  // Só o Médico não passa por aprovação
+  // Cargos de acesso: aprovados só para aquele cargo (o Médico também espera aprovação, mas ela
+  // segue valendo entre profissões)
   assert.deepEqual(
     PROFESSIONAL_CATEGORIES.filter((c) => c.needsApproval).map((c) => c.id),
     ['gestor', 'coordenador-escala', 'administrativo'],

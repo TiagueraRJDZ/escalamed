@@ -1,11 +1,13 @@
 // Configurações > Informações profissionais: cargo (seletor com busca), especialidade
 // e registro no conselho. Os gestores dos grupos veem estes dados no cartão de membro.
-// Gestor, Coordenador de escala e Administrativo passam por aprovação: ao trocar de cargo, a
-// aprovação anterior (access/{uid}) é apagada e o cargo novo volta a aguardar. Enquanto aguarda,
-// a pessoa fica sem acesso à plataforma (tela de espera, que também usa esta seção).
+// Toda conta passa por aprovação. Gestor, Coordenador de escala e Administrativo são aprovados
+// para aquele cargo: ao trocar para ou de um deles, a aprovação anterior (access/{uid}) é apagada
+// e a conta volta a aguardar. Entre profissões (Médico, Enfermeiro...), a aprovação segue valendo.
+// Enquanto aguarda, a pessoa fica sem acesso à plataforma (tela de espera, que também usa esta seção).
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from '../firebase.js';
 import { loadMyAccess, myApprovalState, isBarred } from '../access.js';
+import { sameApproval } from '../permissions.js';
 import { PROFESSIONAL_CATEGORIES, SPECIALTIES, getCategory } from '/data/categories.js';
 import { STATES } from '/data/states.js';
 import { icon } from '../icons.js';
@@ -63,13 +65,13 @@ const PICKER_DIALOG = {
     </div>
     <ul class="picker-list" id="profession-list" role="listbox" aria-label="Cargos"></ul>
     <p class="muted picker-empty" id="profession-empty" hidden>Nenhum cargo encontrado.</p>
-    <p class="field-hint picker-note">Gestor, Coordenador de escala e Administrativo precisam ser aprovados por um Gestor ou pelo administrador. Até lá, a conta fica sem acesso à plataforma.</p>`,
+    <p class="field-hint picker-note">Trocar para ou de Gestor, Coordenador de escala ou Administrativo pede uma nova aprovação de um Gestor ou do administrador. Até lá, a conta fica sem acesso à plataforma.</p>`,
 };
 
 // Situação do cargo salvo (aguardando, aprovado, recusado)
 const APPROVAL_TEXT = {
   pending: 'Aguardando aprovação de um Gestor ou do administrador.',
-  approved: 'Cargo aprovado.',
+  approved: 'Aprovado.',
   declined: 'Pedido recusado. Fale com um Gestor ou com o administrador da plataforma.',
 };
 
@@ -169,10 +171,11 @@ export default {
       if (number && !councilState) errors.push([form.councilState, 'Escolha a UF.']);
       if (showErrors(errors)) return;
 
-      // Hoje com acesso e trocando para um cargo que passa por aprovação: avisa que a conta
-      // fica sem acesso até lá (o administrador e o Dev não passam por aprovação)
+      // Hoje com acesso e trocando para (ou de) um cargo de acesso: avisa que a conta fica sem
+      // acesso até a nova aprovação (o administrador e o Dev não passam por aprovação)
       const access = ctx.access;
-      const needsApproval = category.needsApproval && category.id !== profile.categoryId && !access?.isDev && !access?.isAdmin;
+      const losesApproval = !sameApproval(profile.categoryId, category.id);
+      const needsApproval = losesApproval && !access?.isDev && !access?.isAdmin;
       if (
         needsApproval &&
         !isBarred(profile, access) &&
@@ -196,8 +199,8 @@ export default {
         const changedRole = data.categoryId !== profile.categoryId;
         await updateDoc(ctx.userRef, { ...data, updatedAt: serverTimestamp() });
         Object.assign(profile, data);
-        // Trocou de cargo: a aprovação anterior deixa de valer
-        if (changedRole) await deleteDoc(doc(db, 'access', user.uid)).catch(() => {});
+        // Trocou para (ou de) um cargo de acesso: a aprovação anterior deixa de valer
+        if (changedRole && losesApproval) await deleteDoc(doc(db, 'access', user.uid)).catch(() => {});
         await syncMemberCards(user.uid, profile);
         ctx.access = await loadMyAccess(user.uid);
         ctx.changed();

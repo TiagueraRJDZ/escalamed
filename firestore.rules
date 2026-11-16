@@ -51,6 +51,8 @@ service cloud.firestore {
     }
 
     // 'gestor' | 'coordenador' | 'administrativo' | 'none'
+    // (não confere o perfil, para não estourar o limite de leituras por pedido: quem troca de
+    // cargo apaga a própria aprovação no app; ver isApproved para a conta aprovada)
     function platformRole() {
       return isPlatformAdmin() ? 'gestor'
         : !exists(accessPath(me())) ? 'none'
@@ -63,6 +65,35 @@ service cloud.firestore {
 
     function isGestor() {
       return signedIn() && platformRole() == 'gestor';
+    }
+
+    // ----- Conta aprovada -----
+    // Toda conta nova espera aprovação (Configurações > Usuários) antes de usar a plataforma,
+    // seja qual for o cargo. Gestor, Coordenador de escala e Administrativo: a aprovação vale
+    // para aquele cargo. Profissões (Médico, Enfermeiro...): a aprovação segue valendo se a
+    // pessoa trocar de uma profissão para outra. Dev e administrador da plataforma não esperam.
+    // Sem aprovação, a conta não lê o perfil dos outros, não cria escala nem unidade e não
+    // entra em grupo (aceitar convite). Fica por último nas condições (lê dois documentos).
+    function approvalRoles() {
+      return ['gestor', 'coordenador-escala', 'administrativo'];
+    }
+
+    function sameApproval(approvedCategory, profileCategory) {
+      return approvedCategory == profileCategory
+        || (profileCategory != null
+            && !(profileCategory in approvalRoles())
+            && !(approvedCategory in approvalRoles()));
+    }
+
+    function approvedFor(access, profile) {
+      return access.approved == true && sameApproval(access.categoryId, profile.get('categoryId', null));
+    }
+
+    function isApproved() {
+      let accessDoc = accessPath(me());
+      let profileDoc = /databases/$(database)/documents/users/$(me());
+      return signedIn() && (isDev() || isPlatformAdmin()
+        || (exists(accessDoc) && exists(profileDoc) && approvedFor(get(accessDoc).data, get(profileDoc).data)));
     }
 
     function incoming() {
@@ -151,7 +182,8 @@ service cloud.firestore {
           && d.searchKeywords is list && d.searchKeywords.size() <= 60;
       }
 
-      allow read: if signedIn();
+      // A própria pessoa sempre; os outros perfis, só com a conta aprovada
+      allow read: if isSelf(uid) || isApproved();
       allow create: if isSelf(uid)
         && validUser(incoming())
         && incoming().createdAt == request.time
@@ -182,15 +214,16 @@ service cloud.firestore {
       }
     }
 
-    // ---------- Aprovação de cargos (Configurações > Usuários) ----------
+    // ---------- Aprovação de contas e cargos (Configurações > Usuários) ----------
     // access/{uid}: { categoryId, approved, decidedBy, decidedAt }. A decisão vale para o cargo
-    // que a pessoa pediu naquele momento (categoryId tem de ser igual ao do perfil dela).
-    // Qualquer logado lê (selo do cargo, quem pode ser coordenador). Só administrador ou Gestor
-    // decidem; ninguém decide sobre si mesmo. A própria pessoa apaga ao trocar de cargo.
+    // que a pessoa tinha naquele momento (categoryId tem de ser igual ao do perfil dela); ver
+    // isApproved(). Qualquer logado lê (selo do cargo, quem pode ser coordenador). Só
+    // administrador ou Gestor decidem; ninguém decide sobre si mesmo. A própria pessoa apaga ao
+    // trocar para (ou de) Gestor, Coordenador de escala ou Administrativo.
     match /access/{uid} {
       function validDecision(d) {
         return d.keys().hasOnly(['categoryId', 'approved', 'decidedBy', 'decidedAt'])
-          && d.categoryId in ['gestor', 'coordenador-escala', 'administrativo']
+          && d.categoryId != null && optCategory(d.categoryId)
           && d.categoryId == get(/databases/$(database)/documents/users/$(uid)).data.get('categoryId', null)
           && d.approved is bool
           && d.decidedBy == me()
@@ -207,6 +240,7 @@ service cloud.firestore {
     match /healthUnits/{unitId} {
       allow read: if signedIn();
       allow create: if signedIn()
+        && isApproved()
         && incoming().keys().hasOnly(['name', 'nameLower', 'city', 'cityLower', 'state',
                                       'keywords', 'createdBy', 'createdAt'])
         && str(incoming().name, 3, 120)
@@ -332,9 +366,10 @@ service cloud.firestore {
         return exists(personInvitePath()) ? get(personInvitePath()).data : get(invitePath()).data;
       }
 
+      // Só convite pendente vale (recusado ou já aceito, não: quem sai do grupo não volta com ele)
       function acceptsInvite(invite) {
         return invite.expiresAt > request.time
-          && invite.get('status', 'pending') != 'declined'
+          && invite.get('status', 'pending') == 'pending'
           && incoming().memberIds.toSet() == resource.data.memberIds.toSet().union([me()].toSet())
           && incoming().coordinatorIds == resource.data.coordinatorIds;
       }
@@ -351,7 +386,8 @@ service cloud.firestore {
             || (isGestor() && incoming().coordinatorIds == [])
             || (platformRole() == 'coordenador' && incoming().coordinatorIds == [me()]))
         && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+        && incoming().updatedAt == request.time
+        && isApproved();
 
       // Dados do grupo
       allow update: if settingsEditorOf(resource.data)
@@ -376,7 +412,7 @@ service cloud.firestore {
         && !resource.data.memberIds.toSet().difference(incoming().memberIds.toSet()).hasAny(resource.data.coordinatorIds)
         && incoming().updatedAt == request.time;
 
-      // Aceitar convite: entra só a própria pessoa, como membro, e antes de vencer
+      // Aceitar convite: entra só a própria pessoa (com a conta aprovada), como membro, e antes de vencer
       allow update: if signedIn()
         && resource.data.type == 'team'
         && !(me() in resource.data.memberIds)
@@ -384,7 +420,8 @@ service cloud.firestore {
         && acceptsInvite(myInvite())
         && validGroup(incoming())
         && changedOnly(roleKeys())
-        && incoming().updatedAt == request.time;
+        && incoming().updatedAt == request.time
+        && isApproved();
 
       // Sair do grupo: a pessoa tira só a si mesma (de membro e de coordenadora)
       allow update: if isMemberOf(resource.data)
@@ -498,11 +535,22 @@ service cloud.firestore {
         // Recusar: a própria pessoa marca o convite como recusado (em vez de apagar), para
         // quem convidou ficar sabendo. Só esses três campos mudam; o resto fica igual.
         allow update: if signedIn() && isMine()
-          && resource.data.get('status', 'pending') != 'declined'
+          && resource.data.get('status', 'pending') == 'pending'
           && changedOnly(['status', 'respondedAt', 'respondedByName'])
           && incoming().status == 'declined'
           && incoming().respondedAt == request.time
           && str(incoming().respondedByName, 1, 80);
+
+        // Aceitar: no mesmo lote em que a pessoa entra no grupo, o convite fica marcado como
+        // aceito (em vez de apagado), para quem convidou ficar sabendo. Quem convidou dispensa.
+        allow update: if signedIn() && isMine()
+          && resource.data.get('status', 'pending') == 'pending'
+          && changedOnly(['status', 'respondedAt', 'respondedByName'])
+          && incoming().status == 'accepted'
+          && incoming().respondedAt == request.time
+          && str(incoming().respondedByName, 1, 80)
+          && !(me() in groupData().memberIds)
+          && me() in groupAfter().memberIds;
       }
 
       // ----- Turnos -----

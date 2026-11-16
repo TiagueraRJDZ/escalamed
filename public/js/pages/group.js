@@ -552,7 +552,8 @@ function listenInvites() {
     stopInvites = onSnapshot(
       collection(db, 'groups', groupId, 'invites'),
       (snapshot) => {
-        invites = snapshot.docs.map((d) => d.data());
+        // Aceitos ficam guardados só para o sininho de quem convidou (a pessoa já está em Membros)
+        invites = snapshot.docs.map((d) => d.data()).filter((invite) => invite.status !== 'accepted');
         renderInvites();
       },
       () => {}, // perdeu o cargo: a próxima atualização do grupo desliga

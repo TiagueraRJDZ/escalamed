@@ -1,8 +1,10 @@
 // Cargos da plataforma (o campo continua "categoryId" no banco). O "id" é gravado; o "name" aparece na tela.
 // "council": sigla do conselho de classe (mostrada como rótulo do registro). Sem conselho = null.
 // "specialty": pede especialidade no cadastro. "councilRequired": registro obrigatório.
-// "needsApproval": o cargo só vale depois de aprovado (Configurações > Usuários) pelo administrador
-// da plataforma ou por um Gestor; até lá a pessoa fica na tela de espera, sem entrar na plataforma.
+// Toda conta espera aprovação (Configurações > Usuários) do administrador da plataforma ou de um
+// Gestor; até lá a pessoa fica na tela de espera, sem entrar na plataforma.
+// "needsApproval": cargo de acesso, aprovado só para ele (trocar para ou dele pede nova aprovação;
+// entre as profissões, a aprovação segue valendo).
 // "hint": explicação curta mostrada na escolha.
 // Só estes aparecem para escolher (cadastro e Configurações).
 // Para incluir um cargo novo, adicione aqui, na lista do optCategory no firestore.rules e no
