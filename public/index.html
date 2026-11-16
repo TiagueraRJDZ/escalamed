@@ -34,7 +34,9 @@
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png?v=4f07ea153f" />
   <!-- App instalável (Tela de Início) e notificações push no celular -->
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#ffffff" media="(min-width: 960px)" />
+  <!-- Celular: a barra do navegador no azul do topo da tela de entrada -->
+  <meta name="theme-color" content="#1a46b3" media="(max-width: 959px)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="EscalaMed" />
@@ -56,7 +58,7 @@
   <link rel="modulepreload" href="/js/auth-errors.js?v=3bd3899cf4" />
   <!-- /modulepreload -->
   <link rel="stylesheet" href="/css/base.css?v=78019dac9e" />
-  <link rel="stylesheet" href="/css/auth.css?v=7e8640c8cf" />
+  <link rel="stylesheet" href="/css/auth.css?v=dce5d22072" />
 </head>
 <body>
   <div class="auth">
@@ -90,6 +92,11 @@
 
       <footer class="app-credits auth-showcase-credits" data-credits></footer>
     </aside>
+
+    <!-- Celular e tablet: a ilustração no topo azul, atrás do cartão de entrada -->
+    <div class="auth-hero" aria-hidden="true">
+      <img src="/img/login-illustration.webp" alt="" width="508" height="334" decoding="async" />
+    </div>
 
     <main class="auth-panel">
       <div class="auth-box">

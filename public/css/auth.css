@@ -160,6 +160,39 @@
   background: #fff;
 }
 
+/* ---------- Celular e tablet: ilustração no topo azul, com o cartão de entrada por cima ---------- */
+.auth-hero { display: none; }
+
+@media (max-width: 959px) {
+  .auth { grid-template-rows: auto 1fr; }
+  .auth-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: clamp(190px, 34vh, 320px);
+    padding: calc(var(--esp-4) + env(safe-area-inset-top)) var(--esp-5) var(--esp-6);
+    overflow: hidden;
+    background: linear-gradient(150deg, var(--auth-azul-claro) 0%, var(--auth-azul-painel) 55%);
+  }
+  .auth-hero img {
+    width: auto;
+    max-width: min(100%, 440px);
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+  }
+  /* O cartão sobe um pouco sobre o azul, com os cantos de cima arredondados */
+  .auth-panel {
+    z-index: 1;
+    margin-top: -28px;
+    padding-top: var(--esp-6);
+    border-radius: 28px 28px 0 0;
+    background: var(--cor-fundo);
+    box-shadow: 0 -8px 24px rgb(14 59 171 / 0.12);
+  }
+  .auth-box .auth-brand { margin-bottom: var(--esp-5); }
+}
+
 /* Crédito "Desenvolvido por" centralizado embaixo da parte azul */
 .auth-showcase-credits {
   color: rgb(255 255 255 / 0.8);
