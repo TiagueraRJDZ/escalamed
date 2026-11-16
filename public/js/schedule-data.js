@@ -6,6 +6,8 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  query,
+  where,
   writeBatch,
   arrayUnion,
   arrayRemove,
@@ -19,15 +21,30 @@ export const scheduleRef = (groupId, month) => doc(db, 'groups', groupId, 'sched
 const stamp = () => ({ updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid });
 
 // Turnos do grupo: { id: { title, startMinute, endMinute } }
-export async function loadShifts(groupId) {
-  const snapshot = await getDocs(collection(db, 'groups', groupId, 'shifts'));
-  return Object.fromEntries(
+export const shiftsRef = (groupId) => collection(db, 'groups', groupId, 'shifts');
+
+export const shiftsFrom = (snapshot) =>
+  Object.fromEntries(
     snapshot.docs.map((d) => {
       const { title, startMinute, endMinute } = d.data();
       return [d.id, { title, startMinute, endMinute }];
     }),
   );
+
+export async function loadShifts(groupId) {
+  return shiftsFrom(await getDocs(shiftsRef(groupId)));
 }
+
+// Todas as escalas do grupo, para escutar em tempo real (uma consulta para todos os meses).
+// Quem não vê rascunho consulta só as publicadas (as regras só deixam essa consulta); assim
+// a escala aparece para o membro na hora em que é publicada e some se voltar para rascunho.
+export function schedulesQuery(groupId, withDrafts) {
+  const schedules = collection(db, 'groups', groupId, 'schedules');
+  return withDrafts ? schedules : query(schedules, where('status', '==', 'published'));
+}
+
+// Resposta de schedulesQuery → Map "AAAA-MM" → escala
+export const schedulesFrom = (snapshot) => new Map(snapshot.docs.map((d) => [d.id, d.data()]));
 
 // Turnos para mostrar uma escala: os de hoje + os congelados na publicação
 // (assim um turno apagado depois continua aparecendo na escala antiga)

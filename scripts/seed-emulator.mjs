@@ -27,7 +27,7 @@ const HEALTH_UNITS = [
 ];
 
 // Usuários de teste (senha igual para todos; nomes e registros fictícios)
-// approved = cargo já aprovado (access/{uid}); group = no grupo TELEAUDITORIA HAPVIDA
+// approved = conta aprovada (access/{uid}; toda conta espera aprovação); group = no grupo TELEAUDITORIA HAPVIDA
 // ('coordinator' = membro e coordenador; 'member' = membro; sem group = fora do grupo)
 const PASSWORD = 'Teste@123';
 const USERS = [
@@ -39,14 +39,15 @@ const USERS = [
   { email: 'administrativo@teste.com', name: 'Elisa Administrativa', categoryId: 'administrativo', approved: true },
   // Pediu Gestor e ainda não foi aprovado: vê só o grupo em que está
   { email: 'pendente@teste.com', name: 'Fábio Pendente', categoryId: 'gestor', group: 'member' },
-  { email: 'plantonista@teste.com', name: 'Bruno Plantonista', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10002'], group: 'member' },
-  { email: 'plantonista2@teste.com', name: 'Gabriela Souza', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10003'], group: 'member' },
-  { email: 'plantonista3@teste.com', name: 'Henrique Lima', categoryId: 'medico', specialty: 'Medicina de Família', council: ['CRM', '10004'], group: 'member' },
-  { email: 'plantonista4@teste.com', name: 'Isabela Rocha', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10005'], group: 'member' },
-  { email: 'plantonista5@teste.com', name: 'João Pereira', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10006'], group: 'member' },
-  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10009'], group: 'member' },
-  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10010'], group: 'member' },
-  { email: 'plantonista8@teste.com', name: 'Natália Costa', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10007'], group: 'member' },
+  { email: 'plantonista@teste.com', name: 'Bruno Plantonista', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10002'], approved: true, group: 'member' },
+  { email: 'plantonista2@teste.com', name: 'Gabriela Souza', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10003'], approved: true, group: 'member' },
+  { email: 'plantonista3@teste.com', name: 'Henrique Lima', categoryId: 'medico', specialty: 'Medicina de Família', council: ['CRM', '10004'], approved: true, group: 'member' },
+  { email: 'plantonista4@teste.com', name: 'Isabela Rocha', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10005'], approved: true, group: 'member' },
+  { email: 'plantonista5@teste.com', name: 'João Pereira', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10006'], approved: true, group: 'member' },
+  { email: 'plantonista6@teste.com', name: 'Larissa Mendes', categoryId: 'medico', specialty: 'Pediatria', council: ['CRM', '10009'], approved: true, group: 'member' },
+  { email: 'plantonista7@teste.com', name: 'Marcos Alves', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10010'], approved: true, group: 'member' },
+  { email: 'plantonista8@teste.com', name: 'Natália Costa', categoryId: 'medico', specialty: 'Emergência', council: ['CRM', '10007'], approved: true, group: 'member' },
+  // Conta nova, ainda sem aprovação (aparece em Configurações > Usuários para aprovar)
   { email: 'novo@teste.com', name: 'Otávio Novo', categoryId: 'medico', specialty: 'Clínico Geral', council: ['CRM', '10008'] },
 ];
 

@@ -31,7 +31,8 @@ import {
   memberMinutes,
   formatHours,
 } from '../schedule-math.js';
-import { loadShifts, loadSchedule, scheduleShifts } from '../schedule-data.js';
+import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
+import { listenWithRetry, batched } from '../live.js';
 import {
   escapeHtml,
   initials,
@@ -567,9 +568,46 @@ function listenInvites() {
 }
 
 // ---------- Calendário: meus plantões e plantões do dia ----------
-let liveShifts = null; // turnos do grupo (lidos uma vez)
-const months = new Map(); // "YYYY-MM" → escala (ou null)
+// Turnos e escalas do grupo em tempo real: alocação, vaga, publicação e turnos novos aparecem
+// na hora no calendário, na gaveta do dia e na lista de meses (Editar escala).
+let liveShifts = null; // turnos do grupo
+let schedules = null; // "AAAA-MM" → escala (só os meses que existem e a pessoa pode ver)
+let stopCalendar = null;
+let calendarWithDrafts = null;
+let calendarReady;
+let markCalendarReady;
+const resetReady = () => (calendarReady = new Promise((resolve) => (markCalendarReady = resolve)));
+resetReady();
 let shownMonth = null;
+
+// Começa (ou recomeça, se o papel mudou e a pessoa passou a ver rascunhos ou deixou de ver)
+function listenCalendar() {
+  const withDrafts = can(myRole, 'viewDraft');
+  if (stopCalendar && withDrafts === calendarWithDrafts) return;
+  stopCalendar?.();
+  calendarWithDrafts = withDrafts;
+  const changed = () => {
+    if (!liveShifts || !schedules) return;
+    markCalendarReady();
+    refreshCalendarViews();
+  };
+  const stops = [
+    listenWithRetry(schedulesQuery(groupId, withDrafts), (snapshot) => ((schedules = schedulesFrom(snapshot)), changed()), 'Escalas do grupo', {
+      onError: () => ((schedules ??= new Map()), changed()),
+    }),
+    listenWithRetry(shiftsRef(groupId), (snapshot) => ((liveShifts = shiftsFrom(snapshot)), changed()), 'Turnos do grupo', {
+      onError: () => ((liveShifts ??= {}), changed()),
+    }),
+  ];
+  stopCalendar = () => stops.forEach((stop) => stop());
+}
+
+// Algo mudou: redesenha o que está na tela
+const refreshCalendarViews = batched(() => {
+  if (shownMonth) showMonth(shownMonth);
+  if ($('drawer-day').open) renderDay();
+  if (monthsLoaded !== null) renderMonthList(true);
+});
 
 const monthTitle = (month) => {
   const { year, monthIndex } = monthParts(month);
@@ -584,9 +622,8 @@ const dateOf = (month, day) => {
 };
 
 async function monthData(month) {
-  if (!liveShifts) liveShifts = await loadShifts(groupId).catch(() => ({}));
-  if (!months.has(month)) months.set(month, await loadSchedule(groupId, month));
-  return months.get(month);
+  await calendarReady;
+  return schedules.get(month) ?? null;
 }
 
 const calendar = createCalendar($('group-calendar'), {
@@ -822,10 +859,10 @@ async function renderMonthList(force = false) {
   monthsLoaded = listYear;
   const year = listYear;
   $('year-label').textContent = year;
-  $('month-list').innerHTML = '<li class="muted">Carregando…</li>';
+  if (!force) $('month-list').innerHTML = '<li class="muted">Carregando…</li>';
   // Mais recente primeiro
   const keys = Array.from({ length: 12 }, (_, i) => monthKey(year, 11 - i));
-  const data = await Promise.all(keys.map((m) => loadSchedule(groupId, m).catch(() => null)));
+  const data = await Promise.all(keys.map((m) => monthData(m)));
   if (year !== listYear) return;
   $('month-list').innerHTML = keys
     .map((m, i) => {
@@ -865,6 +902,7 @@ onSnapshot(
     $('tab-schedule').hidden = !can(myRole, 'editSchedule');
     $('invite-button').hidden = !can(myRole, 'manageMembers');
     listenInvites();
+    listenCalendar();
     renderMembers();
     renderInvites();
 

@@ -6,7 +6,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   where,
   writeBatch,
@@ -17,7 +16,8 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { auth, db, isLeaving } from './firebase.js';
+import { auth, db } from './firebase.js';
+import { listenWithRetry as listenLive } from './live.js';
 import { coordinatorPatch, removeMemberPatch } from './permissions.js';
 import { notifyPush } from './push.js';
 
@@ -118,35 +118,9 @@ export async function myInvites(user) {
     .filter((invite) => isPending(invite) && invite.expiresAt?.toMillis() > Date.now());
 }
 
-// Escuta uma consulta em tempo real e, se ela falhar (ex.: índice ainda sendo criado logo
-// depois de publicar, conexão caindo), tenta de novo sozinha a cada 30 s. Enquanto isso,
-// fica a última lista que chegou. Devolve a função que para de escutar.
-const RETRY_MS = 30000;
-
-function listenWithRetry(q, onNext, label) {
-  let stop = () => {};
-  let timer = null;
-  let stopped = false;
-  const start = () => {
-    stop = onSnapshot(
-      q,
-      // includeMetadataChanges: avisa também quando o servidor só confirma o que o cache já tinha
-      { includeMetadataChanges: true },
-      onNext,
-      (error) => {
-        if (stopped || isLeaving()) return;
-        console.warn(`${label}: a consulta falhou; tentando de novo em 30 s.`, error.message);
-        timer = setTimeout(start, RETRY_MS);
-      },
-    );
-  };
-  start();
-  return () => {
-    stopped = true;
-    clearTimeout(timer);
-    stop();
-  };
-}
+// Consultas em tempo real que se recuperam sozinhas (live.js). metadata: o sininho precisa
+// saber quando a resposta já veio do servidor (synced).
+const listenWithRetry = (q, onNext, label) => listenLive(q, onNext, label, { metadata: true });
 
 // Convites pendentes em tempo real (as mesmas duas consultas de myInvites).
 // onChange(lista, { synced }) a cada mudança; synced = as duas consultas já responderam

@@ -23,8 +23,10 @@ import {
   replicate,
   dayShifts,
 } from '../schedule-math.js';
+import { listenWithRetry } from '../live.js';
 import {
-  loadShifts,
+  shiftsRef,
+  shiftsFrom,
   loadSchedule,
   watchSchedule,
   setAssignment,
@@ -430,7 +432,20 @@ $('replicate-form').addEventListener('submit', async (event) => {
 });
 
 // ---------- Dados em tempo real ----------
-shifts = await loadShifts(groupId).catch(() => ({}));
+// Turnos: a primeira resposta antes de desenhar a grade; depois, turno novo ou alterado
+// (Configurações do grupo, em outra aba ou por outra pessoa) aparece na hora
+await new Promise((resolve) =>
+  listenWithRetry(
+    shiftsRef(groupId),
+    (snapshot) => {
+      shifts = shiftsFrom(snapshot);
+      resolve();
+      if (group) render();
+    },
+    'Turnos do grupo',
+    { onError: () => ((shifts ??= {}), resolve()) },
+  ),
+);
 
 onSnapshot(
   doc(db, 'groups', groupId),

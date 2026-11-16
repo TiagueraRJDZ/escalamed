@@ -83,9 +83,16 @@ export function logMovement(batch, groupId, data) {
 
 // Movimentações de um grupo num mês, da mais recente para a mais antiga.
 // Quem não vê rascunhos só pode consultar as públicas (as regras exigem o filtro).
-export async function loadMovements(groupId, month, { seesDrafts = false } = {}) {
+export function movementsQuery(groupId, month, { seesDrafts = false } = {}) {
   const constraints = [where('monthKey', '==', month), orderBy('createdAt', 'desc'), limit(500)];
   if (!seesDrafts) constraints.unshift(where('public', '==', true));
-  const snapshot = await getDocs(query(collection(db, 'groups', groupId, 'movements'), ...constraints));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return query(collection(db, 'groups', groupId, 'movements'), ...constraints);
+}
+
+// Resposta da consulta → lista. Gravação ainda pendente: a hora estimada (aparece na hora certa)
+export const movementsFrom = (snapshot) =>
+  snapshot.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
+
+export async function loadMovements(groupId, month, options) {
+  return movementsFrom(await getDocs(movementsQuery(groupId, month, options)));
 }

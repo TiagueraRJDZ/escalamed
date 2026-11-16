@@ -7,9 +7,10 @@ import { isLeaving } from '../firebase.js';
 import { icon, renderIcons } from '../icons.js';
 import { escapeHtml, setupMenu, toast, firebaseErrorMessage } from '../ui.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
-import { loadMyGroups, loadMembers, groupLabel, rememberGroup, lastGroup } from '../my-groups.js';
+import { loadMyGroups, watchMembers, groupLabel, rememberGroup, lastGroup } from '../my-groups.js';
 import { can, seesReports } from '../permissions.js';
-import { loadShifts, loadSchedule, scheduleShifts } from '../schedule-data.js';
+import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
+import { listenWithRetry, batched } from '../live.js';
 import { collectShifts, buildShiftReport, MAX_RANGE_DAYS } from '../shift-report.js';
 import { formatDuration, toTime } from '../shifts.js';
 import { MONTHS, MONTHS_SHORT, WEEKDAYS_SHORT, brDate, daysBetween, monthRange, monthsInRange, parseIsoDate } from '../dates.js';
@@ -65,16 +66,30 @@ groupSelect.value = groups.some((g) => g.id === remembered) ? remembered : (grou
 
 const selectedGroup = () => groups.find((g) => g.id === groupSelect.value);
 let members = [];
+let stopMembers = () => {};
+let onMembersChange = () => {}; // definido em "Resultado" (o relatório na tela se refaz)
 
-async function fillMembers() {
+// Membros do grupo escolhido em tempo real (filtro de membro e nomes do relatório)
+function fillMembers() {
   const select = $('report-member');
   select.disabled = true;
-  if (noGroups) return; // sem grupo: fica só "Todos os membros", desativado
-  members = await loadMembers(groupSelect.value).catch(() => []);
-  select.innerHTML =
-    '<option value="">Todos os membros</option>' +
-    members.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('');
-  select.disabled = false;
+  stopMembers();
+  if (noGroups) return Promise.resolve(); // sem grupo: fica só "Todos os membros", desativado
+  const groupId = groupSelect.value;
+  return new Promise((resolve) => {
+    stopMembers = watchMembers(groupId, (list) => {
+      members = list;
+      const chosen = select.value;
+      select.innerHTML =
+        '<option value="">Todos os membros</option>' +
+        members.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('');
+      select.value = members.some((m) => m.id === chosen) ? chosen : '';
+      select.disabled = false;
+      resolve();
+      onMembersChange(groupId); // nome trocado ou membro novo: o relatório na tela acompanha
+    });
+    setTimeout(resolve, 10000); // sem resposta: segue sem os nomes
+  });
 }
 
 function setRange(offset) {
@@ -138,7 +153,7 @@ function personHtml(person, index) {
     )
     .join('');
   return `<li class="person-card">
-    <button type="button" class="person-head" aria-expanded="false" aria-controls="${panelId}">
+    <button type="button" class="person-head" aria-expanded="false" aria-controls="${panelId}" data-person="${escapeHtml(person.member?.id ?? String(index))}">
       ${icon('chevronDown', 'person-chevron')}
       ${avatarHtml(person.member, 'avatar person-avatar')}
       <span class="person-name">${escapeHtml(person.name)}</span>
@@ -188,51 +203,75 @@ const monthLabel = (month) => {
 
 let current = null; // { report, groupName, start, end } do relatório na tela
 
-form.addEventListener('submit', async (event) => {
+// O relatório gerado fica em tempo real: escala alterada, publicada ou voltada para rascunho
+// no período, turno mudado ou membro com outro nome → ele se refaz sozinho com os mesmos
+// filtros (os membros abertos continuam abertos). Gerar outro troca as escutas.
+let shown = null; // { group, start, end, uid, schedules, shifts } do relatório na tela
+let stopReport = () => {};
+
+function renderReport() {
+  const { group, start, end, uid, schedules, shifts } = shown;
+  const published = [];
+  const drafts = [];
+  monthsInRange(start, end).forEach((month) => {
+    const schedule = schedules.get(month);
+    if (schedule?.status === 'published') published.push({ month, schedule, shifts: scheduleShifts(schedule, shifts) });
+    else if (schedule) drafts.push(monthLabel(month));
+  });
+  const report = buildShiftReport(collectShifts(published, start, end, uid), members);
+  if (!report.people.length) {
+    body.innerHTML =
+      draftNotice(drafts) +
+      infoState('hourglass', 'Nenhum plantão encontrado no período.', `${brDate(start)} a ${brDate(end)} · ${escapeHtml(group.name)}`);
+    current = null;
+    $('export-bar').hidden = true;
+    return;
+  }
+  const open = new Set([...body.querySelectorAll('.person-head[aria-expanded="true"]')].map((h) => h.dataset.person));
+  current = { report, groupName: group.name, start, end };
+  body.innerHTML = reportHtml(report, drafts);
+  body.querySelectorAll('.person-head').forEach((h) => open.has(h.dataset.person) && setOpen(h, true));
+  $('print-info').textContent = `${group.name}${group.unit ? ` · ${group.unit.name} · ${group.unit.city}/${group.unit.state}` : ''} · ${brDate(start)} a ${brDate(end)}`;
+  $('export-bar').hidden = false;
+}
+
+const redrawReport = batched(() => shown?.schedules && shown.shifts && renderReport());
+// Os membros escutados são os do grupo escolhido no filtro: só refaz se for o do relatório
+onMembersChange = (groupId) => shown?.group.id === groupId && redrawReport();
+
+form.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!validate()) return;
   const group = selectedGroup();
   if (!group) return;
-  const start = form.start.value;
-  const end = form.end.value;
-  const uid = form.member.value || null;
+  stopReport();
   const button = $('report-submit');
   button.disabled = true;
   $('export-bar').hidden = true;
   body.innerHTML = infoState('hourglass', 'Gerando relatório…');
-  try {
-    const months = monthsInRange(start, end);
-    const [liveShifts, schedules] = await Promise.all([
-      loadShifts(group.id),
-      Promise.all(months.map((m) => loadSchedule(group.id, m))),
-    ]);
-    const published = [];
-    const drafts = [];
-    months.forEach((month, i) => {
-      const schedule = schedules[i];
-      if (schedule?.status === 'published') published.push({ month, schedule, shifts: scheduleShifts(schedule, liveShifts) });
-      else if (schedule) drafts.push(monthLabel(month));
-    });
-    const report = buildShiftReport(collectShifts(published, start, end, uid), members);
-    if (!report.people.length) {
-      body.innerHTML =
-        draftNotice(drafts) +
-        infoState('hourglass', 'Nenhum plantão encontrado no período.', `${brDate(start)} a ${brDate(end)} · ${escapeHtml(group.name)}`);
-      current = null;
-      return;
-    }
-    current = { report, groupName: group.name, start, end };
-    body.innerHTML = reportHtml(report, drafts);
-    $('print-info').textContent = `${group.name}${group.unit ? ` · ${group.unit.name} · ${group.unit.city}/${group.unit.state}` : ''} · ${brDate(start)} a ${brDate(end)}`;
-    $('export-bar').hidden = false;
-  } catch (error) {
-    if (isLeaving()) return; // a página está saindo
-    console.error(error);
-    body.innerHTML = errorState(firebaseErrorMessage(error));
-  } finally {
+  const target = { group, start: form.start.value, end: form.end.value, uid: form.member.value || null, schedules: null, shifts: null };
+  shown = target;
+  const ready = () => {
+    if (shown !== target || !target.schedules || !target.shifts) return;
     button.disabled = false;
     validate();
-  }
+    redrawReport();
+  };
+  const stops = [
+    // Quem não vê rascunho (Administrativo) escuta só as publicadas
+    listenWithRetry(schedulesQuery(group.id, can(group.role, 'viewDraft')), (snapshot) => ((target.schedules = schedulesFrom(snapshot)), ready()), 'Relatório', {
+      onError: (error) => {
+        if (target.schedules || shown !== target || isLeaving()) return;
+        body.innerHTML = errorState(firebaseErrorMessage(error));
+        button.disabled = false;
+        validate();
+      },
+    }),
+    listenWithRetry(shiftsRef(group.id), (snapshot) => ((target.shifts = shiftsFrom(snapshot)), ready()), 'Turnos', {
+      onError: () => ((target.shifts ??= {}), ready()),
+    }),
+  ];
+  stopReport = () => stops.forEach((stop) => stop());
 });
 
 // Sanfona: um membro ou todos

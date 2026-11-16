@@ -4,6 +4,7 @@
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from './firebase.js';
 import { platformRoleOf, approvalState } from './permissions.js';
+import { listenWithRetry } from './live.js';
 
 const storageKey = (uid) => `escalamed:acesso:${uid}`;
 
@@ -59,6 +60,29 @@ export async function loadMyAccess(uid) {
     // unknown: sem resposta do servidor nem nada guardado (não dá para dizer se foi aprovado)
     return cachedAccess(uid) ?? { isDev: false, isAdmin: false, access: null, role: null, unknown: true };
   }
+}
+
+// Avisa quando algo que decide o acesso de quem está logado muda: a aprovação (access/{uid}),
+// o perfil (users/{uid}: cargo, nome, foto) ou a lista de administradores. As primeiras
+// respostas (o estado de agora) não contam. onChange({ profile? }) traz o perfil novo quando
+// foi ele que mudou. Devolve a função que para de escutar.
+export function watchMyAccess(uid, onChange) {
+  const refs = [doc(db, 'access', uid), doc(db, 'users', uid), doc(db, 'config', 'admins')];
+  const stops = refs.map((ref, i) => {
+    let first = true;
+    return listenWithRetry(
+      ref,
+      (snapshot) => {
+        if (first) {
+          first = false;
+          return;
+        }
+        onChange(i === 1 && snapshot.exists() ? { profile: snapshot.data() } : {});
+      },
+      'Acesso',
+    );
+  });
+  return () => stops.forEach((stop) => stop());
 }
 
 // Situação da conta ('none' | 'pending' | 'approved' | 'declined'): Dev e administrador não esperam

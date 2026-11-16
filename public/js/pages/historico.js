@@ -6,8 +6,9 @@ import { initLayout } from '../layout.js';
 import { isLeaving } from '../firebase.js';
 import { icon, renderIcons } from '../icons.js';
 import { escapeHtml } from '../ui.js';
-import { loadMyGroups, loadMembers, groupLabel, seesDrafts, rememberGroup, lastGroup } from '../my-groups.js';
-import { loadMovements, MOVEMENT_TYPES, monthOfDate } from '../movements.js';
+import { watchMyGroups, watchMembers, groupLabel, seesDrafts, rememberGroup, lastGroup } from '../my-groups.js';
+import { movementsQuery, movementsFrom, MOVEMENT_TYPES, monthOfDate } from '../movements.js';
+import { listenWithRetry, batched } from '../live.js';
 import { addMonths, monthParts } from '../schedule-math.js';
 import { MONTHS, brDate, isoDate, parseIsoDate } from '../dates.js';
 
@@ -32,7 +33,7 @@ function showError() {
   list.innerHTML = `<div class="empty-state report-empty">${icon('x')}<h3>Não foi possível carregar o histórico</h3>
     <p>Verifique sua conexão e tente de novo.</p>
     <button type="button" class="btn btn-secondary" id="retry">Tentar de novo</button></div>`;
-  $('retry').addEventListener('click', load);
+  $('retry').addEventListener('click', () => load());
 }
 
 // ---------- Filtros ----------
@@ -59,12 +60,30 @@ async function renderMemberOptions() {
   select.value = state.member;
 }
 
-async function membersFor(groupId) {
-  if (!membersOf.has(groupId)) {
-    const members = await loadMembers(groupId).catch(() => []);
-    membersOf.set(groupId, new Map(members.map((m) => [m.id, m])));
+// Membros de cada grupo em tempo real (nomes nas frases e no filtro de membro)
+const membersReady = new Map(); // groupId → Promise (primeira resposta)
+function membersFor(groupId) {
+  if (!membersReady.has(groupId)) {
+    membersReady.set(
+      groupId,
+      new Promise((resolve) => {
+        let first = true;
+        watchMembers(groupId, (members) => {
+          membersOf.set(groupId, new Map(members.map((m) => [m.id, m])));
+          if (first) {
+            first = false;
+            resolve();
+            return;
+          }
+          // Entrou, saiu ou trocou o nome: redesenha a lista (e o filtro, se for deste grupo)
+          redrawList();
+          if (state.group === groupId) renderMemberOptions();
+        });
+        setTimeout(resolve, 10000); // sem resposta: segue sem os nomes ("Ex-membro")
+      }),
+    );
   }
-  return membersOf.get(groupId);
+  return membersReady.get(groupId).then(() => membersOf.get(groupId) ?? new Map());
 }
 
 // ---------- Frases ----------
@@ -293,11 +312,18 @@ function render(movements) {
       : '');
 }
 
-let movements = [];
+let movements = null; // null: ainda carregando
 let loadId = 0;
+let stopLoad = () => {};
 
-async function load() {
+// Movimentações em tempo real: uma escuta por grupo do filtro, no mês escolhido. Troca de
+// filtro ou de mês: para as escutas anteriores e começa outras.
+function load() {
   const id = ++loadId;
+  stopLoad();
+  movements = null;
+  limit = PAGE;
+  expanded.clear();
   if (!groups.length) {
     list.setAttribute('aria-busy', 'false');
     list.innerHTML = emptyState('Você ainda não participa de grupos', 'O histórico mostra as movimentações das escalas dos seus grupos.');
@@ -305,48 +331,77 @@ async function load() {
   }
   list.setAttribute('aria-busy', 'true');
   list.innerHTML = skeleton();
-  limit = PAGE;
-  expanded.clear();
   const targets = state.group === ALL ? groups : groups.filter((g) => g.id === state.group);
-  try {
-    const results = await Promise.all(
-      targets.map(async (g) => {
-        const [items] = await Promise.all([loadMovements(g.id, state.month, { seesDrafts: seesDrafts(g) }), membersFor(g.id)]);
-        return items;
-      }),
-    );
-    if (id !== loadId) return; // mudou o filtro enquanto carregava
-    movements = results.flat().sort((a, b) => whenOf(b) - whenOf(a));
-    render(movements);
-  } catch (error) {
-    if (id !== loadId || isLeaving()) return; // filtro mudou ou a página está saindo
-    console.error(error);
-    showError();
-  } finally {
-    if (id === loadId) list.setAttribute('aria-busy', 'false');
-  }
+  const results = new Map(); // groupId → movimentações
+  let failed = false;
+  const update = batched(async () => {
+    if (id !== loadId) return;
+    if (results.size < targets.length) {
+      if (failed && !isLeaving()) showError();
+      return;
+    }
+    await Promise.all(targets.map((g) => membersFor(g.id)));
+    if (id !== loadId) return;
+    movements = [...results.values()].flat().sort((a, b) => whenOf(b) - whenOf(a));
+    list.setAttribute('aria-busy', 'false');
+    render(movements); // mantém "Mostrar mais" e as linhas abertas
+  });
+  const stops = targets.map((g) =>
+    listenWithRetry(movementsQuery(g.id, state.month, { seesDrafts: seesDrafts(g) }), (snapshot) => {
+      results.set(g.id, movementsFrom(snapshot));
+      update();
+    }, 'Histórico', {
+      onError: () => {
+        failed = true;
+        update();
+      },
+    }),
+  );
+  stopLoad = () => stops.forEach((stop) => stop());
 }
+
+// Redesenha com o que já chegou (ex.: membro trocou de nome)
+const redrawList = batched(() => movements && render(movements));
 
 // ---------- Início ----------
-try {
-  groups = await loadMyGroups(user.uid, access.role);
-} catch (error) {
-  if (isLeaving()) await new Promise(() => {}); // a página está saindo: para aqui
-  console.error(error);
-  showError();
-  throw error;
-}
+// Grupos em tempo real: entrou num grupo, saiu ou o nome mudou → o filtro e a lista acompanham
+const select = $('history-group');
 
-// Sem grupos, os filtros continuam na tela: o de grupo fica desativado e a lista mostra o aviso
-{
-  const select = $('history-group');
+function renderGroupOptions() {
   select.innerHTML =
     `<option value="${ALL}">Todos os meus grupos</option>` +
     groups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(groupLabel(g))}</option>`).join('');
   select.disabled = !groups.length;
+  select.value = state.group;
+}
+
+await new Promise((resolve) => {
+  let first = true;
+  watchMyGroups(user.uid, access.role, async (list) => {
+    const before = groups.map((g) => `${g.id}:${g.role}`).join(',');
+    groups = list;
+    if (first) {
+      first = false;
+      resolve();
+      return;
+    }
+    // O grupo escolhido sumiu (saiu do grupo): volta para todos
+    if (state.group !== ALL && !groups.some((g) => g.id === state.group)) state.group = ALL;
+    renderGroupOptions();
+    if (groups.map((g) => `${g.id}:${g.role}`).join(',') !== before) {
+      await renderMemberOptions();
+      load();
+    } else {
+      redrawList(); // só o nome mudou
+    }
+  });
+});
+
+// Sem grupos, os filtros continuam na tela: o de grupo fica desativado e a lista mostra o aviso
+{
   const remembered = lastGroup('historico');
   state.group = remembered && (remembered === ALL || groups.some((g) => g.id === remembered)) ? remembered : ALL;
-  select.value = state.group;
+  renderGroupOptions();
 
   select.addEventListener('change', async () => {
     state.group = select.value;
@@ -357,7 +412,7 @@ try {
   $('history-member').addEventListener('change', (e) => {
     state.member = e.target.value;
     limit = PAGE;
-    render(movements); // filtro aplicado aqui, sem nova consulta
+    if (movements) render(movements); // filtro aplicado aqui, sem nova consulta
   });
   $('month-prev').addEventListener('click', () => {
     state.month = addMonths(state.month, -1);

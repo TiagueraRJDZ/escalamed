@@ -7,7 +7,7 @@ import { requireAuth, signOutUser, watchSession, readSessionSummary, saveSession
 import { pagePath, nextParam } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
-import { escapeHtml, initials, setupMenu } from './ui.js';
+import { escapeHtml, initials, setupMenu, toast } from './ui.js';
 import { mountCredits } from './version.js';
 import { setupPeopleSearch, personModalHtml } from './people-search.js';
 import { syncMemberCards } from './members.js';
@@ -16,7 +16,7 @@ import { whenActivated } from './prerender.js';
 import { setupNotifications } from './notifications.js';
 import { registerServiceWorker, syncPush } from './push.js';
 import { googleCalendarModalHtml, setupGoogleCalendar } from './gcal.js';
-import { cachedAccess, loadMyAccess, myApprovalState, isBarred, PENDING_PAGE } from './access.js';
+import { cachedAccess, loadMyAccess, watchMyAccess, myApprovalState, isBarred, PENDING_PAGE } from './access.js';
 import { seesReports, canApprove } from './permissions.js';
 
 const NAV = [
@@ -132,6 +132,30 @@ function leaveIfBarred(profile, value) {
   if (!isBarred(profile, value)) return false;
   navigate(`${PENDING_PAGE}${nextParam()}`, { replace: true });
   return true;
+}
+
+// Em tempo real: aprovação retirada (ou recusada) leva na hora para a tela de espera; cargo
+// que mudou (aprovado como Gestor, virou administrador...) recarrega a página, porque menus,
+// botões e o que a pessoa vê dependem dele; nome ou foto trocados atualizam a pílula da conta.
+function watchAccessLive(app, user, profile, access) {
+  const sameRole = (value) => value.role === access.role && value.isAdmin === access.isAdmin && value.isDev === access.isDev;
+  let reloading = false;
+  watchMyAccess(user.uid, async (change) => {
+    if (reloading) return;
+    if (change.profile) {
+      Object.assign(profile, change.profile);
+      paintAccount(shell);
+    }
+    const value = await loadMyAccess(user.uid);
+    if (leaveIfBarred(profile, value)) return;
+    if (!sameRole(value) && !value.unknown) {
+      reloading = true;
+      toast('Seu cargo na plataforma mudou. Atualizando…', 'info');
+      setTimeout(() => location.reload(), 1500);
+      return;
+    }
+    paintRole(app, profile, value);
+  });
 }
 
 async function showRole(app, uid, profile) {
@@ -427,6 +451,7 @@ export async function initLayout({ active, search = true } = {}) {
   fresh.then((value) => {
     if (!leaveIfBarred(profile, value)) paintRole(app, profile, value);
   });
+  watchAccessLive(app, user, profile, access);
   setupNotifications(app, user, profile, access); // access.isDev: teste do push em todos os aparelhos
   setupGoogleCalendar(app, user);
   // Notificações push: o service worker vale em todas as telas; com o push ativado, confere a inscrição

@@ -8,10 +8,11 @@ import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessag
 import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
 import { isMember, canCreateTeam, canEditSettings } from '../permissions.js';
-import { groupQueries, mergeGroups } from '../my-groups.js';
+import { groupQueries, mergeGroups, seesDrafts } from '../my-groups.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays, dayShifts } from '../schedule-math.js';
-import { loadSchedule, loadShifts, scheduleShifts } from '../schedule-data.js';
+import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
+import { listenWithRetry, batched } from '../live.js';
 import { formatClock } from '../shifts.js';
 import { isoDate } from '../dates.js';
 
@@ -36,29 +37,61 @@ const today = new Date();
 today.setHours(0, 0, 0, 0);
 let selectedDate = today;
 let calendarMonth = null;
-let groupsKey = null; // grupos prontos; quando muda, as escalas são lidas de novo
-const monthCache = new Map(); // "YYYY-MM" → Promise<[{ group, schedule, shifts }]>
-const shiftsCache = new Map(); // groupId → Promise<turnos do grupo>
 
 // Calendário: só os grupos em que a pessoa está na escala (Gestor e Administrativo veem
 // todos os grupos na lista, mas os plantões e vagas do calendário são os da pessoa)
 const readyGroups = () => groups.filter((g) => g.setupStep === 'done' && isMember(g, user.uid));
 
+// Escalas e turnos de cada grupo em tempo real (uma escuta de escalas e uma de turnos por
+// grupo): alocação, vaga e publicação aparecem na hora no calendário e no painel do dia.
+const live = new Map(); // groupId → { group, withDrafts, schedules, shifts, stop }
+const liveReady = () => [...live.values()].every((entry) => entry.schedules && entry.shifts);
+const redraw = batched(() => {
+  if (!liveReady()) return;
+  markDays();
+  renderDay();
+});
+
+// Os grupos mudaram (entrou, saiu, terminou a configuração, mudou o papel): ajusta as escutas
+function syncLive() {
+  const ready = readyGroups();
+  const ids = new Set(ready.map((g) => g.id));
+  for (const [id, entry] of live) {
+    if (ids.has(id)) continue;
+    entry.stop();
+    live.delete(id);
+  }
+  for (const group of ready) {
+    const withDrafts = seesDrafts(group);
+    const current = live.get(group.id);
+    if (current && current.withDrafts === withDrafts) {
+      current.group = group; // nome ou cor podem ter mudado
+      continue;
+    }
+    current?.stop();
+    const entry = { group, withDrafts, schedules: null, shifts: null };
+    const stops = [
+      listenWithRetry(schedulesQuery(group.id, withDrafts), (snapshot) => ((entry.schedules = schedulesFrom(snapshot)), redraw()), 'Escalas', {
+        onError: () => ((entry.schedules ??= new Map()), redraw()),
+      }),
+      listenWithRetry(shiftsRef(group.id), (snapshot) => ((entry.shifts = shiftsFrom(snapshot)), redraw()), 'Turnos', {
+        onError: () => ((entry.shifts ??= {}), redraw()),
+      }),
+    ];
+    entry.stop = () => stops.forEach((stop) => stop());
+    live.set(group.id, entry);
+  }
+  redraw();
+}
+
 // Escalas do mês em todos os grupos prontos (só as que existem e a pessoa pode ler)
 function monthEntries(month) {
-  if (!monthCache.has(month)) {
-    const promise = Promise.all(
-      readyGroups().map(async (group) => {
-        const schedule = await loadSchedule(group.id, month);
-        if (!schedule) return null;
-        if (!shiftsCache.has(group.id)) shiftsCache.set(group.id, loadShifts(group.id).catch(() => ({})));
-        return { group, schedule, shifts: scheduleShifts(schedule, await shiftsCache.get(group.id)) };
-      }),
-    ).then((list) => list.filter(Boolean));
-    promise.catch(() => monthCache.delete(month)); // erro de rede: tenta de novo na próxima vez
-    monthCache.set(month, promise);
-  }
-  return monthCache.get(month);
+  return [...live.values()]
+    .map(({ group, schedules, shifts }) => {
+      const schedule = schedules?.get(month);
+      return schedule ? { group, schedule, shifts: scheduleShifts(schedule, shifts) } : null;
+    })
+    .filter(Boolean);
 }
 
 // Vagas abertas só contam em escala publicada (rascunho ainda pode mudar)
@@ -68,11 +101,9 @@ const isPublished = (schedule) => schedule.status === 'published';
 const openSlots = (schedule, key) =>
   isPublished(schedule) && !schedule.assignments?.[key]?.includes(user.uid) ? schedule.vacancies?.[key] ?? 0 : 0;
 
-async function markDays() {
-  if (!loaded || !calendarMonth) return;
-  const month = calendarMonth;
-  const entries = await monthEntries(month).catch(() => []);
-  if (month !== calendarMonth) return; // trocou de mês enquanto carregava
+function markDays() {
+  if (!loaded || !calendarMonth || !liveReady()) return;
+  const entries = monthEntries(calendarMonth);
   const mine = new Set();
   const open = new Set();
   for (const { schedule, shifts } of entries) {
@@ -124,11 +155,8 @@ const sectionHtml = (title, items, empty) => `<div class="card day-card">
     ${items.length ? `<ul class="home-shifts">${items.join('')}</ul>` : `<p class="day-empty">${empty}</p>`}
   </div>`;
 
-let dayRequest = 0;
-
-async function renderDay() {
+function renderDay() {
   const date = selectedDate;
-  const id = ++dayRequest;
   const isToday = date.getTime() === today.getTime();
   dayTitle.innerHTML = `<span class="day-title-text">${escapeHtml(capitalize(longDay.format(date)))}</span>${isToday ? '<span class="badge badge-primary">Hoje</span>' : ''}`;
   if (!loaded) {
@@ -141,21 +169,12 @@ async function renderDay() {
       <p>Quando você fizer parte de um grupo com escala, os plantões de cada dia aparecem aqui.</p></div></div>`;
     return;
   }
-  dayPanel.setAttribute('aria-busy', 'true');
-  dayPanel.innerHTML = panelSkeleton();
-  let entries;
-  try {
-    entries = await monthEntries(monthKey(date.getFullYear(), date.getMonth()));
-  } catch (error) {
-    if (id !== dayRequest || isLeaving()) return;
-    console.error(error);
-    dayPanel.setAttribute('aria-busy', 'false');
-    dayPanel.innerHTML = `<div class="card"><div class="empty-state">${icon('x')}<h3>Não foi possível carregar os plantões</h3>
-      <p>Verifique sua conexão e tente de novo.</p>
-      <button type="button" class="btn btn-secondary" data-retry>Tentar de novo</button></div></div>`;
-    return;
+  if (!liveReady()) {
+    dayPanel.setAttribute('aria-busy', 'true');
+    dayPanel.innerHTML = panelSkeleton();
+    return; // desenha de novo quando as escalas chegarem
   }
-  if (id !== dayRequest) return; // escolheu outro dia enquanto carregava
+  const entries = monthEntries(monthKey(date.getFullYear(), date.getMonth()));
 
   const day = date.getDate();
   const mine = [];
@@ -181,21 +200,6 @@ async function renderDay() {
     sectionHtml('Disponíveis', sorted(open), 'Nenhuma vaga aberta neste dia. Plantões vagos nos seus grupos aparecem aqui.');
 }
 
-dayPanel.addEventListener('click', (event) => {
-  if (event.target.closest('[data-retry]')) renderDay();
-});
-
-// Os grupos mudaram (entrou, saiu, terminou a configuração): lê as escalas de novo
-function refreshCalendar() {
-  const key = readyGroups()
-    .map((g) => g.id)
-    .join(',');
-  if (key === groupsKey) return;
-  groupsKey = key;
-  monthCache.clear();
-  markDays();
-  renderDay();
-}
 renderDay();
 
 // Aviso depois de concluir o wizard
@@ -327,7 +331,7 @@ queries.forEach((q, i) =>
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
       loaded = true;
       render();
-      refreshCalendar();
+      syncLive();
     },
     (error) => {
       if (isLeaving()) return; // trocando de página: não é erro de verdade

@@ -4,8 +4,9 @@
 // os botões Aprovar/Recusar (gravam access/{uid}). Cada linha mostra o selo do cargo.
 // Só o administrador vê o login (e-mail, usuário, situação), que vem do serviço de contas, e as
 // ações de senha provisória, inativar e excluir (o serviço confere em config/admins).
-import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { collection, doc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from '../firebase.js';
+import { listenWithRetry, batched } from '../live.js';
 import { isProfileComplete } from '../auth.js';
 import { adminAccounts, adminTemporaryPassword, adminSetAccess, adminDeleteAccount } from '../auth-api.js';
 import { avatarHtml } from '../layout.js';
@@ -28,50 +29,85 @@ const TEMP_PASSWORD_DIALOG = {
   footer: '<button type="button" class="btn btn-primary" data-close>Pronto</button>',
 };
 
-async function loadPlatformUsers(ui, isAdmin) {
-  const [accounts, profiles, decisions, admins] = await Promise.allSettled([
-    isAdmin ? adminAccounts() : Promise.resolve(null),
-    getDocs(collection(db, 'users')),
-    getDocs(collection(db, 'access')),
-    getDoc(doc(db, 'config', 'admins')),
-  ]);
-  if (profiles.status === 'rejected') throw profiles.reason;
+// Lista em tempo real: perfis (users), decisões (access) e administradores (config/admins)
+// chegam pelo Firestore na hora em que mudam (conta nova pedindo aprovação, aprovação feita por
+// outro Gestor). Os logins (e-mail, situação) vêm do serviço de contas, que não avisa: são lidos
+// de novo quando entra ou sai um perfil. onChange(lista) a cada mudança; onError(erro) se os
+// perfis não puderem ser lidos. Devolve { stop, patchAccount, dropAccount }.
+function watchPlatformUsers(ui, isAdmin, onChange, onError) {
+  const state = { profiles: null, decisions: new Map(), admins: new Set(), accounts: null, accountsError: null };
+  let accountsDone = !isAdmin;
+  let profileIds = null;
 
-  const profileOf = new Map();
-  profiles.value.docs.forEach((d) => profileOf.set(d.id, d.data()));
-  const accessOf = new Map();
-  if (decisions.status === 'fulfilled') decisions.value.docs.forEach((d) => accessOf.set(d.id, d.data()));
-  const adminIds = new Set(admins.status === 'fulfilled' ? (admins.value.data()?.uids ?? []) : []);
-
-  const people = new Map();
-  if (isAdmin && accounts.status === 'fulfilled') {
-    ui.alert.hidden = true;
-    accounts.value.forEach((a) => people.set(a.uid, { ...a, profile: profileOf.get(a.uid) ?? null }));
-  } else if (isAdmin) {
-    ui.alert.textContent = `${firebaseErrorMessage(accounts.reason)} A lista mostra só os perfis, sem e-mail e situação do acesso.`;
-    ui.alert.hidden = false;
-  }
-  // Perfil sem login: só é marcado "Sem login" quando a lista de contas veio
-  profileOf.forEach((profile, uid) => {
-    if (people.has(uid)) return;
-    people.set(uid, {
-      uid,
-      email: null,
-      usuario: profile.username ?? null,
-      inativa: false,
-      profile,
-      semLogin: isAdmin && accounts.status === 'fulfilled',
+  function build() {
+    const people = new Map();
+    if (isAdmin && state.accounts) {
+      ui.alert.hidden = true;
+      state.accounts.forEach((a) => people.set(a.uid, { ...a, profile: state.profiles.get(a.uid) ?? null }));
+    } else if (isAdmin && state.accountsError) {
+      ui.alert.textContent = `${firebaseErrorMessage(state.accountsError)} A lista mostra só os perfis, sem e-mail e situação do acesso.`;
+      ui.alert.hidden = false;
+    }
+    // Perfil sem login: só é marcado "Sem login" quando a lista de contas veio
+    state.profiles.forEach((profile, uid) => {
+      if (people.has(uid)) return;
+      people.set(uid, { uid, email: null, usuario: profile.username ?? null, inativa: false, profile, semLogin: Boolean(isAdmin && state.accounts) });
     });
-  });
+    return [...people.values()]
+      .map((p) => ({
+        ...p,
+        name: p.profile?.name || p.email || 'Sem nome',
+        isAdmin: state.admins.has(p.uid),
+        access: state.decisions.get(p.uid) ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }
 
-  return [...people.values()]
-    .map((p) => ({
-      ...p,
-      name: p.profile?.name || p.email || 'Sem nome',
-      isAdmin: adminIds.has(p.uid),
-      access: accessOf.get(p.uid) ?? null,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const emit = batched(() => state.profiles && accountsDone && onChange(build()));
+
+  function fetchAccounts() {
+    if (!isAdmin) return;
+    adminAccounts().then(
+      (accounts) => Object.assign(state, { accounts, accountsError: null }),
+      (error) => (state.accountsError = error),
+    ).finally(() => {
+      accountsDone = true;
+      emit();
+    });
+  }
+  fetchAccounts();
+
+  const stops = [
+    listenWithRetry(collection(db, 'users'), (snapshot) => {
+      state.profiles = new Map(snapshot.docs.map((d) => [d.id, d.data()]));
+      const ids = [...state.profiles.keys()].sort().join(',');
+      if (profileIds !== null && ids !== profileIds) fetchAccounts(); // conta nova ou excluída
+      profileIds = ids;
+      emit();
+    }, 'Usuários', { onError: (error) => !state.profiles && onError(error) }),
+    listenWithRetry(collection(db, 'access'), (snapshot) => {
+      state.decisions = new Map(snapshot.docs.map((d) => [d.id, d.data()]));
+      emit();
+    }, 'Aprovações'),
+    listenWithRetry(doc(db, 'config', 'admins'), (snapshot) => {
+      state.admins = new Set(snapshot.data()?.uids ?? []);
+      emit();
+    }, 'Administradores'),
+  ];
+
+  return {
+    stop: () => stops.forEach((stop) => stop()),
+    // Mudança feita aqui no login (inativar, reativar, excluir): vale na hora, sem esperar
+    patchAccount(uid, fields) {
+      const account = state.accounts?.find((a) => a.uid === uid);
+      if (account) Object.assign(account, fields);
+      emit();
+    },
+    dropAccount(uid) {
+      if (state.accounts) state.accounts = state.accounts.filter((a) => a.uid !== uid);
+      emit();
+    },
+  };
 }
 
 // Situação do cargo de alguém (o administrador da plataforma não passa por aprovação)
@@ -212,17 +248,24 @@ export default {
         (inactive ? ` · ${inactive} ${inactive === 1 ? 'inativo' : 'inativos'}` : '');
     }
 
-    async function load() {
-      if (platformUsers) return;
+    // Começa a escutar na primeira vez que a seção abre (e continua enquanto a página está aberta)
+    let live = null;
+    function load() {
+      if (live) return;
       ui.list.innerHTML = '<li class="muted">Carregando usuários…</li>';
-      try {
-        platformUsers = await loadPlatformUsers(ui, isAdmin());
-        renderUsers();
-      } catch (error) {
-        ui.list.innerHTML = '';
-        ui.alert.textContent = firebaseErrorMessage(error);
-        ui.alert.hidden = false;
-      }
+      live = watchPlatformUsers(
+        ui,
+        isAdmin(),
+        (list) => {
+          platformUsers = list;
+          renderUsers();
+        },
+        (error) => {
+          ui.list.innerHTML = '';
+          ui.alert.textContent = firebaseErrorMessage(error);
+          ui.alert.hidden = false;
+        },
+      );
     }
     ui.search.addEventListener('input', () => platformUsers && renderUsers());
 
@@ -278,13 +321,11 @@ export default {
       // Na hora: a pessoa sai já com o aviso (sessions/{uid}) e a linha muda, sem esperar o
       // serviço de contas (que leva alguns segundos). Se ele falhar, a linha volta como estava.
       if (!activate) endSession(person);
-      person.inativa = !activate;
-      renderUsers();
+      live.patchAccount(person.uid, { inativa: !activate });
       try {
         await adminSetAccess(person.uid, activate);
       } catch (error) {
-        person.inativa = activate;
-        renderUsers();
+        live.patchAccount(person.uid, { inativa: activate });
         throw error;
       }
       toast(activate ? `Acesso de ${person.name} reativado.` : `Acesso de ${person.name} inativado.`, 'success');
@@ -307,8 +348,7 @@ export default {
         await batch.commit();
       }
       if (!person.semLogin) await adminDeleteAccount(person.uid);
-      platformUsers = platformUsers.filter((p) => p.uid !== person.uid);
-      renderUsers();
+      live.dropAccount(person.uid); // o perfil sai sozinho (escuta de users)
       toast(`Acesso de ${person.name} excluído.`, 'success');
     }
 
@@ -329,9 +369,7 @@ export default {
         if (!ok) return;
       }
       const decision = { categoryId, approved, decidedBy: user.uid, decidedAt: serverTimestamp() };
-      await setDoc(doc(db, 'access', person.uid), decision);
-      person.access = { categoryId, approved };
-      renderUsers();
+      await setDoc(doc(db, 'access', person.uid), decision); // a linha muda sozinha (escuta de access)
       toast(
         approved
           ? `${person.name} aprovado(a) como ${role}.`

@@ -3,6 +3,7 @@
 import { collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from './firebase.js';
 import { groupRole, seesAllGroups, can } from './permissions.js';
+import { listenWithRetry } from './live.js';
 
 // Consultas que as regras deixam fazer: grupos em que está, grupos que coordena e,
 // para Gestor e Administrativo, todos os grupos de equipe. Dev: todos, inclusive as escalas
@@ -23,13 +24,33 @@ export function mergeGroups(snapshots, uid, platformRole) {
   return [...byId.values()].map((g) => ({ ...g, role: groupRole(g, uid, platformRole) })).filter((g) => g.role);
 }
 
+const readySorted = (list) =>
+  list.filter((g) => g.setupStep === 'done').sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
 // Grupos prontos (wizard concluído), em ordem alfabética, cada um com { role }
 export async function loadMyGroups(uid, platformRole = null) {
   const snapshots = await Promise.all(groupQueries(uid, platformRole).map((q) => getDocs(q)));
-  return mergeGroups(snapshots, uid, platformRole)
-    .filter((g) => g.setupStep === 'done')
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  return readySorted(mergeGroups(snapshots, uid, platformRole));
 }
+
+// Os mesmos grupos, em tempo real: onChange(lista) quando todas as consultas responderam e a
+// cada mudança (entrou, saiu, grupo novo, nome trocado). Devolve a função que para de escutar.
+export function watchMyGroups(uid, platformRole, onChange) {
+  const queries = groupQueries(uid, platformRole);
+  const snapshots = queries.map(() => null);
+  const emit = () => snapshots.every(Boolean) && onChange(readySorted(mergeGroups(snapshots, uid, platformRole)));
+  const stops = queries.map((q, i) =>
+    listenWithRetry(q, (snapshot) => ((snapshots[i] = snapshot), emit()), 'Grupos', {
+      // Uma consulta falhando não segura as outras (ela tenta de novo sozinha)
+      onError: () => ((snapshots[i] ??= { docs: [] }), emit()),
+    }),
+  );
+  return () => stops.forEach((stop) => stop());
+}
+
+// Cartões de membro do grupo em tempo real (mesma ordem de loadMembers)
+export const watchMembers = (groupId, onChange) =>
+  listenWithRetry(collection(db, 'groups', groupId, 'members'), (snapshot) => onChange(membersFrom(snapshot)), 'Membros');
 
 // Vê escalas em rascunho (e o histórico delas): Gestor, coordenador do grupo e dono
 export const seesDrafts = (group) => can(group.role, 'viewDraft');
@@ -41,11 +62,11 @@ export function groupLabel(group) {
 }
 
 // Cartões de membro do grupo (nome, foto, cargo), em ordem alfabética
+const membersFrom = (snapshot) =>
+  snapshot.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+
 export async function loadMembers(groupId) {
-  const snapshot = await getDocs(collection(db, 'groups', groupId, 'members'));
-  return snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+  return membersFrom(await getDocs(collection(db, 'groups', groupId, 'members')));
 }
 
 // Último grupo escolhido numa página (lembrado por navegador)
