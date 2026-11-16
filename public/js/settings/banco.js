@@ -1,6 +1,6 @@
 // Configurações > Apagar dados (só Dev). Apaga no Firebase os dados da plataforma e mantém as
-// contas: grupos (com membros, convites, turnos, histórico e escalas), aprovações de cargo e
-// unidades de saúde. Perfis (users), dados pessoais, logins e config/ ficam como estão.
+// contas: grupos (com membros, convites, turnos, histórico e escalas) e unidades de saúde.
+// Perfis (users), cargos aprovados (access), dados pessoais, logins e config/ ficam como estão.
 // Lê sempre do servidor (não do cache local) e cada lote só conta como apagado quando o
 // Firebase confirma. No fim, o serviço de contas tira os plantões das Agendas Google.
 // As regras deixam o Dev apagar tudo (match /{document=**} no firestore.rules).
@@ -21,10 +21,7 @@ const BATCH_SIZE = 400; // o Firestore aceita até 500 gravações por lote
 // Subcoleções de cada grupo (as mesmas do firestore.rules)
 const GROUP_SUBCOLLECTIONS = ['members', 'invites', 'shifts', 'movements', 'schedules'];
 // Coleções apagadas por inteiro, além dos grupos
-const FLAT_COLLECTIONS = [
-  { id: 'access', label: 'Aprovações de cargo' },
-  { id: 'healthUnits', label: 'Unidades de saúde' },
-];
+const FLAT_COLLECTIONS = [{ id: 'healthUnits', label: 'Unidades de saúde' }];
 
 const plural = (n, one, many) => `${n.toLocaleString('pt-BR')} ${n === 1 ? one : many}`;
 
@@ -66,11 +63,12 @@ export default {
       <ul class="wipe-counts" id="wipe-counts" aria-live="polite"><li class="muted">Contando…</li></ul>
       <p class="muted text-sm wipe-note">
         Grupos levam junto membros, convites, turnos, escalas e histórico. Os plantões também saem das
-        Agendas Google conectadas. Gestores, Coordenadores e Administrativos voltam a aguardar aprovação.
+        Agendas Google conectadas.
       </p>
       <h2 class="settings-label">O que continua</h2>
       <ul class="settings-bullets">
         <li>Perfis, dados pessoais e logins de todo mundo (as pessoas entram numa plataforma vazia)</li>
+        <li>Contas e cargos já aprovados: ninguém volta a aguardar aprovação</li>
         <li>Administradores da plataforma (config/admins) e o cargo Dev</li>
       </ul>
       <form id="wipe-form" class="wipe-form" novalidate>
