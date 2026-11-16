@@ -6,7 +6,7 @@
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 // No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
 // chegarem no celular com o app fechado.
-import { collection, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { collection, deleteDoc, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db } from './firebase.js';
 import { listenWithRetry } from './live.js';
 import { icon } from './icons.js';
@@ -25,6 +25,9 @@ import {
 let invites = []; // recebidos, pendentes
 let answered = []; // mandados e respondidos (aceitos ou recusados)
 let notices = []; // avisos da própria pessoa (ex.: cargo alterado)
+// Avisos e respostas já vistos (clicados), guardados em notificationReads/{uid} para valer em
+// todos os aparelhos. Convite recebido não entra: fica destacado até ser respondido.
+let seen = new Set();
 let ready = false;
 let session = null; // { app, user, profile }
 const listeners = new Set();
@@ -80,9 +83,15 @@ const whenText = (ts) => {
   return date ? date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 };
 
+const isUnread = (item) => !seen.has(item.id);
+
+// Marca e desmarca: no aviso visto, a cor de destaque some e o número do sininho diminui
+const readClass = (item) => (isUnread(item) ? '' : ' is-read');
+const unreadLabel = (item) => (isUnread(item) ? '<span class="sr-only">Não lida. </span>' : '');
+
 function renderBell() {
   const bell = session.app.querySelector('#notifications-button');
-  const count = invites.length + answered.length + notices.length;
+  const count = invites.length + answered.filter(isUnread).length + notices.filter(isUnread).length;
   let badge = bell.querySelector('.bell-count');
   if (!badge) {
     badge = document.createElement('span');
@@ -119,10 +128,10 @@ function renderDrawer() {
     ? `<h3 class="section-title">Avisos</h3>
       <ul class="notification-list">${mine
         .map(
-          (n) => `<li class="notification-item is-notice" data-id="${escapeHtml(n.id)}">
+          (n) => `<li class="notification-item is-notice${readClass(n)}" data-id="${escapeHtml(n.id)}" data-readable>
           <span class="notification-icon" aria-hidden="true">${icon('userCheck')}</span>
           <div class="notification-text">
-            <span class="notification-sentence">${noticeText(n)}</span>
+            <span class="notification-sentence">${unreadLabel(n)}${noticeText(n)}</span>
             <small>${whenText(n.createdAt)}</small>
             <div class="notification-actions">
               <a class="btn btn-ghost" href="/settings.html#profissional">Ver meu cargo</a>
@@ -157,10 +166,10 @@ function renderDrawer() {
     ? `<h3 class="section-title">Respostas aos seus convites</h3>
       <ul class="notification-list">${replies
         .map(
-          (inv) => `<li class="notification-item ${isAccepted(inv) ? 'is-accepted' : 'is-declined'}" data-id="${escapeHtml(inv.id)}">
+          (inv) => `<li class="notification-item ${isAccepted(inv) ? 'is-accepted' : 'is-declined'}${readClass(inv)}" data-id="${escapeHtml(inv.id)}" data-readable>
           <span class="notification-icon" aria-hidden="true">${icon(isAccepted(inv) ? 'check' : 'x')}</span>
           <div class="notification-text">
-            <span class="notification-sentence">${answeredText(inv)}</span>
+            <span class="notification-sentence">${unreadLabel(inv)}${answeredText(inv)}</span>
             <small>${whenText(inv.respondedAt)}</small>
             <div class="notification-actions">
               <button type="button" class="btn btn-ghost" data-dismiss>Dispensar</button>
@@ -171,9 +180,18 @@ function renderDrawer() {
         .join('')}</ul>`
     : '';
 
+  // Limpar todas: avisos e respostas aos convites (os do filtro escolhido). Convite recebido
+  // só sai respondendo.
+  const clearable = mine.length + replies.length;
+  const toolsHtml = clearable
+    ? `<div class="notification-tools">
+        <button type="button" class="btn btn-ghost" data-clear-all>${icon('trash')}Limpar todas</button>
+      </div>`
+    : '';
+
   list.innerHTML =
     noticesHtml || receivedHtml || repliesHtml
-      ? noticesHtml + receivedHtml + repliesHtml
+      ? toolsHtml + noticesHtml + receivedHtml + repliesHtml
       : `<h3 class="section-title">Não lidas</h3>
       <div class="empty-state">
         ${icon('bell')}
@@ -410,9 +428,67 @@ export function setupNotifications(app, user, profile, access = {}) {
     { metadata: true },
   );
 
+  // Já vistas, em tempo real (vistas em outro aparelho também deixam de contar aqui)
+  const readsRef = doc(db, 'notificationReads', user.uid);
+  listenWithRetry(
+    readsRef,
+    (snapshot) => {
+      seen = new Set(snapshot.data()?.ids ?? []);
+      render();
+    },
+    'Notificações vistas',
+  );
+
+  // Guarda só as que ainda estão na lista (as dispensadas saem), no máximo 300
+  const saveSeen = () =>
+    setDoc(readsRef, {
+      ids: [...notices, ...answered].map((item) => item.id).filter((id) => seen.has(id)).slice(0, 300),
+      updatedAt: serverTimestamp(),
+    }).catch(() => {}); // sem conexão: o Firestore grava quando voltar
+
+  function markSeen(id) {
+    if (seen.has(id)) return;
+    seen.add(id);
+    // Na hora, sem esperar o servidor; depois do clique, para o link "Ver meu cargo" ainda abrir
+    setTimeout(render);
+    saveSeen();
+  }
+
+  async function clearAll(button) {
+    const list = [...document.querySelectorAll('#notifications-list [data-readable]')].map((li) => li.dataset.id);
+    const ok = await confirmDialog({
+      title: 'Limpar todas as notificações?',
+      message: 'Os avisos e as respostas aos seus convites saem da lista. Convites que você recebeu continuam até você responder.',
+      confirmText: 'Limpar todas',
+      danger: true,
+    });
+    if (!ok) return;
+    setLoading(button, true);
+    const results = await Promise.allSettled(
+      list.map((id) => {
+        const notice = notices.find((item) => item.id === id);
+        const inv = answered.find((item) => item.id === id);
+        if (notice) return deleteDoc(doc(db, notice.id));
+        if (inv) return cancelInvite(inv.groupId, inviteKey(inv));
+        return null;
+      }),
+    );
+    const failed = results.filter((r) => r.status === 'rejected');
+    if (failed.length) toast(firebaseErrorMessage(failed[0].reason), 'error');
+    if (button.isConnected) setLoading(button, false);
+  }
+
   const drawer = document.getElementById('drawer-notifications');
   drawer.querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', renderDrawer));
   drawer.addEventListener('click', async (event) => {
+    const clear = event.target.closest('[data-clear-all]');
+    if (clear) {
+      clearAll(clear);
+      return;
+    }
+    // Clicar no aviso (ou em "Ver meu cargo") marca como visto; Dispensar apaga
+    const item = event.target.closest('[data-readable]');
+    if (item && !event.target.closest('[data-dismiss]')) markSeen(item.dataset.id);
     const button = event.target.closest('[data-accept], [data-decline], [data-dismiss]');
     if (!button) return;
     const id = button.closest('[data-id]').dataset.id;

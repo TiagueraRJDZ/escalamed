@@ -272,6 +272,19 @@ test('avisos: a pessoa lê e dispensa; quem avisou lê; os outros não', async (
   })])));
 });
 
+test('notificações vistas: só a própria pessoa lê e grava, com a lista de caminhos', async () => {
+  const R = `notificationReads/${medico.uid}`;
+  const ids = ['users/x/notices/n1', 'groups/g/invites/i1'];
+  assert.ok(await commit(medico.token, [w.set(R, { ids, updatedAt: NOW })]));
+  assert.ok(await canRead(medico.token, R));
+  assert.ok(!(await canRead(gestor.token, R)));
+  assert.ok(!(await commit(gestor.token, [w.set(R, { ids: [], updatedAt: NOW })])));
+  // Campos estranhos, lista grande demais ou data que não é a do servidor: recusado
+  assert.ok(!(await commit(medico.token, [w.set(R, { ids, updatedAt: NOW, extra: true })])));
+  assert.ok(!(await commit(medico.token, [w.set(R, { ids: Array.from({ length: 301 }, (_, i) => `x/${i}`), updatedAt: NOW })])));
+  assert.ok(!(await commit(medico.token, [w.set(R, { ids: 'tudo', updatedAt: NOW })])));
+});
+
 test('aprovação: a própria pessoa apaga a sua (troca de cargo); outra pessoa não', async () => {
   assert.ok(!(await commit(medico.token, [w.delete(`access/${coord.uid}`)])));
   assert.ok(await commit(coord.token, [w.delete(`access/${coord.uid}`)]));

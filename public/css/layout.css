@@ -71,17 +71,25 @@ body.is-booting.has-shell .page-skeleton {
   background: var(--brand-sidebar);
   color: #fff;
   overflow: hidden auto;
+  /* Rolagem (só com o menu mais alto que a tela): barra fina e branca, sobre o azul */
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.45) transparent;
   /* Canto de baixo à direita arredondado, igual ao canto "folha" dos cartões */
   border-bottom-right-radius: var(--folha);
 }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { border-radius: 4px; background: rgb(255 255 255 / 0.45); }
 
-/* Rodapé do menu: marca d'água discreta (calendário, batimento e relógio), só em azul */
+/* Rodapé do menu: marca d'água discreta (calendário, batimento e relógio), só em azul.
+   Em tela baixa (notebook) ela encolhe antes de o menu precisar rolar. */
 .sidebar::after {
   content: '';
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-height: 0;
   margin: auto calc(var(--esp-3) * -1) 0;
   height: 230px;
-  background: url('/img/marca-dagua-menu.svg') no-repeat center bottom 20px / 190px auto;
+  background: url('/img/marca-dagua-menu.svg') no-repeat center bottom 20px / auto min(190px, calc(100% - 30px));
   opacity: 0.09;
   pointer-events: none;
 }
@@ -246,7 +254,7 @@ body.is-booting.has-shell .page-skeleton {
 }
 .app.is-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
 /* Menu recolhido: a marca d'água encolhe para caber na faixa estreita */
-.app.is-collapsed .sidebar::after { height: 90px; background-size: 52px auto; }
+.app.is-collapsed .sidebar::after { height: 90px; background-size: auto min(52px, calc(100% - 30px)); }
 
 /* ---------- Barra superior ---------- */
 .topbar {
@@ -415,12 +423,31 @@ body.is-booting.has-shell .page-skeleton {
 .notification-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-2); margin-top: var(--esp-2); }
 .notification-text small { color: var(--cor-texto-3); font-size: var(--texto-xs); }
 .notification-sentence strong { font-weight: 500; }
-/* Convite recusado: aviso neutro, ícone vermelho */
-.notification-item.is-declined { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
+/* Convite aceito (ícone verde) ou recusado (ícone vermelho) */
 .notification-item.is-declined .notification-icon { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
-.notification-item.is-accepted { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
 .notification-item.is-notice .notification-actions { justify-content: flex-start; }
 .notification-item.is-accepted .notification-icon { background: var(--cor-sucesso-suave); color: var(--cor-sucesso); }
+/* Aviso e resposta clicam para marcar como vistos: o não visto fica azul com um ponto; o visto,
+   branco e sem destaque */
+.notification-item[data-readable] { position: relative; cursor: pointer; }
+.notification-item[data-readable]:not(.is-read)::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+}
+.notification-item.is-read { border-color: var(--cor-borda); background: var(--cor-superficie); cursor: default; }
+.notification-item.is-read .notification-icon { opacity: 0.6; }
+.notification-item.is-read .notification-sentence { color: var(--cor-texto-3); }
+/* Limpar todas: no topo da lista, à direita */
+.notification-tools { display: flex; justify-content: flex-end; margin-top: var(--esp-3); }
+.notification-tools .btn { gap: var(--esp-1); font-size: var(--texto-sm); }
+.notification-tools .btn svg { width: 16px; height: 16px; }
+.notification-tools + .section-title { margin-top: 0; }
 
 /* ---------- Notificações push neste aparelho (topo da gaveta do sininho) ---------- */
 .push-panel { margin-bottom: var(--esp-4); }
@@ -886,7 +913,7 @@ dialog::backdrop {
   .app.is-collapsed .nav-item { flex-direction: row; gap: var(--esp-3); min-height: 48px; justify-content: flex-start; padding: 0 var(--esp-3); }
   .app.is-collapsed .nav-label { font-size: inherit; text-align: left; }
   .app.is-collapsed .sidebar { padding-inline: var(--esp-3); }
-  .app.is-collapsed .sidebar::after { height: 230px; background-size: 190px auto; }
+  .app.is-collapsed .sidebar::after { height: 230px; background-size: auto min(190px, calc(100% - 30px)); }
   .app.is-collapsed .nav-chevron { display: block; }
   .app.is-collapsed .nav-sub { display: flex; }
   .app.is-collapsed .nav-sub[hidden] { display: none; }

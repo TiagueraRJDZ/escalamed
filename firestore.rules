@@ -715,6 +715,17 @@ service cloud.firestore {
         && incoming().endedBy == me();
     }
 
+    // Notificações do sininho já vistas: notificationReads/{uid} = { ids, updatedAt }, com os
+    // caminhos dos avisos e das respostas aos convites que a pessoa abriu. Só ela lê e grava.
+    match /notificationReads/{uid} {
+      allow read, delete: if isSelf(uid);
+      allow create, update: if isSelf(uid)
+        && incoming().keys().hasOnly(['ids', 'updatedAt'])
+        && incoming().ids is list
+        && incoming().ids.size() <= 300
+        && incoming().updatedAt == request.time;
+    }
+
     // Dev: lê e grava qualquer documento (soma-se às regras acima; para os outros nada muda).
     // config/dev (pode nem existir) só o Dev lê: é assim que o app e o serviço de contas
     // sabem que a conta é Dev.
