@@ -48,7 +48,23 @@ function baseGroup(extra = {}) {
 }
 
 const card = (name = 'Fulano de Tal') => ({ name, photoURL: null, joinedAt: new Date() });
-const profile = (categoryId, extra = {}) => ({ name: 'Fulano de Tal', categoryId, signupStep: 4, ...extra });
+// Perfil completo, como o cadastro grava (validUser confere tudo quando outra pessoa altera o cargo)
+const profile = (categoryId, extra = {}) => ({
+  name: 'Fulano de Tal',
+  nameLower: 'fulano de tal',
+  photoURL: null,
+  username: null,
+  categoryId,
+  specialty: null,
+  council: null,
+  searchKeywords: ['fulano', 'de', 'tal'],
+  signupStep: 4,
+  termsAcceptedAt: new Date(),
+  termsVersion: '2026-10',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  ...extra,
+});
 const decision = (categoryId, approved = true) => ({ categoryId, approved, decidedBy: 'seed', decidedAt: new Date() });
 
 function invite(email, extra = {}) {
@@ -210,6 +226,50 @@ test('aprovação: pendente ganha acesso só depois de aprovado; recusado contin
   assert.ok(!(await canRead(pending.token, G2)));
   assert.ok(await approve(gestor, pending, 'gestor', true));
   assert.ok(await canRead(pending.token, G2));
+});
+
+// Alterar cargo (Configurações > Usuários): perfil, aprovação e aviso no mesmo lote
+const changeRole = (actor, target, categoryId, { withAccess = true, withNotice = true, noticeCategory = categoryId } = {}) =>
+  commit(actor.token, [
+    w.update(`users/${target.uid}`, { categoryId, specialty: null, council: null, updatedAt: NOW }),
+    ...(withAccess ? [w.set(`access/${target.uid}`, { categoryId, approved: true, decidedBy: actor.uid, decidedAt: NOW })] : []),
+    ...(withNotice
+      ? [w.set(`users/${target.uid}/notices/n1`, {
+          type: 'role', categoryId: noticeCategory, categoryName: 'Administrativo', previousCategoryId: 'medico',
+          by: actor.uid, byName: 'Gestor', createdAt: NOW,
+        })]
+      : []),
+  ]);
+
+test('alterar cargo: Gestor e administrador trocam o cargo de outra pessoa, já aprovado e com aviso', async () => {
+  assert.ok(!(await changeRole(medico, invited, 'administrativo'))); // Médico não altera
+  assert.ok(!(await changeRole(adm, invited, 'administrativo'))); // Administrativo não altera
+  assert.ok(!(await changeRole(gestor, gestor, 'medico'))); // nem o próprio cargo
+  assert.ok(!(await changeRole(gestor, invited, 'administrativo', { withAccess: false }))); // sem aprovar junto, não
+  assert.ok(!(await changeRole(gestor, invited, 'administrativo', { noticeCategory: 'gestor' }))); // aviso com outro cargo
+  // Só cargo, especialidade e registro: o nome não
+  assert.ok(!(await commit(gestor.token, [
+    w.update(`users/${invited.uid}`, { categoryId: 'administrativo', name: 'Outro Nome', updatedAt: NOW }),
+    w.set(`access/${invited.uid}`, { categoryId: 'administrativo', approved: true, decidedBy: gestor.uid, decidedAt: NOW }),
+  ])));
+  assert.ok(await changeRole(gestor, invited, 'administrativo'));
+  assert.ok(await changeRole(platformAdmin, invited, 'gestor', { withNotice: false }));
+  // A pessoa já entra com o cargo novo
+  assert.ok(await canRead(invited.token, G2));
+});
+
+test('avisos: a pessoa lê e dispensa; quem avisou lê; os outros não', async () => {
+  await changeRole(gestor, invited, 'administrativo');
+  const N = `users/${invited.uid}/notices/n1`;
+  assert.ok(await canRead(invited.token, N));
+  assert.ok(await canRead(gestor.token, N));
+  assert.ok(!(await canRead(medico.token, N)));
+  assert.ok(!(await commit(gestor.token, [w.delete(N)])));
+  assert.ok(await commit(invited.token, [w.delete(N)]));
+  // Ninguém cria aviso solto (sem o cargo ter sido trocado para o mesmo do aviso)
+  assert.ok(!(await commit(medico.token, [w.set(`users/${gestor.uid}/notices/n2`, {
+    type: 'role', categoryId: 'gestor', categoryName: 'Gestor', previousCategoryId: null, by: medico.uid, byName: 'Médico', createdAt: NOW,
+  })])));
 });
 
 test('aprovação: a própria pessoa apaga a sua (troca de cargo); outra pessoa não', async () => {

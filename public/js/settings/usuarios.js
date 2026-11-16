@@ -2,6 +2,7 @@
 // Toda conta espera aprovação: quem ainda não foi aprovado (ou foi recusado) está sem acesso
 // à plataforma e aparece no topo da lista, com a linha destacada e
 // os botões Aprovar/Recusar (gravam access/{uid}). Cada linha mostra o selo do cargo.
+// "Alterar cargo" (lápis) troca o cargo de alguém, já aprovado, e avisa a pessoa.
 // Só o administrador vê o login (e-mail, usuário, situação), que vem do serviço de contas, e as
 // ações de senha provisória, inativar e excluir (o serviço confere em config/admins).
 import { collection, doc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -11,7 +12,8 @@ import { isProfileComplete } from '../auth.js';
 import { adminAccounts, adminTemporaryPassword, adminSetAccess, adminDeleteAccount } from '../auth-api.js';
 import { avatarHtml } from '../layout.js';
 import { icon } from '../icons.js';
-import { professionLabel, councilLabel, categoryName } from '/data/categories.js';
+import { professionLabel, councilLabel, categoryName, getCategory, PROFESSIONAL_CATEGORIES } from '/data/categories.js';
+import { notifyPush } from '../push.js';
 import { approvalState } from '../permissions.js';
 import { normalize } from '../validators.js';
 import { escapeHtml, toast, confirmDialog, setLoading, firebaseErrorMessage } from '../ui.js';
@@ -28,6 +30,47 @@ const TEMP_PASSWORD_DIALOG = {
     </div>`,
   footer: '<button type="button" class="btn btn-primary" data-close>Pronto</button>',
 };
+
+// Alterar cargo: Gestor, administrador ou Dev corrige o cargo de alguém (pediu o cargo errado,
+// por exemplo). O cargo novo já fica aprovado e a pessoa é avisada no sininho e no celular.
+const ROLE_DIALOG = {
+  id: 'modal-change-role',
+  title: 'Alterar cargo',
+  className: 'picker-modal',
+  body: `
+    <p class="muted" id="change-role-text"></p>
+    <ul class="picker-list" id="change-role-list" role="listbox" aria-label="Cargos"></ul>
+    <p class="field-hint picker-note">O cargo novo já fica aprovado. A pessoa é avisada, sai da conta e entra de novo já com o novo cargo.</p>`,
+  footer: `<button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+    <button type="button" class="btn btn-primary" id="change-role-save" disabled>Salvar cargo</button>`,
+};
+
+// Perfil, aprovação e aviso num lote só (as regras exigem os três juntos). Especialidade e
+// registro ficam só se o cargo novo usa (registro do mesmo conselho).
+async function changeRole(person, categoryId, by) {
+  const category = getCategory(categoryId);
+  const profile = person.profile;
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', person.uid), {
+    categoryId,
+    specialty: category.specialty ? (profile.specialty ?? null) : null,
+    council: category.council && profile.council?.type === category.council ? profile.council : null,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(db, 'access', person.uid), { categoryId, approved: true, decidedBy: by.uid, decidedAt: serverTimestamp() });
+  const notice = doc(collection(db, 'users', person.uid, 'notices'));
+  batch.set(notice, {
+    type: 'role',
+    categoryId,
+    categoryName: category.name,
+    previousCategoryId: profile.categoryId ?? null,
+    by: by.uid,
+    byName: String(by.name || 'Gestor').slice(0, 80),
+    createdAt: serverTimestamp(),
+  });
+  await batch.commit();
+  notifyPush('cargo', person.uid, notice.id); // push no celular da pessoa (o serviço confere o aviso)
+}
 
 // Lista em tempo real: perfis (users), decisões (access) e administradores (config/admins)
 // chegam pelo Firestore na hora em que mudam (conta nova pedindo aprovação, aprovação feita por
@@ -191,6 +234,7 @@ export default {
         </div>
         <div class="user-actions">
           ${decisionButtons(p)}
+          ${changeRoleButton(p, name)}
           ${roleButton(p, name)}
           ${
             isAdmin()
@@ -220,6 +264,12 @@ export default {
       return '';
     }
 
+    // Alterar cargo: para quem já terminou o cadastro (ninguém sobre si mesmo, exceto o Dev)
+    function changeRoleButton(p, name) {
+      if (!decidesFor(p) || !isProfileComplete(p.profile)) return '';
+      return `<button type="button" class="btn-icon" data-action="change-role" title="Alterar cargo" aria-label="Alterar cargo de ${name}">${icon('edit')}</button>`;
+    }
+
     // Aguardando aprovação: Recusar e Aprovar na própria linha
     function decisionButtons(p) {
       if (!isWaiting(p) || !decidesFor(p)) return '';
@@ -231,8 +281,8 @@ export default {
 
     function renderUsers() {
       ui.intro.textContent = isAdmin()
-        ? 'Todas as contas da plataforma. Ao fim de cada linha: aprovar cargo, redefinir senha, inativar acesso e excluir acesso.'
-        : 'Pessoas da plataforma e o cargo de cada uma. Aprove ou recuse as contas novas e os pedidos de cargo.';
+        ? 'Todas as contas da plataforma. Ao fim de cada linha: alterar cargo, aprovar, redefinir senha, inativar acesso e excluir acesso.'
+        : 'Pessoas da plataforma e o cargo de cada uma. Aprove ou recuse as contas novas e os pedidos de cargo, ou altere o cargo de alguém.';
       const term = normalize(ui.search.value);
       const shown = platformUsers
         .filter((p) => !term || normalize(`${p.name} ${p.usuario ?? ''} ${p.email ?? ''}`).includes(term))
@@ -380,7 +430,58 @@ export default {
       );
     }
 
+    // ---------- Alterar cargo ----------
+    const roleDialog = createDialog(ROLE_DIALOG);
+    const roleList = roleDialog.querySelector('#change-role-list');
+    const roleSave = roleDialog.querySelector('#change-role-save');
+    let roleTarget = null; // { person, chosen }
+
+    function renderRoleOptions() {
+      const { person, chosen } = roleTarget;
+      const current = person.profile.categoryId;
+      roleList.innerHTML = PROFESSIONAL_CATEGORIES.map((c) => {
+        const selected = c.id === chosen;
+        const now = c.id === current ? ' <span class="badge badge-muted">Atual</span>' : '';
+        return `<li><button type="button" class="picker-option" role="option" aria-selected="${selected}" data-id="${c.id}">
+          <span>${escapeHtml(c.name)}${now}${c.hint ? `<small>${escapeHtml(c.hint)}</small>` : ''}</span>${selected ? icon('check') : ''}</button></li>`;
+      }).join('');
+      roleSave.disabled = !chosen || chosen === current;
+    }
+
+    function openRoleDialog(person) {
+      roleTarget = { person, chosen: null };
+      roleDialog.querySelector('#change-role-text').innerHTML =
+        `Cargo atual de <strong>${escapeHtml(person.name)}</strong>: ${escapeHtml(categoryName(person.profile.categoryId))}. Escolha o novo cargo:`;
+      renderRoleOptions();
+      roleDialog.showModal();
+    }
+
+    roleList.addEventListener('click', (event) => {
+      const option = event.target.closest('.picker-option');
+      if (!option || !roleTarget) return;
+      roleTarget.chosen = option.dataset.id;
+      renderRoleOptions();
+      roleList.querySelector(`[data-id="${option.dataset.id}"]`)?.focus();
+    });
+
+    roleSave.addEventListener('click', async () => {
+      const { person, chosen } = roleTarget ?? {};
+      if (!chosen) return;
+      setLoading(roleSave, true);
+      try {
+        await changeRole(person, chosen, { uid: user.uid, name: ctx.profile?.name });
+        roleDialog.close();
+        toast(`Cargo de ${person.name} alterado para ${categoryName(chosen)}. A pessoa vai entrar de novo já com ele.`, 'success'); // a linha muda sozinha
+      } catch (error) {
+        toast(firebaseErrorMessage(error) ?? 'Não foi possível alterar o cargo.', 'error', 6000);
+      } finally {
+        setLoading(roleSave, false);
+        renderRoleOptions();
+      }
+    });
+
     const ACTIONS = {
+      'change-role': openRoleDialog,
       approve: (p) => decide(p, true),
       decline: (p) => decide(p, false),
       revoke: (p) => decide(p, false),

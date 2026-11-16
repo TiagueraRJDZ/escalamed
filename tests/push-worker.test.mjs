@@ -380,6 +380,32 @@ test('aceite: quem convidou recebe; convite pendente ou recusado não vira aceit
   assert.equal(entregues.length, 1);
 });
 
+test('cargo alterado: a pessoa recebe; só quem alterou consegue pedir', async () => {
+  const aparelho = await novoAparelho('bruno');
+  await chamar('/push/inscrever', { inscricao: aparelho.inscricao }, 'bruno');
+  // users/bruno/notices/a1 (o mapa usa "uid/aviso")
+  convites['bruno/a1'] = {
+    type: texto('role'),
+    categoryId: texto('administrativo'),
+    categoryName: texto('Administrativo'),
+    by: texto('gestora'),
+    byName: texto('Ana Gestora'),
+    createdAt: momento(),
+  };
+  leitores['bruno/a1'] = ['bruno', 'gestora', 'intruso'];
+  // Quem pede não é quem alterou
+  assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a1' }, 'intruso')).enviados, 0);
+  assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a1' }, 'gestora')).enviados, 1);
+  const mensagem = await abrir(aparelho, entregues[0].corpo);
+  assert.equal(mensagem.titulo, 'Seu cargo foi alterado');
+  assert.equal(mensagem.corpo, 'Ana Gestora alterou seu cargo para Administrativo.');
+  assert.equal(mensagem.url, '/settings.html#profissional');
+  // Uma vez só; aviso que não existe
+  assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a1' }, 'gestora')).enviados, 0);
+  assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a2' }, 'gestora')).status, 404);
+  assert.equal(entregues.length, 1);
+});
+
 // ---------- Teste geral (só Dev) ----------
 test('Dev: teste para todos os aparelhos ativos, de todas as contas', async () => {
   const aparelhos = {};

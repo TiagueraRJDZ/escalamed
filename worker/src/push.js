@@ -11,6 +11,8 @@
  *   convite  alguém foi convidado para um grupo     → para a pessoa convidada
  *   aceite   o convidado aceitou e entrou no grupo  → para quem convidou
  *   recusa   o convidado recusou                    → para quem convidou
+ *   cargo    um Gestor ou administrador alterou o cargo de alguém → para essa pessoa
+ *            (grupo = uid dela, chave = id do aviso em users/{uid}/notices)
  *
  * Rotas (POST, com "Authorization: Bearer <token do Firebase>"):
  *   /push/inscrever  { inscricao: { endpoint, keys: { p256dh, auth } }, aparelho }
@@ -158,9 +160,9 @@ async function avisar(contexto) {
     throw new apoio.Falha(400, 'Aviso incompleto.');
   }
 
-  const caminho = `groups/${encodeURIComponent(grupo)}/invites/${encodeURIComponent(chave)}`;
+  const caminho = (CAMINHOS[tipo] ?? CAMINHOS.convite)(encodeURIComponent(grupo), encodeURIComponent(chave));
   const campos = await apoio.lerDocumento(env, quem.token, caminho, local);
-  if (!campos) throw new apoio.Falha(404, 'Convite não encontrado.');
+  if (!campos) throw new apoio.Falha(404, 'Aviso não encontrado.');
   const convite = valoresDe(campos);
 
   const aviso = await AVISOS[tipo]({ env, local, quem, grupo, chave, convite });
@@ -175,8 +177,30 @@ async function avisar(contexto) {
   return { enviados: await enviarParaConta(env, aviso.destino, aviso.mensagem) };
 }
 
+// Documento conferido de cada tipo de aviso ("grupo" e "chave" vêm do app)
+const CAMINHOS = {
+  convite: (grupo, chave) => `groups/${grupo}/invites/${chave}`,
+  // cargo: grupo = uid de quem teve o cargo alterado; chave = id do aviso
+  cargo: (uid, aviso) => `users/${uid}/notices/${aviso}`,
+};
+
 // Cada tipo de aviso: confere o documento e monta a notificação (null = nada a avisar)
 const AVISOS = {
+  // Cargo alterado por um Gestor ou administrador (Configurações > Usuários): avisa a pessoa.
+  // Quem pediu precisa ser quem alterou.
+  async cargo({ quem, grupo, convite: aviso }) {
+    if (aviso.type !== 'role' || aviso.by !== quem.uid) return null;
+    return {
+      momento: Date.parse(aviso.createdAt || ''),
+      destino: grupo,
+      mensagem: {
+        titulo: 'Seu cargo foi alterado',
+        corpo: `${aviso.byName || 'Um Gestor'} alterou seu cargo para ${aviso.categoryName || 'outro cargo'}.`,
+        url: '/settings.html#profissional',
+        tag: 'cargo',
+      },
+    };
+  },
   // Convite novo: quem pediu precisa ser quem convidou. Convite por e-mail só chega
   // se a pessoa já tem conta (o e-mail vira o uid pelo Authentication).
   async convite({ env, local, quem, grupo, convite }) {

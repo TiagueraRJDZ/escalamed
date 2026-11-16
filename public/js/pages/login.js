@@ -76,12 +76,15 @@ function setupLogin() {
   });
 }
 
-// ---------- Sessão encerrada pelo administrador (auth.js: watchSession) ----------
+// ---------- Sessão encerrada pelo administrador ou cargo alterado (auth.js: watchSession) ----------
 // Mostra o aviso e tira o "?sessao=" do endereço (recarregar não mostra de novo)
+const SESSION_NOTICES = { encerrada: 'session-ended', cargo: 'session-role' };
+
 function showSessionEnded() {
   const params = new URLSearchParams(location.search);
-  if (params.get('sessao') !== 'encerrada') return;
-  document.getElementById('session-ended').hidden = false;
+  const id = SESSION_NOTICES[params.get('sessao')];
+  if (!id) return;
+  document.getElementById(id).hidden = false;
   params.delete('sessao');
   const query = params.toString();
   history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);

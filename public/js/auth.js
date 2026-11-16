@@ -1,6 +1,7 @@
 // Sessão do usuário: proteção das páginas (guards) e saída.
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
+  collection,
   doc,
   getDoc,
   getDocFromCache,
@@ -164,34 +165,60 @@ export async function signOutUser() {
   navigate('/', { replace: true });
 }
 
-// ---------- Acesso expirado (sessão encerrada pelo administrador) ----------
+// ---------- Acesso expirado (sessão encerrada pelo administrador) ou cargo alterado ----------
 // Sai na hora, mostra o aviso por alguns segundos e leva para a tela de entrada, que repete o
-// aviso (?sessao=encerrada). Sem o layout do app (ex.: tela de espera), vai direto.
-const EXPIRED_URL = '/?sessao=encerrada';
-const EXPIRED_SECONDS = 2; // curto: a sessão já caiu, o aviso só confirma (a tela de entrada repete)
+// aviso (?sessao=encerrada ou ?sessao=cargo). Sem o layout do app (ex.: tela de espera), vai direto.
+const LOCK_ICON = '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const ROLE_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>';
 
-function showExpiredDialog() {
+const escapeText = (value) =>
+  String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+const ENDINGS = {
+  expired: {
+    url: '/?sessao=encerrada',
+    seconds: 2, // curto: a sessão já caiu, o aviso só confirma (a tela de entrada repete)
+    icon: LOCK_ICON,
+    title: 'Seu acesso expirou',
+    text: () => 'A sua sessão foi encerrada pelo administrador da plataforma. Se precisar de acesso, fale com ele.',
+    button: 'Ir para a tela de entrada',
+  },
+  role: {
+    url: '/?sessao=cargo',
+    seconds: 8, // dá tempo de ler quem alterou e para qual cargo
+    icon: ROLE_ICON,
+    title: 'Seu cargo foi alterado',
+    text: (n) =>
+      `${escapeText(n?.byName || 'Um Gestor')} alterou seu cargo para <strong>${escapeText(n?.categoryName || 'outro cargo')}</strong>. ` +
+      'Entre de novo para continuar já com o novo cargo.',
+    button: 'Entrar de novo',
+  },
+};
+
+function showEndDialog(ending, detail) {
   if (!document.querySelector('.app')) return false;
   document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  document.querySelectorAll('.toast').forEach((t) => t.remove()); // o aviso é só este
   const dialog = document.createElement('dialog');
   dialog.className = 'modal modal-center session-expired';
   dialog.setAttribute('aria-labelledby', 'session-expired-title');
   dialog.setAttribute('aria-describedby', 'session-expired-text');
   dialog.innerHTML = `
     <div class="dialog-body">
-      <span class="session-expired-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-      <h2 id="session-expired-title">Seu acesso expirou</h2>
-      <p class="muted" id="session-expired-text">A sua sessão foi encerrada pelo administrador da plataforma. Se precisar de acesso, fale com ele.</p>
-      <p class="muted text-sm" aria-live="polite">Indo para a tela de entrada em <span data-seconds>${EXPIRED_SECONDS}</span> s…</p>
+      <span class="session-expired-icon" aria-hidden="true">${ending.icon}</span>
+      <h2 id="session-expired-title">${ending.title}</h2>
+      <p class="muted" id="session-expired-text">${ending.text(detail)}</p>
+      <p class="muted text-sm" aria-live="polite">Indo para a tela de entrada em <span data-seconds>${ending.seconds}</span> s…</p>
     </div>
-    <div class="dialog-footer"><button type="button" class="btn btn-primary">Ir para a tela de entrada</button></div>`;
+    <div class="dialog-footer"><button type="button" class="btn btn-primary">${ending.button}</button></div>`;
   document.body.append(dialog);
-  const go = () => location.replace(EXPIRED_URL);
+  const go = () => location.replace(ending.url);
   dialog.addEventListener('cancel', (event) => event.preventDefault()); // Esc não fecha
   dialog.querySelector('button').addEventListener('click', go);
   dialog.showModal();
   dialog.querySelector('button').focus();
-  let left = EXPIRED_SECONDS;
+  let left = ending.seconds;
   const timer = setInterval(() => {
     left -= 1;
     dialog.querySelector('[data-seconds]').textContent = String(Math.max(left, 0));
@@ -203,13 +230,38 @@ function showExpiredDialog() {
   return true;
 }
 
-async function expireSession() {
+// Cargo alterado: as outras abas também saem com este aviso (e não com o de acesso expirado)
+const ROLE_KEY = 'escalamed:cargo';
+
+function roleChangedRecently() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ROLE_KEY) ?? 'null');
+    return saved && Date.now() - saved.at < 15000 ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+async function endSession(kind, detail = null) {
   if (signingOut) return;
   signingOut = true;
-  const shown = showExpiredDialog();
+  const ending = ENDINGS[kind];
+  if (kind === 'role') {
+    try {
+      localStorage.setItem(ROLE_KEY, JSON.stringify({ at: Date.now(), byName: detail?.byName, categoryName: detail?.categoryName }));
+    } catch {
+      // sem armazenamento: as outras abas mostram o aviso de acesso expirado
+    }
+  }
+  const shown = showEndDialog(ending, detail);
   await endLocalSession();
-  if (!shown) location.replace(EXPIRED_URL);
+  if (!shown) location.replace(ending.url);
 }
+
+const expireSession = () => endSession('expired');
+
+// Saindo da conta (Sair, acesso expirado ou cargo alterado): a página não deve recarregar sozinha
+export const isSigningOut = () => signingOut;
 
 // Inativar, gerar senha provisória ou excluir o acesso derruba as sessões no Firebase, mas o
 // app só perceberia ao abrir outra página. Aqui ele sai na hora:
@@ -234,7 +286,9 @@ export async function watchSession(user) {
   let checking = false;
   onAuthStateChanged(auth, (current) => {
     if (current || signingOut || checking) return;
+    const role = roleChangedRecently();
     if (loggedOutOnPurpose()) signOutUser();
+    else if (role) endSession('role', role);
     else expireSession();
   });
 
@@ -257,5 +311,19 @@ export async function watchSession(user) {
       if (endedAt > authTime) expireSession();
     },
     () => {}, // regras ainda não publicadas ou sem conexão: ficam os outros dois avisos
+  );
+
+  // 4. Cargo alterado por um Gestor (Configurações > Usuários grava users/{uid}/notices) depois
+  //    do login desta sessão: sai e entra de novo já com o cargo novo. Vale também para quem só
+  //    abrir o app depois da troca, com o login antigo.
+  onSnapshot(
+    collection(db, 'users', user.uid, 'notices'),
+    (snapshot) => {
+      const notice = snapshot.docs
+        .map((d) => d.data())
+        .find((n) => n.type === 'role' && (n.createdAt?.toMillis?.() ?? 0) > authTime);
+      if (notice) endSession('role', notice);
+    },
+    () => {},
   );
 }

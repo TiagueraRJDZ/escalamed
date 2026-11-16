@@ -419,6 +419,7 @@ body.is-booting.has-shell .page-skeleton {
 .notification-item.is-declined { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
 .notification-item.is-declined .notification-icon { background: var(--cor-perigo-suave); color: var(--cor-perigo); }
 .notification-item.is-accepted { border-color: var(--cor-borda); background: var(--cor-superficie-2); }
+.notification-item.is-notice .notification-actions { justify-content: flex-start; }
 .notification-item.is-accepted .notification-icon { background: var(--cor-sucesso-suave); color: var(--cor-sucesso); }
 
 /* ---------- Notificações push neste aparelho (topo da gaveta do sininho) ---------- */

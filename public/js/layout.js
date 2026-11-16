@@ -3,7 +3,7 @@
 // Uso na página:  const { user, profile, access } = await initLayout({ active: 'schedules' });
 // access = { isDev, isAdmin, access, role }: cargo que vale (role: 'dev' | 'gestor' | 'coordenador' | 'administrativo' | null)
 import { auth, navigate } from './firebase.js';
-import { requireAuth, signOutUser, watchSession, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
+import { requireAuth, signOutUser, watchSession, isSigningOut, readSessionSummary, saveSessionSummary as saveSummary } from './auth.js';
 import { pagePath, nextParam } from './redirect.js';
 import { categoryName } from '/data/categories.js';
 import { icon } from './icons.js';
@@ -145,13 +145,21 @@ function watchAccessLive(app, user, profile, access) {
     if (change.profile) {
       Object.assign(profile, change.profile);
       paintAccount(shell);
+      syncCards(user, profile); // cargo alterado por um Gestor: os cartões nos grupos acompanham
     }
     const value = await loadMyAccess(user.uid);
+    // Os três documentos avisam juntos: só a primeira resposta decide (um aviso só)
+    if (reloading || isSigningOut()) return;
     if (leaveIfBarred(profile, value)) return;
     if (!sameRole(value) && !value.unknown) {
       reloading = true;
-      toast('Seu cargo na plataforma mudou. Atualizando…', 'info');
-      setTimeout(() => location.reload(), 1500);
+      // Cargo alterado por um Gestor encerra a sessão (auth.js): espera um instante para
+      // não recarregar por cima da janela que explica a saída
+      setTimeout(() => {
+        if (isSigningOut()) return;
+        toast('Seu cargo na plataforma mudou. Atualizando…', 'info');
+        setTimeout(() => location.reload(), 1500);
+      }, 1500);
       return;
     }
     paintRole(app, profile, value);
@@ -355,20 +363,23 @@ function setupDialogs() {
   });
 }
 
-// Cartões de membro sem e-mail (criados antes da busca por e-mail) ou com o e-mail
-// antigo: atualiza em todos os grupos. Roda uma vez por e-mail, em segundo plano.
-function syncCardEmail(user, profile) {
-  const key = `escalamed:email-cartoes:${user.uid}`;
+// Cartões de membro desatualizados: sem e-mail (criados antes da busca por e-mail), com o
+// e-mail antigo ou com o cargo antigo (um Gestor alterou o cargo em Configurações > Usuários;
+// o cartão só pode ser gravado pela própria pessoa). Atualiza em todos os grupos, em segundo
+// plano, uma vez para cada combinação de e-mail e cargo.
+function syncCards(user, profile) {
+  const key = `escalamed:cartoes:${user.uid}`;
   const email = (user.email ?? '').toLowerCase();
+  const signature = JSON.stringify([email, profile.categoryId ?? null, profile.specialty ?? null, profile.council ?? null]);
   try {
-    if (!email || localStorage.getItem(key) === email) return;
+    if (!email || localStorage.getItem(key) === signature) return;
   } catch {
     return; // sem armazenamento: tenta de novo em outra visita
   }
   syncMemberCards(user.uid, profile)
     .then(() => {
       try {
-        localStorage.setItem(key, email);
+        localStorage.setItem(key, signature);
       } catch {
         // sem armazenamento
       }
@@ -446,7 +457,7 @@ export async function initLayout({ active, search = true } = {}) {
   });
 
   if (search) setupPeopleSearch(app.querySelector('#global-search'), user.uid);
-  syncCardEmail(user, profile);
+  syncCards(user, profile);
   // Resposta do servidor (o guardado pode estar velho): atualiza o cargo e os itens do menu
   fresh.then((value) => {
     if (!leaveIfBarred(profile, value)) paintRole(app, profile, value);

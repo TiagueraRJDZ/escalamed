@@ -196,8 +196,36 @@ service cloud.firestore {
         && incoming().termsVersion == resource.data.termsVersion
         && incoming().signupStep >= resource.data.signupStep
         && incoming().updatedAt == request.time;
+      // Gestor ou administrador corrige o cargo de outra pessoa (Configurações > Usuários > Alterar
+      // cargo): só cargo, especialidade e registro, e no mesmo lote em que aprova o cargo novo
+      allow update: if signedIn() && uid != me()
+        && changedOnly(['categoryId', 'specialty', 'council', 'updatedAt'])
+        && incoming().categoryId != null
+        && validUser(incoming())
+        && incoming().updatedAt == request.time
+        && getAfter(accessPath(uid)).data.categoryId == incoming().categoryId
+        && getAfter(accessPath(uid)).data.approved == true
+        && isGestor();
       // O administrador apaga o perfil ao excluir o acesso de alguém (Configurações > Usuários)
       allow delete: if isSelf(uid) || isPlatformAdmin();
+
+      // Avisos da própria pessoa no sininho (hoje: cargo alterado por um Gestor ou administrador).
+      // Quem avisou também lê (o serviço de contas confere o aviso antes de mandar o push).
+      // A pessoa dispensa (apaga).
+      match /notices/{noticeId} {
+        allow read: if isSelf(uid) || (signedIn() && resource.data.by == me());
+        allow delete: if isSelf(uid);
+        allow create: if signedIn() && uid != me()
+          && incoming().keys().hasOnly(['type', 'categoryId', 'categoryName', 'previousCategoryId', 'by', 'byName', 'createdAt'])
+          && incoming().type == 'role'
+          && incoming().categoryId == getAfter(/databases/$(database)/documents/users/$(uid)).data.categoryId
+          && str(incoming().categoryName, 1, 60)
+          && optCategory(incoming().previousCategoryId)
+          && incoming().by == me()
+          && str(incoming().byName, 1, 80)
+          && incoming().createdAt == request.time
+          && isGestor();
+      }
 
       // Dados pessoais: só o próprio usuário lê e grava
       match /private/{docId} {
@@ -219,12 +247,13 @@ service cloud.firestore {
     // que a pessoa tinha naquele momento (categoryId tem de ser igual ao do perfil dela); ver
     // isApproved(). Qualquer logado lê (selo do cargo, quem pode ser coordenador). Só
     // administrador ou Gestor decidem; ninguém decide sobre si mesmo. A própria pessoa apaga ao
-    // trocar para (ou de) Gestor, Coordenador de escala ou Administrativo.
+    // trocar para (ou de) Gestor, Coordenador de escala ou Administrativo. O cargo é conferido
+    // depois do lote (getAfter): "Alterar cargo" troca o perfil e aprova juntos.
     match /access/{uid} {
       function validDecision(d) {
         return d.keys().hasOnly(['categoryId', 'approved', 'decidedBy', 'decidedAt'])
           && d.categoryId != null && optCategory(d.categoryId)
-          && d.categoryId == get(/databases/$(database)/documents/users/$(uid)).data.get('categoryId', null)
+          && d.categoryId == getAfter(/databases/$(database)/documents/users/$(uid)).data.get('categoryId', null)
           && d.approved is bool
           && d.decidedBy == me()
           && d.decidedAt == request.time;

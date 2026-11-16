@@ -1,10 +1,14 @@
 // Notificações (sininho do topo), em tempo real em todas as páginas:
 //  - convites para grupos que a pessoa recebeu (Aceitar / Recusar);
-//  - convites que ela mandou e foram aceitos ou recusados (Dispensar).
+//  - convites que ela mandou e foram aceitos ou recusados (Dispensar);
+//  - avisos dela (users/{uid}/notices), como o cargo alterado por um Gestor (Dispensar).
 // O sininho mostra quantas há; o que chega com a página aberta também vira um aviso.
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 // No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
 // chegarem no celular com o app fechado.
+import { collection, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { db } from './firebase.js';
+import { listenWithRetry } from './live.js';
 import { icon } from './icons.js';
 import { pushStatus, enablePush, disablePush, dismissPush, resetPushChoice, sendTestPush, sendTestPushToAll, setAppBadge } from './push.js';
 import { escapeHtml, toast, setLoading, firebaseErrorMessage, confirmDialog } from './ui.js';
@@ -20,6 +24,7 @@ import {
 
 let invites = []; // recebidos, pendentes
 let answered = []; // mandados e respondidos (aceitos ou recusados)
+let notices = []; // avisos da própria pessoa (ex.: cargo alterado)
 let ready = false;
 let session = null; // { app, user, profile }
 const listeners = new Set();
@@ -65,6 +70,11 @@ const answeredText = (inv) =>
   `<strong>${escapeHtml(answerer(inv))}</strong> ${answerVerb(inv)} o convite para
   <strong>${escapeHtml(inv.groupName)}</strong>`;
 
+const noticeText = (n) =>
+  n.type === 'role'
+    ? `<strong>${escapeHtml(n.byName ?? 'Um Gestor')}</strong> alterou seu cargo para <strong>${escapeHtml(n.categoryName ?? 'outro cargo')}</strong>`
+    : 'Você tem um aviso novo';
+
 const whenText = (ts) => {
   const date = ts?.toDate?.();
   return date ? date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
@@ -72,7 +82,7 @@ const whenText = (ts) => {
 
 function renderBell() {
   const bell = session.app.querySelector('#notifications-button');
-  const count = invites.length + answered.length;
+  const count = invites.length + answered.length + notices.length;
   let badge = bell.querySelector('.bell-count');
   if (!badge) {
     badge = document.createElement('span');
@@ -102,6 +112,27 @@ function renderDrawer() {
   const showAnswered = !filters.length || filters.includes('groups') || filters.includes('management');
   const received = showInvites ? invites : [];
   const replies = showAnswered ? answered : [];
+  const mine = !filters.length || filters.includes('management') ? notices : [];
+
+  // "Ana Gestora alterou seu cargo para Médico"
+  const noticesHtml = mine.length
+    ? `<h3 class="section-title">Avisos</h3>
+      <ul class="notification-list">${mine
+        .map(
+          (n) => `<li class="notification-item is-notice" data-id="${escapeHtml(n.id)}">
+          <span class="notification-icon" aria-hidden="true">${icon('userCheck')}</span>
+          <div class="notification-text">
+            <span class="notification-sentence">${noticeText(n)}</span>
+            <small>${whenText(n.createdAt)}</small>
+            <div class="notification-actions">
+              <a class="btn btn-ghost" href="/settings.html#profissional">Ver meu cargo</a>
+              <button type="button" class="btn btn-ghost" data-dismiss>Dispensar</button>
+            </div>
+          </div>
+        </li>`,
+        )
+        .join('')}</ul>`
+    : '';
 
   const receivedHtml = received.length
     ? `<h3 class="section-title">Convites para grupos</h3>
@@ -141,8 +172,8 @@ function renderDrawer() {
     : '';
 
   list.innerHTML =
-    receivedHtml || repliesHtml
-      ? receivedHtml + repliesHtml
+    noticesHtml || receivedHtml || repliesHtml
+      ? noticesHtml + receivedHtml + repliesHtml
       : `<h3 class="section-title">Não lidas</h3>
       <div class="empty-state">
         ${icon('bell')}
@@ -360,6 +391,25 @@ export function setupNotifications(app, user, profile, access = {}) {
     render();
   });
 
+  // Avisos da própria pessoa, em tempo real (o mais novo primeiro). Cargo alterado não tem
+  // toast: a sessão termina com uma janela explicando (auth.js: watchSession).
+  const noticesChanged = tracker((n) => {
+    if (n.type !== 'role') toast('Você tem um aviso novo.', 'info', 8000);
+  });
+  listenWithRetry(
+    collection(db, 'users', user.uid, 'notices'),
+    (snapshot) => {
+      const list = snapshot.docs
+        .map((d) => ({ id: d.ref.path, ...d.data({ serverTimestamps: 'estimate' }) }))
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      if (!noticesChanged(list, { synced: !snapshot.metadata.fromCache })) return;
+      notices = list;
+      render();
+    },
+    'Avisos',
+    { metadata: true },
+  );
+
   const drawer = document.getElementById('drawer-notifications');
   drawer.querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', renderDrawer));
   drawer.addEventListener('click', async (event) => {
@@ -369,10 +419,12 @@ export function setupNotifications(app, user, profile, access = {}) {
     setLoading(button, true);
     let ok = true;
     if (button.hasAttribute('data-dismiss')) {
-      // Dispensar a resposta: apaga o convite aceito ou recusado
+      // Dispensar: apaga o aviso, ou o convite aceito ou recusado
+      const notice = notices.find((item) => item.id === id);
       const inv = answered.find((item) => item.id === id);
       try {
-        if (inv) await cancelInvite(inv.groupId, inviteKey(inv));
+        if (notice) await deleteDoc(doc(db, notice.id));
+        else if (inv) await cancelInvite(inv.groupId, inviteKey(inv));
       } catch (error) {
         ok = false;
         toast(firebaseErrorMessage(error), 'error');
