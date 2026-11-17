@@ -339,9 +339,9 @@ service cloud.firestore {
         return editorOf(g);
       }
 
-      // Dados do grupo e turnos: Gestor e dono; o coordenador só enquanto o grupo é criado
+      // Dados do grupo e turnos: Gestor e dono (o coordenador, nunca)
       function settingsEditorOf(g) {
-        return isGestorOf(g) || isOwnerOf(g) || (isCoordinatorOf(g) && g.setupStep != 'done');
+        return isGestorOf(g) || isOwnerOf(g);
       }
 
       function unique(list) {
@@ -405,15 +405,14 @@ service cloud.firestore {
 
       allow read: if canView(resource.data);
 
-      // Equipe: Gestor (entra como membro) ou Coordenador de escala (membro e coordenador).
+      // Equipe: só o Gestor (entra como membro).
       // Escala individual: qualquer pessoa, só para si.
       allow create: if signedIn()
         && validGroup(incoming())
         && incoming().ownerId == me()
         && incoming().memberIds == [me()]
         && (incoming().type == 'personal'
-            || (isGestor() && incoming().coordinatorIds == [])
-            || (platformRole() == 'coordenador' && incoming().coordinatorIds == [me()]))
+            || (isGestor() && incoming().coordinatorIds == []))
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
         && isApproved();

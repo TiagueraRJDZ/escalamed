@@ -534,10 +534,9 @@ function newGroup(actor, extra = {}) {
 const createGroup = (actor, data, path = 'groups/novo') =>
   commit(actor.token, [w.set(path, data), w.set(`${path}/members/${actor.uid}`, { ...card(), joinedAt: NOW })]);
 
-test('criar grupo de equipe: Gestor e Coordenador; Médico, Administrativo e pendente não', async () => {
+test('criar grupo de equipe: só o Gestor; Coordenador, Médico, Administrativo e pendente não', async () => {
   assert.ok(await createGroup(gestor, newGroup(gestor), 'groups/n1'));
-  assert.ok(await createGroup(coord, newGroup(coord, { coordinatorIds: [coord.uid] }), 'groups/n2'));
-  // Coordenador precisa entrar como coordenador do grupo que cria
+  assert.ok(!(await createGroup(coord, newGroup(coord, { coordinatorIds: [coord.uid] }), 'groups/n2')));
   assert.ok(!(await createGroup(coord, newGroup(coord), 'groups/n3')));
   assert.ok(!(await createGroup(medico, newGroup(medico), 'groups/n4')));
   assert.ok(!(await createGroup(adm, newGroup(adm), 'groups/n5')));
@@ -558,7 +557,7 @@ test('escala individual: qualquer um cria para si; só o dono vê e edita', asyn
   assert.ok(!(await createGroup(medico, newGroup(medico, { type: 'personal', memberIds: [medico.uid, gestor.uid] }), 'groups/p2')));
 });
 
-test('dados e turnos do grupo: Gestor; coordenador só enquanto o grupo é criado', async () => {
+test('dados e turnos do grupo: Gestor; coordenador nunca, nem durante a criação', async () => {
   let n = 0;
   const rename = (actor, path = G) => commit(actor.token, [w.update(path, { name: `Novo nome ${++n}`, updatedAt: NOW })]);
   const shift = (actor, path = G) =>
@@ -569,8 +568,9 @@ test('dados e turnos do grupo: Gestor; coordenador só enquanto o grupo é criad
   assert.ok(!(await shift(coord)));
   assert.ok(!(await rename(adm)));
   await admin([w.update(G, { setupStep: 'members' })]);
-  assert.ok(await rename(coord));
-  assert.ok(await shift(coord));
+  assert.ok(!(await rename(coord)));
+  assert.ok(!(await shift(coord)));
+  await admin([w.update(G, { setupStep: 'done' })]);
 });
 
 test('excluir grupo: Gestor sim; coordenador e membro não', async () => {

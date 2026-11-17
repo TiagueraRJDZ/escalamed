@@ -65,7 +65,7 @@ profissionais (`users/{uid}.categoryId`).
 |---|---|---|
 | Dev (sem `categoryId`) | não se escolhe | Acima de todos: lê e grava qualquer documento do banco (inclusive escalas individuais e dados pessoais dos outros) e tem os poderes do administrador da plataforma. Definido por e-mail em `isDev()` no `firestore.rules`. |
 | `gestor` | sim | Vê e altera todos os grupos de equipe: dados, turnos, escala, membros, coordenadores, excluir. Aprova cargos (Configurações > Usuários). |
-| `coordenador-escala` | sim | Nos grupos em que o Gestor o marcou (`coordinatorIds`): monta e publica a escala, convida e remove membros (não remove outro coordenador). Cria grupos e vira coordenador do que criou; ajusta dados e turnos só enquanto o grupo está sendo criado. |
+| `coordenador-escala` | sim | Nos grupos em que o Gestor o marcou (`coordinatorIds`): monta e publica a escala, convida e remove membros (não remove outro coordenador). Não cria grupo nem altera os dados e turnos do grupo (isso é com o Gestor). |
 | `administrativo` | sim | Vê as escalas publicadas, o histórico e os relatórios de todos os grupos de equipe. Não altera nada e não vê rascunhos. |
 | `medico` | não | Vê os grupos em que está (só o publicado); troca, cede e pega vaga. |
 

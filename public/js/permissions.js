@@ -11,6 +11,7 @@
 //   inclusive as escalas individuais dos outros, e tem os poderes do administrador.
 //   Gestor: vê e altera todos os grupos de equipe; aprova cargos.
 //   Coordenador de escala: altera a escala e os membros dos grupos em que o Gestor o marcou.
+//   Não cria grupo nem altera os dados e turnos do grupo (isso é com o Gestor).
 //   Administrativo: vê todos os grupos de equipe, só o que está publicado, sem alterar.
 //   Médico (e quem ainda não foi aprovado): vê os grupos em que está, só o publicado.
 
@@ -47,7 +48,7 @@ export function approvalState(profile, access) {
 
 // O que o cargo libera fora dos grupos
 export const seesAllGroups = (platformRole) => ['dev', 'gestor', 'administrativo'].includes(platformRole);
-export const canCreateTeam = (platformRole) => ['dev', 'gestor', 'coordenador'].includes(platformRole);
+export const canCreateTeam = (platformRole) => ['dev', 'gestor'].includes(platformRole);
 export const canApprove = (platformRole) => platformRole === 'dev' || platformRole === 'gestor';
 export const seesReports = (platformRole) => ['dev', 'gestor', 'coordenador', 'administrativo'].includes(platformRole);
 
@@ -82,7 +83,7 @@ export function groupRole(group, uid, platformRole) {
 const MATRIX = {
   viewDraft: ['dev', 'gestor', 'coordinator', 'owner'],
   editSchedule: ['dev', 'gestor', 'coordinator', 'owner'],
-  editSettings: ['dev', 'gestor', 'owner'], // turnos, valores e dados do grupo (o coordenador só ao criar)
+  editSettings: ['dev', 'gestor', 'owner'], // turnos, valores e dados do grupo (o coordenador, nunca)
   manageMembers: ['dev', 'gestor', 'coordinator'], // convidar e remover
   setCoordinators: ['dev', 'gestor'],
   viewHistory: ['dev', 'gestor', 'coordinator', 'administrativo', 'member', 'owner'],
@@ -97,10 +98,8 @@ export function can(role, action) {
   return Boolean(role && MATRIX[action]?.includes(role));
 }
 
-// Grupo ainda no assistente de criação: o coordenador que criou também ajusta turnos e dados
-export function canEditSettings(group, role) {
-  return can(role, 'editSettings') || (role === 'coordinator' && group?.setupStep !== 'done');
-}
+// Dados do grupo e turnos (botão "Configurações do grupo"): Gestor, Dev e dono da escala individual
+export const canEditSettings = (group, role) => can(role, 'editSettings');
 
 // Trocar, ceder, pegar vaga, check-in: quem está no grupo (está na escala)
 export const canTakeShifts = (group, uid) => isMember(group, uid);

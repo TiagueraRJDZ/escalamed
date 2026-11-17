@@ -104,10 +104,10 @@ test('todo papel tem ao menos uma ação', () => {
   }
 });
 
-test('configurações: coordenador só enquanto o grupo é criado', () => {
+test('configurações do grupo: Gestor sim; coordenador nunca, nem durante a criação', () => {
   assert.ok(canEditSettings(team, 'gestor'));
   assert.ok(!canEditSettings(team, 'coordinator'));
-  assert.ok(canEditSettings({ ...team, setupStep: 'shifts' }, 'coordinator'));
+  assert.ok(!canEditSettings({ ...team, setupStep: 'shifts' }, 'coordinator'));
   assert.ok(!canEditSettings(team, 'administrativo'));
 });
 
@@ -127,7 +127,7 @@ test('sair do grupo: só membro de grupo de equipe', () => {
 });
 
 test('o que cada cargo libera fora dos grupos', () => {
-  assert.ok(canCreateTeam('gestor') && canCreateTeam('coordenador'));
+  assert.ok(canCreateTeam('gestor') && !canCreateTeam('coordenador'));
   assert.ok(!canCreateTeam('administrativo') && !canCreateTeam(null));
   assert.ok(canApprove('gestor') && !canApprove('coordenador'));
   assert.ok(seesAllGroups('gestor') && seesAllGroups('administrativo') && !seesAllGroups('coordenador'));

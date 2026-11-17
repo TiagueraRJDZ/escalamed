@@ -1,4 +1,4 @@
-// Wizard de criação de grupo (Gestor ou Coordenador de escala) ou escala individual (qualquer pessoa).
+// Wizard de criação de grupo (Gestor) ou escala individual (qualquer pessoa).
 // Etapa 1: informações. Etapa 2: turnos.
 // O grupo é gravado ao sair da etapa 1, então dá para fechar e continuar depois.
 import {
@@ -56,7 +56,6 @@ function leave(message) {
 }
 
 // Grupo já existente (continuar configuração ou editar): Gestor, dono da escala individual
-// ou o coordenador enquanto o grupo ainda está sendo criado
 if (groupId) {
   const snapshot = await getDoc(doc(db, 'groups', groupId)).catch(() => null);
   const existing = snapshot?.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
@@ -66,8 +65,8 @@ if (groupId) {
   group = existing;
   type = group.type;
 } else if (type === 'team' && !canCreateTeam(access.role)) {
-  // Grupo de equipe novo: só Gestor e Coordenador de escala (cargo aprovado)
-  await leave('Criar grupo de equipe é para Gestor e Coordenador de escala.');
+  // Grupo de equipe novo: só o Gestor (cargo aprovado)
+  await leave('Criar grupo de equipe é só para o Gestor.');
 }
 
 const isTeam = type === 'team';
@@ -208,8 +207,7 @@ async function createGroup(data) {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
     ownerId: user.uid,
     memberIds: [user.uid],
-    // Coordenador que cria o grupo já fica como coordenador dele (o Gestor vê todos)
-    coordinatorIds: type === 'team' && access.role === 'coordenador' ? [user.uid] : [],
+    coordinatorIds: [], // o Gestor marca os coordenadores depois, em Membros
     setupStep: 'shifts',
   };
 

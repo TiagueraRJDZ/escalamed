@@ -20,7 +20,7 @@ renderIcons();
 const { user, access } = await initLayout({ active: 'schedules' });
 const platformRole = access.role;
 
-// "Criar novo grupo" só para Gestor e Coordenador de escala (cargo aprovado)
+// "Criar novo grupo" só para o Gestor (cargo aprovado)
 document.getElementById('new-team').hidden = !canCreateTeam(platformRole);
 
 const listEl = document.getElementById('group-list');
