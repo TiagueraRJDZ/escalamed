@@ -394,12 +394,24 @@ shiftForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const data = {
-    title,
-    startMinute: toMinutes(shiftForm.start.value),
-    endMinute: toMinutes(shiftForm.end.value),
-    updatedAt: serverTimestamp(),
-  };
+  const startMinute = toMinutes(shiftForm.start.value);
+  const endMinute = toMinutes(shiftForm.end.value);
+
+  // Turno repetido (mesmo nome e mesmo horário de outro turno) não entra
+  const twin = shifts.find(
+    (s) =>
+      s.id !== editingShift?.id &&
+      s.startMinute === startMinute &&
+      s.endMinute === endMinute &&
+      normalize(s.title) === normalize(title),
+  );
+  if (twin) {
+    setFieldError(shiftForm.title, `Já existe o turno ${twin.title} das ${toTime(startMinute)} às ${toTime(endMinute)}.`);
+    shiftForm.title.focus();
+    return;
+  }
+
+  const data = { title, startMinute, endMinute, updatedAt: serverTimestamp() };
 
   // O Firestore mostra a mudança na lista na hora; não esperamos o servidor
   // confirmar para fechar (assim funciona até com internet lenta).
