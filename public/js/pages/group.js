@@ -5,6 +5,7 @@ import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout, avatarHtml } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
 import { professionLabel, councilLabel } from '/data/categories.js';
+import { groupSubtitle } from '../my-groups.js';
 import { groupColor } from '/data/colors.js';
 import { normalize, isValidEmail } from '../validators.js';
 import {
@@ -86,7 +87,7 @@ function renderHeader() {
   $('group-avatar').style.background = groupColor(group.color);
   $('group-avatar').textContent = initials(group.name);
   $('group-name').textContent = group.name;
-  const unit = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
+  const unit = groupSubtitle(group);
   $('group-unit').innerHTML = `${escapeHtml(unit)}${
     group.type === 'team' ? ` <span class="badge badge-primary">${GROUP_ROLES[myRole]}</span>` : ''
   }`;
@@ -800,7 +801,7 @@ async function openShiftDetail(uid, shiftId) {
   const person = byId.get(uid) ?? { id: uid, name: 'Ex-membro' };
   const others = (source[cellKey(day, shiftId)] ?? []).filter((id) => id !== uid).map((id) => byId.get(id) ?? { id, name: 'Ex-membro' });
   const work = [professionLabel(person), councilLabel(person.council)].filter(Boolean);
-  const unit = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
+  const unit = groupSubtitle(group);
 
   $('shift-detail').innerHTML = `
     <div class="detail-group">

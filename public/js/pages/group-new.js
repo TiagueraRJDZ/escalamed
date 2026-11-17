@@ -5,25 +5,20 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   addDoc,
   setDoc,
   updateDoc,
   deleteDoc,
   writeBatch,
   onSnapshot,
-  query,
-  where,
-  limit,
   serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { db, navigate, isLeaving } from '../firebase.js';
 import { initLayout } from '../layout.js';
 import { icon, renderIcons } from '../icons.js';
-import { PROFESSIONAL_CATEGORIES } from '/data/categories.js';
+import { PROFESSIONAL_CATEGORIES, categoryName } from '/data/categories.js';
 import { GROUP_COLORS, DEFAULT_GROUP_COLOR, groupColor } from '/data/colors.js';
-import { STATES } from '/data/states.js';
-import { normalize, searchKeywords } from '../validators.js';
+import { normalize } from '../validators.js';
 import { memberCard } from '../members.js';
 import { groupRole, canEditSettings, canCreateTeam } from '../permissions.js';
 import { toMinutes, toTime, durationMinutes, endsNextDay, formatDuration, SHIFT_PRESETS } from '../shifts.js';
@@ -48,7 +43,6 @@ const params = new URLSearchParams(location.search);
 let groupId = params.get('id');
 let group = null;
 let type = params.get('type') === 'personal' ? 'personal' : 'team';
-let selectedUnit = null;
 let shifts = [];
 let shiftsLoaded = false;
 let stopShifts = null;
@@ -71,7 +65,6 @@ if (groupId) {
   }
   group = existing;
   type = group.type;
-  selectedUnit = group.unit;
 } else if (type === 'team' && !canCreateTeam(access.role)) {
   // Grupo de equipe novo: só Gestor e Coordenador de escala (cargo aprovado)
   await leave('Criar grupo de equipe é para Gestor e Coordenador de escala.');
@@ -100,7 +93,6 @@ $('group-name-label').textContent = texts.nameLabel;
 $('group-name').placeholder = texts.namePlaceholder;
 document.title = `${texts.title} | EscalaMed`;
 if (!isTeam) {
-  $('unit-label').textContent = 'Unidade de saúde (opcional)';
   $('category-label').textContent = 'Categoria profissional (opcional)';
 }
 
@@ -142,10 +134,6 @@ $('group-category').insertAdjacentHTML(
   'beforeend',
   GROUP_CATEGORIES.map((c) => `<option value="${c.id}">${c.name}</option>`).join(''),
 );
-$('unit-state').insertAdjacentHTML(
-  'beforeend',
-  STATES.map((s) => `<option value="${s.uf}">${s.uf} · ${s.name}</option>`).join(''),
-);
 
 $('swatches').innerHTML = GROUP_COLORS.map(
   (c) => `<label class="swatch" title="${c.name}">
@@ -166,223 +154,13 @@ function currentColor() {
 
 function renderPreview() {
   const name = infoForm.name.value.trim();
-  const subtitle = !isTeam
-    ? 'Escala individual'
-    : selectedUnit
-      ? `${selectedUnit.name} · ${selectedUnit.city}/${selectedUnit.state}`
-      : 'Unidade de saúde';
+  const subtitle = isTeam ? categoryName(infoForm.categoryId.value) || 'Categoria profissional' : 'Escala individual';
   $('group-preview').innerHTML = `
     <span class="group-avatar" style="background:${currentColor()}" aria-hidden="true">${escapeHtml(initials(name || '?'))}</span>
     <div><strong>${escapeHtml(name || texts.nameLabel)}</strong><small>${escapeHtml(subtitle)}</small></div>`;
 }
 
 infoForm.addEventListener('input', renderPreview);
-
-// ---------- Busca de unidade de saúde ----------
-const unitInput = $('unit-search');
-const unitList = $('unit-options');
-let unitResults = [];
-let activeOption = -1;
-let searchTimer = null;
-let searchSeq = 0;
-
-function setListOpen(open) {
-  unitList.hidden = !open;
-  unitInput.setAttribute('aria-expanded', String(open));
-  if (!open) {
-    activeOption = -1;
-    unitInput.removeAttribute('aria-activedescendant');
-  }
-}
-
-function renderUnitOptions(status) {
-  const typed = unitInput.value.trim();
-  const options = unitResults.map(
-    (u, i) => `<li class="combobox-option" role="option" id="unit-opt-${i}" data-index="${i}" aria-selected="${i === activeOption}">
-        <span>${escapeHtml(u.name)}</span><small>${escapeHtml(u.city)}/${escapeHtml(u.state)}</small>
-      </li>`,
-  );
-  const createIndex = unitResults.length;
-  options.push(
-    `<li class="combobox-option is-create" role="option" id="unit-opt-${createIndex}" data-create aria-selected="${activeOption === createIndex}">
-      ${icon('plus')}<span>Cadastrar ${typed ? `"${escapeHtml(typed)}"` : 'nova unidade'}</span>
-    </li>`,
-  );
-  unitList.innerHTML = (status ? `<li class="combobox-status" role="presentation">${status}</li>` : '') + options.join('');
-  setListOpen(true);
-  if (activeOption >= 0) unitInput.setAttribute('aria-activedescendant', `unit-opt-${activeOption}`);
-}
-
-async function searchUnits(text) {
-  const term = normalize(text);
-  const words = term.split(' ').filter(Boolean);
-  const units = collection(db, 'healthUnits');
-  const queries = [
-    query(units, where('nameLower', '>=', term), where('nameLower', '<=', `${term}`), limit(8)),
-    query(units, where('cityLower', '>=', term), where('cityLower', '<=', `${term}`), limit(8)),
-  ];
-  // Palavra inteira em qualquer posição do nome (ex.: "lucas" acha "Hospital São Lucas")
-  const longest = [...words].sort((a, b) => b.length - a.length)[0];
-  if (longest?.length >= 3) queries.push(query(units, where('keywords', 'array-contains', longest), limit(10)));
-
-  const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
-  const found = new Map();
-  snapshots.forEach((s) => s.docs.forEach((d) => found.set(d.id, { id: d.id, ...d.data() })));
-
-  // Cada palavra digitada precisa começar alguma palavra do nome ou da cidade
-  return [...found.values()]
-    .filter((u) => {
-      const tokens = normalize(`${u.name} ${u.city}`).split(/[^a-z0-9]+/);
-      return words.every((w) => tokens.some((t) => t.startsWith(w)));
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    .slice(0, 8);
-}
-
-unitInput.addEventListener('input', () => {
-  clearTimeout(searchTimer);
-  const text = unitInput.value.trim();
-  if (normalize(text).length < 2) {
-    setListOpen(false);
-    return;
-  }
-  unitResults = [];
-  activeOption = -1;
-  renderUnitOptions('Buscando…');
-  const seq = ++searchSeq;
-  searchTimer = setTimeout(async () => {
-    try {
-      const results = await searchUnits(text);
-      if (seq !== searchSeq) return; // chegou uma busca mais nova
-      unitResults = results;
-      renderUnitOptions(results.length ? '' : 'Nenhuma unidade encontrada.');
-    } catch (error) {
-      if (seq === searchSeq) renderUnitOptions(firebaseErrorMessage(error));
-    }
-  }, 300);
-});
-
-unitInput.addEventListener('keydown', (event) => {
-  if (unitList.hidden) return;
-  const total = unitResults.length + 1;
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    activeOption = (activeOption + (event.key === 'ArrowDown' ? 1 : -1) + total) % total;
-    renderUnitOptions();
-    $(`unit-opt-${activeOption}`)?.scrollIntoView({ block: 'nearest' });
-  } else if (event.key === 'Enter' && activeOption >= 0) {
-    event.preventDefault();
-    chooseOption(activeOption);
-  } else if (event.key === 'Escape') {
-    setListOpen(false);
-  }
-});
-
-unitInput.addEventListener('blur', () => setTimeout(() => setListOpen(false), 150));
-
-// mousedown em vez de click: escolhe antes de o campo perder o foco
-unitList.addEventListener('mousedown', (event) => {
-  const option = event.target.closest('.combobox-option');
-  if (!option) return;
-  event.preventDefault();
-  chooseOption(option.hasAttribute('data-create') ? unitResults.length : Number(option.dataset.index));
-});
-
-function chooseOption(index) {
-  if (index === unitResults.length) {
-    openUnitModal(unitInput.value.trim());
-  } else {
-    selectUnit(unitResults[index]);
-  }
-  setListOpen(false);
-}
-
-function selectUnit(unit) {
-  selectedUnit = unit ? { id: unit.id, name: unit.name, city: unit.city, state: unit.state } : null;
-  const box = $('selected-unit');
-  $('unit-combobox').hidden = Boolean(selectedUnit);
-  box.hidden = !selectedUnit;
-  if (selectedUnit) {
-    box.innerHTML = `${icon('mapPin')}
-      <div><strong>${escapeHtml(selectedUnit.name)}</strong><small>${escapeHtml(selectedUnit.city)}/${escapeHtml(selectedUnit.state)}</small></div>
-      <button type="button" class="btn-icon" id="clear-unit" aria-label="Trocar unidade" title="Trocar unidade">${icon('x')}</button>`;
-    setFieldError(unitInput, '');
-  } else {
-    unitInput.value = '';
-  }
-  renderPreview();
-}
-
-$('selected-unit').addEventListener('click', (event) => {
-  if (!event.target.closest('#clear-unit')) return;
-  selectUnit(null);
-  unitInput.focus();
-});
-
-// ---------- Cadastrar unidade nova ----------
-const unitForm = $('unit-form');
-
-function openUnitModal(name) {
-  unitForm.reset();
-  clearFormErrors(unitForm);
-  unitForm.name.value = name;
-  $('modal-unit').showModal();
-  (name ? unitForm.city : unitForm.name).focus();
-}
-
-unitForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  clearFormErrors(unitForm);
-  const name = unitForm.name.value.trim().replace(/\s+/g, ' ');
-  const city = unitForm.city.value.trim().replace(/\s+/g, ' ');
-  const state = unitForm.state.value;
-
-  const errors = [];
-  if (name.length < 3) errors.push([unitForm.name, 'Informe o nome da unidade (mínimo 3 letras).']);
-  if (city.length < 2) errors.push([unitForm.city, 'Informe a cidade.']);
-  if (!state) errors.push([unitForm.state, 'Selecione a UF.']);
-  if (errors.length) {
-    errors.forEach(([input, message]) => setFieldError(input, message));
-    errors[0][0].focus();
-    return;
-  }
-
-  const button = unitForm.querySelector('[type=submit]');
-  setLoading(button, true);
-  try {
-    // Já existe uma unidade igual? Usa a existente
-    const existing = await getDocs(
-      query(
-        collection(db, 'healthUnits'),
-        where('nameLower', '==', normalize(name)),
-        where('cityLower', '==', normalize(city)),
-        limit(1),
-      ),
-    );
-    if (!existing.empty) {
-      const d = existing.docs[0];
-      selectUnit({ id: d.id, ...d.data() });
-      toast('Essa unidade já estava cadastrada e foi selecionada.');
-    } else {
-      const unit = { name, city, state };
-      const ref = await addDoc(collection(db, 'healthUnits'), {
-        ...unit,
-        nameLower: normalize(name),
-        cityLower: normalize(city),
-        keywords: searchKeywords(name, city),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      selectUnit({ id: ref.id, ...unit });
-      toast('Unidade cadastrada.', 'success');
-    }
-    $('modal-unit').close();
-  } catch (error) {
-    showFormAlert(unitForm, firebaseErrorMessage(error));
-  } finally {
-    setLoading(button, false);
-  }
-});
 
 // ---------- Próximo (grava o grupo) ----------
 infoForm.addEventListener('submit', async (event) => {
@@ -393,7 +171,6 @@ infoForm.addEventListener('submit', async (event) => {
 
   const errors = [];
   if (name.length < 3) errors.push([infoForm.name, 'Informe um nome com pelo menos 3 letras.']);
-  if (isTeam && !selectedUnit) errors.push([unitInput, 'Escolha a unidade de saúde do grupo.']);
   if (isTeam && !categoryId) errors.push([infoForm.categoryId, 'Escolha a categoria profissional do grupo.']);
   if (errors.length) {
     errors.forEach(([input, message]) => setFieldError(input, message));
@@ -401,7 +178,8 @@ infoForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const data = { name, color: currentColor(), unit: selectedUnit, categoryId };
+  // A unidade de saúde saiu do formulário: grupo novo fica sem unidade; ao editar, mantém a que já tinha
+  const data = { name, color: currentColor(), categoryId };
   const button = infoForm.querySelector('[type=submit]');
   setLoading(button, true);
   try {
@@ -425,6 +203,7 @@ async function createGroup(data) {
 
   const newGroup = {
     ...data,
+    unit: null,
     type,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
     ownerId: user.uid,
@@ -655,7 +434,6 @@ $('finish').addEventListener('click', async (event) => {
 });
 
 // ---------- Início ----------
-[infoForm, unitForm, shiftForm].forEach(clearErrorsWhileTyping);
-if (selectedUnit) selectUnit(selectedUnit);
+[infoForm, shiftForm].forEach(clearErrorsWhileTyping);
 renderPreview();
 goTo(groupId && params.get('step') !== 'info' ? 'shifts' : 'info', { focus: false });

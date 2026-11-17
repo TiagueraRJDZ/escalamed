@@ -8,7 +8,7 @@ import { escapeHtml, initials, setupMenu, toast, setLoading, firebaseErrorMessag
 import { normalize } from '../validators.js';
 import { groupColor } from '/data/colors.js';
 import { isMember, canCreateTeam, canEditSettings } from '../permissions.js';
-import { groupQueries, mergeGroups, seesDrafts } from '../my-groups.js';
+import { groupQueries, mergeGroups, seesDrafts, groupSubtitle } from '../my-groups.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays, dayShifts } from '../schedule-math.js';
 import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
@@ -221,12 +221,6 @@ function skeleton() {
       <div><span class="skeleton" style="height:14px;width:55%"></span><span class="skeleton" style="height:12px;width:35%"></span></div>
     </li>`;
   return row.repeat(4);
-}
-
-function groupSubtitle(group) {
-  if (group.type === 'personal') return 'Escala individual';
-  if (!group.unit) return 'Sem unidade definida';
-  return `${group.unit.name} · ${group.unit.city}/${group.unit.state}`;
 }
 
 function groupItem(group) {

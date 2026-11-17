@@ -35,6 +35,7 @@ import {
   writeReplica,
 } from '../schedule-data.js';
 import { normalize } from '../validators.js';
+import { groupSubtitle } from '../my-groups.js';
 import { shiftFields } from '../movements.js';
 import { escapeHtml, initials, toast, setLoading, confirmDialog, firebaseErrorMessage } from '../ui.js';
 
@@ -458,7 +459,7 @@ onSnapshot(
       return;
     }
     $('schedule-group').textContent = group.name;
-    $('schedule-unit').textContent = group.unit ? `${group.unit.name} · ${group.unit.city}/${group.unit.state}` : 'Escala individual';
+    $('schedule-unit').textContent = groupSubtitle(group);
     render();
   },
   (error) => {

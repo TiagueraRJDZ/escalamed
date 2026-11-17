@@ -4,6 +4,7 @@ import { collection, getDocs, query, where } from 'https://www.gstatic.com/fireb
 import { db } from './firebase.js';
 import { groupRole, seesAllGroups, can } from './permissions.js';
 import { listenWithRetry } from './live.js';
+import { categoryName } from '/data/categories.js';
 
 // Consultas que as regras deixam fazer: grupos em que está, grupos que coordena e,
 // para Gestor e Administrativo, todos os grupos de equipe. Dev: todos, inclusive as escalas
@@ -54,6 +55,14 @@ export const watchMembers = (groupId, onChange) =>
 
 // Vê escalas em rascunho (e o histórico delas): Gestor, coordenador do grupo e dono
 export const seesDrafts = (group) => can(group.role, 'viewDraft');
+
+// Linha embaixo do nome do grupo: "Hospital X · Fortaleza/CE" nos grupos antigos com unidade;
+// nos novos (o formulário não pede mais a unidade), a categoria profissional
+export function groupSubtitle(group) {
+  if (group.type === 'personal') return 'Escala individual';
+  if (group.unit) return `${group.unit.name} · ${group.unit.city}/${group.unit.state}`;
+  return categoryName(group.categoryId) || 'Grupo de equipe';
+}
 
 // "Antonio Prudente · Fortaleza/CE"
 export function groupLabel(group) {

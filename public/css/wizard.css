@@ -97,7 +97,7 @@
   .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ---------- Busca de unidade (combobox) ---------- */
+/* ---------- Combobox ---------- */
 .combobox { position: relative; }
 
 .combobox-list {
@@ -136,22 +136,6 @@
 }
 .combobox-option.is-create svg { width: 18px; height: 18px; }
 .combobox-status { padding: var(--esp-2) var(--esp-3); font-size: var(--texto-sm); color: var(--cor-texto-3); }
-
-/* Unidade escolhida */
-.selected-unit {
-  display: flex;
-  align-items: center;
-  gap: var(--esp-3);
-  min-height: 44px;
-  padding: var(--esp-2) var(--esp-2) var(--esp-2) var(--esp-3);
-  border: 1px solid var(--cor-primaria-borda);
-  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
-  background: var(--cor-primaria-suave);
-}
-.selected-unit > svg { width: 18px; height: 18px; color: var(--cor-primaria); flex-shrink: 0; }
-.selected-unit div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.selected-unit small { color: var(--cor-texto-3); }
-.selected-unit .btn-icon { width: 34px; height: 34px; }
 
 /* ---------- Cores ---------- */
 .color-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
