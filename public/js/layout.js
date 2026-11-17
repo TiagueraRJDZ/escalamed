@@ -192,11 +192,21 @@ const searchHtml = () => `
 function shellHtml(user, profile, active, collapsed, search) {
   return `
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
-      <a class="sidebar-brand" href="/schedules.html">
-        <img class="sidebar-brand-full" src="/assets/img/escalamed-hapvida-lado-a-lado.png" alt="EscalaMed - Hapvida" />
-        <img class="sidebar-brand-icon" src="/img/escalamed-grade.svg" alt="EscalaMed" width="32" height="32" />
-        <span class="sidebar-brand-divider" aria-hidden="true"></span>
-        <img class="sidebar-brand-hapvida" src="/img/hapvida-flor.svg" alt="Hapvida" width="26" height="26" />
+      <a class="sidebar-brand" href="/schedules.html" aria-label="EscalaMed">
+        <span class="brand sidebar-brand-full" aria-hidden="true">
+          <svg class="brand-icon" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <rect x="7" y="7" width="12" height="12" rx="3.5" fill="#FFFFFF"/>
+            <rect x="21" y="7" width="12" height="12" rx="3.5" fill="#FFFFFF" fill-opacity=".35"/>
+            <rect x="7" y="21" width="12" height="12" rx="3.5" fill="#FFFFFF" fill-opacity=".35"/>
+            <rect x="21" y="21" width="12" height="12" rx="3.5" fill="#2FD3B5"/>
+            <path d="M27 24.5v5M24.5 27h5" stroke="#0B4F45" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-name"><span class="brand-escala">Escala</span><span class="brand-med">Med</span></span>
+            <span class="brand-tagline">PLANTÕES · EQUIPES</span>
+          </span>
+        </span>
+        <img class="sidebar-brand-icon" src="/img/escalamed-grade.svg" alt="" width="32" height="32" />
       </a>
       <nav aria-label="Navegação principal">
         <ul class="nav">${NAV.map((item) => navItem(item, active, menuOptions(cachedAccess(user.uid)))).join('')}</ul>

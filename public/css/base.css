@@ -469,12 +469,12 @@ a:hover {
 }
 
 /* ---------- Carregando com o ícone do EscalaMed ----------
-   "Cube Grid" adaptado ao ícone: grade 2x2 com as cores do logo, num painel azul da marca.
-   Cada quadrado encolhe e volta (1 → 0 → 1) em onda diagonal: começa no de baixo à
-   esquerda (0s), passa pela diagonal do meio (cima à esquerda e o verde com "+", 0.2s) e
-   termina no de cima à direita (0.4s). Proporções do logo: quadrado 12, espaço 2 e margem 7
-   (numa caixa de 40). Usado no login (.app-loader, loader.js) e no carregar das páginas
-   internas (.boot-spinner): o mesmo desenho do clique em Entrar até a página abrir. */
+   O mesmo ícone animado do topo do login (.brand-icon--animado, auth.css), num painel azul da
+   marca e em loop: os 4 blocos balançam e trocam de lugar 4 vezes (sentido horário) até voltar
+   à posição inicial, e recomeçam. A cruz anda junto com o bloco verde. O viewBox recorta só a
+   grade do ícone (de 7 a 33 na caixa de 40). Usado no login (.app-loader, loader.js) e no
+   carregar das páginas internas (.boot-spinner): o mesmo desenho do clique em Entrar até a
+   página abrir. */
 /* view-transition-name: na troca de página (login → app) o painel fica parado no lugar */
 .cube-loader {
   view-transition-name: carregando;
@@ -484,31 +484,20 @@ a:hover {
   box-shadow: 0 12px 32px rgb(10 22 70 / 0.28);
 }
 
-.cube-loader-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 5px;
+/* overflow visível: no balanço os blocos passam um pouco da borda do viewBox */
+.cube-loader-icon {
+  display: block;
   width: 64px;
   height: 64px;
+  overflow: visible;
 }
 
-.cube-loader-cube {
-  display: grid;
-  place-items: center;
-  border-radius: 29%;
-  background: #ffffff;
-  animation: cube-loader 1.3s infinite ease-in-out;
-}
-.cube-loader-cube:nth-child(1) { animation-delay: 0.2s; }                                        /* cima, esquerda */
-.cube-loader-cube:nth-child(2) { animation-delay: 0.4s; background: rgb(255 255 255 / 0.35); } /* cima, direita */
-.cube-loader-cube:nth-child(3) { animation-delay: 0s; background: rgb(255 255 255 / 0.35); }   /* baixo, esquerda */
-.cube-loader-cube:nth-child(4) { animation-delay: 0.2s; background: #2fd3b5; }                 /* baixo, direita: verde com "+" */
-.cube-loader-cube svg { width: 100%; height: 100%; }
-.cube-loader-cube path { fill: none; stroke: #0b4f45; stroke-width: 1.6; stroke-linecap: round; }
-
-@keyframes cube-loader {
-  0%, 70%, 100% { transform: scale(1); }
-  35% { transform: scale(0); }
+@media (prefers-reduced-motion: no-preference) {
+  .cube-loader-icon rect:nth-of-type(1) { animation: grade-tl 2.4s ease-in-out infinite; }
+  .cube-loader-icon rect:nth-of-type(2) { animation: grade-tr 2.4s ease-in-out infinite; }
+  .cube-loader-icon rect:nth-of-type(3) { animation: grade-bl 2.4s ease-in-out infinite; }
+  .cube-loader-icon rect:nth-of-type(4) { animation: grade-br 2.4s ease-in-out infinite; }
+  .cube-loader-icon path { animation: grade-br 2.4s ease-in-out infinite; }
 }
 
 /* Véu sobre a tela de login durante o envio (loader.js) */
@@ -528,14 +517,109 @@ a:hover {
   from { opacity: 0; }
 }
 
-/* Movimento reduzido: sem encolher; os quadrados só piscam devagar, na mesma ordem */
+/* Movimento reduzido: os blocos ficam parados e o ícone só pisca devagar */
 @media (prefers-reduced-motion: reduce) {
   .app-loader { animation: none; }
-  .cube-loader-cube { animation-name: cube-loader-fade; animation-duration: 2.6s; }
+  .cube-loader-icon { animation: cube-loader-fade 2.6s ease-in-out infinite; }
 }
 @keyframes cube-loader-fade {
-  0%, 70%, 100% { opacity: 1; }
-  35% { opacity: 0.4; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Blocos do ícone trocando de lugar (passos de 14 = bloco 12 + espaço 2, em unidades do SVG).
+   Usados no topo do login (.brand-icon--animado, uma volta) e no carregando (em loop). */
+@keyframes grade-tl {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(14px, 0px); }
+  25%, 34% { transform: translate(14px, 0px); }
+  36% { transform: translate(12.5px, 0px); }
+  38% { transform: translate(15.5px, 0px); }
+  40% { transform: translate(14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(14px, 14px); }
+  50%, 59% { transform: translate(14px, 14px); }
+  61% { transform: translate(12.5px, 14px); }
+  63% { transform: translate(15.5px, 14px); }
+  65% { transform: translate(14px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(0px, 14px); }
+  75%, 84% { transform: translate(0px, 14px); }
+  86% { transform: translate(-1.5px, 14px); }
+  88% { transform: translate(1.5px, 14px); }
+  90% { transform: translate(0px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-tr {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(0px, 14px); }
+  25%, 34% { transform: translate(0px, 14px); }
+  36% { transform: translate(-1.5px, 14px); }
+  38% { transform: translate(1.5px, 14px); }
+  40% { transform: translate(0px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(-14px, 14px); }
+  50%, 59% { transform: translate(-14px, 14px); }
+  61% { transform: translate(-15.5px, 14px); }
+  63% { transform: translate(-12.5px, 14px); }
+  65% { transform: translate(-14px, 14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(-14px, 0px); }
+  75%, 84% { transform: translate(-14px, 0px); }
+  86% { transform: translate(-15.5px, 0px); }
+  88% { transform: translate(-12.5px, 0px); }
+  90% { transform: translate(-14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-bl {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(0px, -14px); }
+  25%, 34% { transform: translate(0px, -14px); }
+  36% { transform: translate(-1.5px, -14px); }
+  38% { transform: translate(1.5px, -14px); }
+  40% { transform: translate(0px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(14px, -14px); }
+  50%, 59% { transform: translate(14px, -14px); }
+  61% { transform: translate(12.5px, -14px); }
+  63% { transform: translate(15.5px, -14px); }
+  65% { transform: translate(14px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(14px, 0px); }
+  75%, 84% { transform: translate(14px, 0px); }
+  86% { transform: translate(12.5px, 0px); }
+  88% { transform: translate(15.5px, 0px); }
+  90% { transform: translate(14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
+}
+@keyframes grade-br {
+  0%, 9% { transform: translate(0px, 0px); }
+  11% { transform: translate(-1.5px, 0px); }
+  13% { transform: translate(1.5px, 0px); }
+  15% { transform: translate(0px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  23% { transform: translate(-14px, 0px); }
+  25%, 34% { transform: translate(-14px, 0px); }
+  36% { transform: translate(-15.5px, 0px); }
+  38% { transform: translate(-12.5px, 0px); }
+  40% { transform: translate(-14px, 0px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  48% { transform: translate(-14px, -14px); }
+  50%, 59% { transform: translate(-14px, -14px); }
+  61% { transform: translate(-15.5px, -14px); }
+  63% { transform: translate(-12.5px, -14px); }
+  65% { transform: translate(-14px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  73% { transform: translate(0px, -14px); }
+  75%, 84% { transform: translate(0px, -14px); }
+  86% { transform: translate(-1.5px, -14px); }
+  88% { transform: translate(1.5px, -14px); }
+  90% { transform: translate(0px, -14px); animation-timing-function: cubic-bezier(0.5, -0.35, 0.3, 1.35); }
+  98% { transform: translate(0px, 0px); }
+  100% { transform: translate(0px, 0px); }
 }
 
 @keyframes brilho {
@@ -683,7 +767,7 @@ a:hover {
 /* ---------- Marca EscalaMed ----------
    Ícone de 4 blocos + "Escala" (700) "Med" (400) + "PLANTÕES · EQUIPES".
    Marcação direto no HTML das telas de entrada (index, signup, new-password, termos)
-   e no cabeçalho da impressão do Relatório. O menu lateral usa uma imagem (layout.css).
+   e no cabeçalho da impressão do Relatório; no menu lateral é montada pelo layout.js.
    .brand--light: versão para fundo claro (login, cadastro, impressão). */
 .brand {
   display: flex;
