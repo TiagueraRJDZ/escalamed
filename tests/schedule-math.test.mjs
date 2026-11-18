@@ -17,6 +17,8 @@ import {
   replicate,
   requestId,
   requestBlock,
+  cessionBlock,
+  receiverBlock,
 } from '../public/js/schedule-math.js';
 
 // Turnos do grupo de referência
@@ -147,4 +149,24 @@ test('pedido de plantão vago: id e quando dá para pedir', () => {
   assert.equal(block('u4', '07_n'), null);
   // N do dia 7 (19h-01h) bate com o MAD do dia 8 (00h-06h)
   assert.equal(block('u3', '07_n'), 'conflict');
+});
+
+test('cessão direcionada: quem pode ceder e quem pode receber', () => {
+  const now = new Date(2026, 10, 7, 6, 0); // 07/11/2026, 06h00
+  const schedule = {
+    status: 'published',
+    assignments: { '07_m': ['u1', 'u2'], '06_m': ['u1'], '07_t': ['u3'], '08_mad': ['u4'], '07_n': ['u1'] },
+    vacancies: {},
+  };
+  const cede = (uid, key, extra = {}) => cessionBlock({ ...schedule, ...extra }, SHIFTS, uid, '2026-11', key, now);
+  assert.equal(cede('u1', '07_m'), null);
+  assert.equal(cede('u1', '07_m', { status: 'draft' }), 'closed');
+  assert.equal(cede('u1', '07_x'), 'closed');
+  assert.equal(cede('u3', '07_m'), 'not-mine');
+  assert.equal(cede('u1', '06_m'), 'past');
+  const receive = (uid, key) => receiverBlock(schedule, SHIFTS, uid, key);
+  assert.equal(receive('u5', '07_m'), null);
+  assert.equal(receive('u2', '07_m'), 'assigned');
+  assert.equal(receive('u3', '07_m'), null); // T (13h-19h) não bate com M (07h-13h)
+  assert.equal(receive('u4', '07_n'), 'conflict'); // MAD do dia 8 bate com o N do dia 7
 });

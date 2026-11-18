@@ -112,7 +112,10 @@ function sentence(m, members) {
     case 'swap':
       return `${actor} trocou o plantão de ${shiftText(m)} com ${target}${m.counterShiftDate ? ` (${shiftText(m, 'counterShift')})` : ''}`;
     case 'cession':
-      return `${actor} cedeu o plantão de ${shiftText(m)} para ${target}`;
+      // Cessão aprovada pela coordenação: quem cedeu é o fromUid
+      return m.fromUid
+        ? `${nameOf(members, m.fromUid)} cedeu o plantão de ${shiftText(m)} para ${target} (aprovado por ${actor})`
+        : `${actor} cedeu o plantão de ${shiftText(m)} para ${target}`;
     case 'vacant_open':
       return `${actor} abriu ${m.count === 1 ? '1 vaga' : `${m.count ?? ''} vagas`} no plantão de ${shiftText(m)}`;
     case 'vacant_closed':
@@ -201,6 +204,8 @@ function groupSentence(items, members) {
   const target = m.targetUid ? nameOf(members, m.targetUid) : '';
   const self = m.targetUid === m.actorUid;
   const n = `${count} plantões`;
+  // Cessões aprovadas pela coordenação: a lista aberta mostra quem cedeu para quem
+  if (m.type === 'cession' && m.fromUid) return `${actor} aprovou ${count} cessões de plantão`;
   if (m.targetUid && !self && !sameTarget(items)) {
     // Várias pessoas: a lista aberta mostra quem
     if (m.type === 'assigned') return `${actor} fez ${count} escalações`;
@@ -259,7 +264,7 @@ function renderRow(row, groupById) {
         many
           ? `<ul class="history-details" id="${detailsId}"${open ? '' : ' hidden'}>${row.items
               .map(
-                (i) => `<li><span>${withNames ? `${nameOf(members, i.targetUid)} · ` : ''}${shiftText(i)}${i.type === 'vacant_open' && i.count > 1 ? ` · ${i.count} vagas` : ''}</span><time datetime="${whenOf(i).toISOString()}">${timeOf(i)}</time></li>`,
+                (i) => `<li><span>${i.fromUid ? `${nameOf(members, i.fromUid)} → ${nameOf(members, i.targetUid)} · ` : withNames ? `${nameOf(members, i.targetUid)} · ` : ''}${shiftText(i)}${i.type === 'vacant_open' && i.count > 1 ? ` · ${i.count} vagas` : ''}</span><time datetime="${whenOf(i).toISOString()}">${timeOf(i)}</time></li>`,
               )
               .join('')}</ul>`
           : ''

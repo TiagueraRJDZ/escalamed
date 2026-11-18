@@ -630,7 +630,7 @@ service cloud.firestore {
         }
 
         function validMovement(d) {
-          return d.keys().hasOnly(['type', 'groupId', 'actorUid', 'targetUid', 'memberUids', 'public',
+          return d.keys().hasOnly(['type', 'groupId', 'actorUid', 'targetUid', 'fromUid', 'memberUids', 'public',
                                    'shiftId', 'shiftTitle', 'shiftDate', 'shiftStart', 'shiftEnd',
                                    'counterShiftId', 'counterShiftDate', 'counterShiftStart', 'counterShiftEnd',
                                    'count', 'scheduleMonth', 'fromMonth', 'monthKey', 'createdAt'])
@@ -638,7 +638,9 @@ service cloud.firestore {
             && d.groupId == groupId
             && d.actorUid == me()
             && optStr(d.get('targetUid', null), 128)
-            && d.memberUids is list && d.memberUids.size() >= 1 && d.memberUids.size() <= 2
+            // fromUid: quem cedeu, numa cessão aprovada pela coordenação (actor = quem aprovou)
+            && optStr(d.get('fromUid', null), 128)
+            && d.memberUids is list && d.memberUids.size() >= 1 && d.memberUids.size() <= 3
             && me() in d.memberUids
             && d.public is bool
             && optStr(d.get('shiftId', null), 128)
@@ -758,11 +760,90 @@ service cloud.firestore {
 
         allow delete: if signedIn() && (resource.data.uid == me() || editorOf(groupData()));
       }
+
+      // ----- Cessão direcionada (id = "<mês>_<célula>_<uid de quem cede>": uma por plantão) -----
+      // Quem está num plantão de escala publicada escolhe um colega do grupo (toUid) para ficar
+      // com ele; a coordenação (Gestor, coordenador do grupo) aprova ou recusa. Aprovar é no
+      // mesmo lote em que o plantão passa de uma pessoa para a outra. O colega é avisado e lê o
+      // pedido. Quem cede cancela (apaga); os dois dispensam a notificação (dismissedBy).
+      match /cessionRequests/{requestId} {
+        function schedulePath(m) {
+          return /databases/$(database)/documents/groups/$(groupId)/schedules/$(m);
+        }
+
+        function validCession(d) {
+          return d.keys().hasOnly(['uid', 'name', 'toUid', 'toName', 'groupName', 'month', 'cell', 'shiftId',
+                                   'shiftTitle', 'shiftDate', 'shiftStart', 'shiftEnd', 'status', 'createdAt'])
+            && d.uid == me()
+            && str(d.name, 1, 80)
+            && str(d.toUid, 1, 128) && d.toUid != me()
+            && str(d.toName, 1, 80)
+            && str(d.groupName, 1, 60)
+            && d.month is string && d.month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+            && str(d.shiftId, 1, 128) && d.shiftId.matches('^[A-Za-z0-9]+$')
+            && d.shiftDate is string && d.shiftDate.matches('^' + d.month + '-(0[1-9]|[12][0-9]|3[01])$')
+            && d.cell == d.shiftDate.split('-')[2] + '_' + d.shiftId
+            && requestId == d.month + '_' + d.cell + '_' + me()
+            && str(d.shiftTitle, 1, 40)
+            && d.shiftStart is string && d.shiftStart.matches('^[0-2][0-9]:[0-5][0-9]$')
+            && d.shiftEnd is string && d.shiftEnd.matches('^[0-2][0-9]:[0-5][0-9]$')
+            && d.status == 'pending'
+            && d.createdAt == request.time;
+        }
+
+        // Escala publicada, quem cede está no plantão, o colega é do grupo e ainda não está nele
+        function cedable(d) {
+          let s = get(schedulePath(d.month)).data;
+          return s.status == 'published'
+            && me() in s.assignments.get(d.cell, [])
+            && !(d.toUid in s.assignments.get(d.cell, []))
+            && d.toUid in groupData().memberIds;
+        }
+
+        function canCede() {
+          return groupData().type == 'team' && isMemberOf(groupData())
+            && validCession(incoming()) && exists(schedulePath(incoming().month)) && cedable(incoming());
+        }
+
+        allow read: if signedIn()
+          && (resource.data.uid == me() || resource.data.toUid == me() || editorOf(groupData()));
+        allow create: if canCede();
+        // Pedir de novo (o pedido anterior já foi respondido; pode ser para outro colega)
+        allow update: if resource.data.uid == me() && resource.data.status != 'pending' && canCede();
+
+        // Dispensar a notificação: quem cede ou quem recebe se tira da lista (o outro continua vendo)
+        allow update: if signedIn()
+          && (resource.data.uid == me() || resource.data.toUid == me())
+          && changedOnly(['dismissedBy'])
+          && incoming().dismissedBy is list && incoming().dismissedBy.size() <= 2
+          && incoming().dismissedBy.toSet() == resource.data.get('dismissedBy', []).toSet().union([me()].toSet());
+
+        // Responder: aprovar só junto com a troca no plantão (sai quem cede, entra o colega,
+        // ainda no grupo); recusar, a qualquer momento
+        allow update: if editorOf(groupData())
+          && resource.data.status == 'pending'
+          && changedOnly(['status', 'decidedBy', 'decidedByName', 'decidedAt'])
+          && incoming().decidedBy == me()
+          && str(incoming().decidedByName, 1, 80)
+          && incoming().decidedAt == request.time
+          && (incoming().status == 'declined'
+              || (incoming().status == 'approved'
+                  && resource.data.toUid in groupData().memberIds
+                  && resource.data.toUid in getAfter(schedulePath(resource.data.month)).data.assignments.get(resource.data.cell, [])
+                  && !(resource.data.uid in getAfter(schedulePath(resource.data.month)).data.assignments.get(resource.data.cell, []))));
+
+        allow delete: if signedIn() && (resource.data.uid == me() || editorOf(groupData()));
+      }
     }
 
     // "Minhas solicitações": os pedidos de plantão vago da própria pessoa, em todos os grupos
     match /{path=**}/vacancyRequests/{requestId} {
       allow read: if signedIn() && resource.data.uid == me();
+    }
+
+    // Cessões que a pessoa pediu ou que foram pedidas para ela, em todos os grupos
+    match /{path=**}/cessionRequests/{requestId} {
+      allow read: if signedIn() && (resource.data.uid == me() || resource.data.toUid == me());
     }
 
     // Administradores da plataforma: qualquer usuário logado lê (o app decide se mostra

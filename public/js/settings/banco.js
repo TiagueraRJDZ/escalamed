@@ -19,7 +19,7 @@ import { toast, setLoading, firebaseErrorMessage } from '../ui.js';
 const CONFIRM_WORD = 'APAGAR';
 const BATCH_SIZE = 400; // o Firestore aceita até 500 gravações por lote
 // Subcoleções de cada grupo (as mesmas do firestore.rules)
-const GROUP_SUBCOLLECTIONS = ['members', 'invites', 'shifts', 'movements', 'schedules', 'vacancyRequests'];
+const GROUP_SUBCOLLECTIONS = ['members', 'invites', 'shifts', 'movements', 'schedules', 'vacancyRequests', 'cessionRequests'];
 // Coleções apagadas por inteiro, além dos grupos
 const FLAT_COLLECTIONS = [{ id: 'healthUnits', label: 'Unidades de saúde' }];
 

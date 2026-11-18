@@ -16,6 +16,8 @@
  *   vaga-pedido    um membro pediu um plantão vago → para os coordenadores do grupo (sem
  *                  coordenador, para o Gestor que criou o grupo); chave = id do pedido
  *   vaga-resposta  a coordenação aceitou ou recusou o pedido → para quem pediu
+ *   cessao-pedido  alguém quer ceder o plantão para um colega → para o colega e os coordenadores
+ *   cessao-resposta a coordenação aprovou ou recusou a cessão → para quem cedeu (e o colega, se aprovada)
  *
  * Rotas (POST, com "Authorization: Bearer <token do Firebase>"):
  *   /push/inscrever  { inscricao: { endpoint, keys: { p256dh, auth } }, aparelho }
@@ -179,11 +181,21 @@ async function avisar(contexto) {
   const novo = await env.DB.prepare('INSERT INTO push_avisos (chave, em) VALUES (?1, ?2) ON CONFLICT (chave) DO NOTHING RETURNING chave')
     .bind(`${tipo}:${grupo}:${chave}:${aviso.momento}`, Date.now())
     .first();
-  // Para uma pessoa (destino) ou algumas (destinos); quem pediu nunca recebe o próprio aviso
-  const destinos = [...new Set(aviso.destinos ?? [aviso.destino])].filter((uid) => uid && uid !== quem.uid).slice(0, MAX_DESTINOS);
-  if (!novo || !destinos.length) return { enviados: 0 };
+  // Uma mensagem para uma pessoa (destino) ou algumas (destinos), ou mensagens diferentes para
+  // pessoas diferentes (envios). Quem pediu nunca recebe o próprio aviso; cada pessoa, uma vez só.
+  const envios = aviso.envios ?? [{ destinos: aviso.destinos ?? [aviso.destino], mensagem: aviso.mensagem }];
+  const ja = new Set([quem.uid]);
+  const fila = [];
+  for (const envio of envios) {
+    for (const uid of envio.destinos) {
+      if (!uid || ja.has(uid) || fila.length >= MAX_DESTINOS) continue;
+      ja.add(uid);
+      fila.push({ uid, mensagem: envio.mensagem });
+    }
+  }
+  if (!novo || !fila.length) return { enviados: 0 };
   let enviados = 0;
-  for (const uid of destinos) enviados += await enviarParaConta(env, uid, aviso.mensagem);
+  for (const { uid, mensagem } of fila) enviados += await enviarParaConta(env, uid, mensagem);
   return { enviados };
 }
 
@@ -194,6 +206,8 @@ const CAMINHOS = {
   cargo: (uid, aviso) => `users/${uid}/notices/${aviso}`,
   'vaga-pedido': (grupo, pedido) => `groups/${grupo}/vacancyRequests/${pedido}`,
   'vaga-resposta': (grupo, pedido) => `groups/${grupo}/vacancyRequests/${pedido}`,
+  'cessao-pedido': (grupo, pedido) => `groups/${grupo}/cessionRequests/${pedido}`,
+  'cessao-resposta': (grupo, pedido) => `groups/${grupo}/cessionRequests/${pedido}`,
 };
 
 // "Noturno de 07/11 (19h00 às 01h00)"
@@ -279,6 +293,65 @@ const AVISOS = {
         tag: `vaga-resposta:${grupo}:${chave}`,
       },
     };
+  },
+  // Cessão direcionada pedida: quem avisa precisa ser quem cede. O colega (primeiro) e os
+  // coordenadores do grupo (sem coordenador, o Gestor que criou o grupo) recebem.
+  async 'cessao-pedido'({ env, local, quem, grupo, chave, convite: pedido }) {
+    if (pedido.uid !== quem.uid || pedido.status !== 'pending') return null;
+    const campos = await apoio.lerDocumento(env, quem.token, `groups/${encodeURIComponent(grupo)}`, local);
+    const coordenadores = textos(campos?.coordinatorIds);
+    const plantao = plantaoDe(pedido);
+    const onde = pedido.groupName || 'o grupo';
+    const url = `/group.html?id=${encodeURIComponent(grupo)}&dia=${encodeURIComponent(pedido.shiftDate || '')}`;
+    return {
+      momento: Date.parse(pedido.createdAt || ''),
+      envios: [
+        {
+          destinos: [pedido.toUid],
+          mensagem: {
+            titulo: 'Cessão de plantão para você',
+            corpo: `${pedido.name || 'Um colega'} quer ceder para você o plantão ${plantao} em ${onde}. A coordenação vai aprovar ou recusar.`,
+            url,
+            tag: `cessao-pedido:${grupo}:${chave}`,
+          },
+        },
+        {
+          destinos: coordenadores.length ? coordenadores : [campos?.ownerId?.stringValue],
+          mensagem: {
+            titulo: 'Cessão de plantão para aprovar',
+            corpo: `${pedido.name || 'Um membro'} quer ceder o plantão ${plantao} para ${pedido.toName || 'um colega'} em ${onde}. Toque para aprovar ou recusar.`,
+            url,
+            tag: `cessao-pedido:${grupo}:${chave}`,
+          },
+        },
+      ],
+    };
+  },
+  // Cessão respondida: quem avisa precisa ser quem respondeu. Quem cedeu recebe a resposta;
+  // aprovada, o colega também
+  async 'cessao-resposta'({ quem, grupo, chave, convite: pedido }) {
+    if (pedido.decidedBy !== quem.uid || !['approved', 'declined'].includes(pedido.status)) return null;
+    const plantao = plantaoDe(pedido);
+    const onde = pedido.groupName || 'o grupo';
+    const por = pedido.decidedByName || 'A coordenação';
+    const url = `/group.html?id=${encodeURIComponent(grupo)}&dia=${encodeURIComponent(pedido.shiftDate || '')}`;
+    const tag = `cessao-resposta:${grupo}:${chave}`;
+    const aprovada = pedido.status === 'approved';
+    const envios = [
+      {
+        destinos: [pedido.uid],
+        mensagem: aprovada
+          ? { titulo: 'Cessão aprovada', corpo: `${por} aprovou: ${pedido.toName || 'o colega'} ficou com o seu plantão ${plantao} em ${onde}.`, url, tag }
+          : { titulo: 'Cessão recusada', corpo: `${por} recusou a cessão do seu plantão ${plantao} em ${onde}. Você continua no plantão.`, url, tag },
+      },
+    ];
+    if (aprovada) {
+      envios.push({
+        destinos: [pedido.toUid],
+        mensagem: { titulo: 'Plantão cedido para você', corpo: `Você ficou com o plantão ${plantao} em ${onde}, cedido por ${pedido.name || 'um colega'}.`, url, tag },
+      });
+    }
+    return { momento: Date.parse(pedido.decidedAt || ''), envios };
   },
   // Convite aceito: avisa quem convidou (o convite fica marcado como aceito até ser dispensado)
   async aceite({ grupo, convite }) {

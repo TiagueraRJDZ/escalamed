@@ -12,6 +12,7 @@ import { groupQueries, mergeGroups, seesDrafts, groupSubtitle } from '../my-grou
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
 import { monthKey, userDays, dayShifts, requestId } from '../schedule-math.js';
 import { watchMyRequests } from '../vacancy-requests.js';
+import { watchMyCessions } from '../cession-requests.js';
 import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
 import { listenWithRetry, batched } from '../live.js';
 import { formatClock } from '../shifts.js';
@@ -39,6 +40,7 @@ today.setHours(0, 0, 0, 0);
 let selectedDate = today;
 let calendarMonth = null;
 let askedVacancies = new Set(); // pedidos de plantão vago pendentes: "<grupo>/<id do pedido>"
+let cedingShifts = new Set(); // cessões pedidas, esperando a coordenação: "<grupo>/<id da cessão>"
 
 // Calendário: só os grupos em que a pessoa está na escala (Gestor e Administrativo veem
 // todos os grupos na lista, mas os plantões e vagas do calendário são os da pessoa)
@@ -184,7 +186,12 @@ function renderDay() {
   for (const { group, schedule, shifts } of entries) {
     for (const { shiftId, shift, uids } of dayShifts(schedule, shifts, day)) {
       if (uids.includes(user.uid)) {
-        const badge = isPublished(schedule) ? '' : '<span class="badge badge-muted">Rascunho</span>';
+        const cellId = requestId(monthKey(date.getFullYear(), date.getMonth()), `${String(day).padStart(2, '0')}_${shiftId}`, user.uid);
+        const badge = !isPublished(schedule)
+          ? '<span class="badge badge-muted">Rascunho</span>'
+          : cedingShifts.has(`${group.id}/${cellId}`)
+            ? '<span class="badge badge-warning">Cedendo</span>'
+            : '';
         mine.push({ start: shift.startMinute, html: shiftItem({ group, shift, date, badge }) });
         continue;
       }
@@ -206,6 +213,12 @@ function renderDay() {
     sectionHtml('Disponíveis', sorted(open), 'Nenhuma vaga aberta neste dia. Plantões vagos nos seus grupos aparecem aqui.') +
     (open.length ? '<p class="muted text-sm day-hint">Toque numa vaga para pedir o plantão. A coordenação da escala aceita ou recusa.</p>' : '');
 }
+
+// Plantões que a pessoa pediu para ceder e esperam a coordenação: selo "Cedendo"
+watchMyCessions(user.uid, ({ mine }) => {
+  cedingShifts = new Set(mine.filter((c) => c.status === 'pending').map((c) => `${c.groupId}/${c.docId}`));
+  redraw();
+});
 
 // Vagas que a pessoa já pediu e esperam resposta: selo "Pedido enviado"
 watchMyRequests(user.uid, (list) => {

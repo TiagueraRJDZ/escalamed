@@ -59,7 +59,7 @@ export function shiftFields(month, day, shiftId, shift) {
 const OPTIONAL = [
   'shiftId', 'shiftTitle', 'shiftDate', 'shiftStart', 'shiftEnd',
   'counterShiftId', 'counterShiftDate', 'counterShiftStart', 'counterShiftEnd',
-  'count', 'scheduleMonth', 'fromMonth',
+  'count', 'scheduleMonth', 'fromMonth', 'fromUid',
 ];
 
 // Acrescenta o registro ao lote. data: { type, targetUid?, public?, ...campos do plantão }
@@ -71,7 +71,8 @@ export function logMovement(batch, groupId, data) {
     groupId,
     actorUid,
     targetUid,
-    memberUids: [...new Set([actorUid, targetUid].filter(Boolean))],
+    // fromUid: quem cedeu (cessão aprovada pela coordenação); entra no filtro por membro
+    memberUids: [...new Set([actorUid, targetUid, data.fromUid].filter(Boolean))],
     public: data.public ?? true,
     monthKey: monthOfDate(),
     createdAt: serverTimestamp(),

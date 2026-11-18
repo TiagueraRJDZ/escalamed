@@ -387,3 +387,33 @@
 .day-request-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2); font-size: var(--texto-sm); }
 .day-request .btn { justify-self: start; }
 .day-request-title { font-size: var(--texto-sm); font-weight: 600; color: var(--cor-texto-2); }
+
+/* ---------- Cessão direcionada ---------- */
+.cession-shift { margin-bottom: var(--esp-3); font-weight: 500; }
+.cession-people { display: grid; gap: var(--esp-1); max-height: 320px; margin: var(--esp-2) 0 var(--esp-3); padding: 0; overflow-y: auto; list-style: none; }
+.cession-person {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-sm);
+  cursor: pointer;
+}
+.cession-person:hover { background: var(--cor-primaria-suave); }
+.cession-person:has(input:checked) { border-color: var(--cor-primaria); background: var(--cor-primaria-suave); }
+.cession-person.is-blocked { cursor: not-allowed; opacity: 0.6; }
+.cession-person.is-blocked:hover { background: none; }
+.cession-person-name { display: grid; flex: 1; min-width: 0; font-size: var(--texto-sm); }
+.cession-person-name small { color: var(--cor-texto-3); }
+.cession-person input { accent-color: var(--cor-primaria); }
+.detail-cession { display: grid; gap: var(--esp-2); }
+.detail-cession .btn { justify-self: start; }
+
+/* Coordenação: os pedidos de cada turno na gaveta do dia (como o médico vê o dele) */
+.day-shift-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-1); }
+.day-request-list { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
+.day-request-person { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); }
+.day-request-who { display: grid; flex: 1 1 140px; gap: 2px; min-width: 0; font-size: var(--texto-sm); }
+.day-request-who .badge { justify-self: start; }
+.day-request-person .request-actions { margin-left: auto; }

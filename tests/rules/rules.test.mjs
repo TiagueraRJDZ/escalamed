@@ -488,6 +488,117 @@ test('pedido de vaga: recusar (também "vagas preenchidas"); depois a pessoa pod
   assert.ok(await ask(medico)); // regrava como pedido novo
 });
 
+// ---------- Cessão direcionada ----------
+// O médico está no 05_m da escala de outubro e cede para o convidado (que entra no grupo)
+const CQ = (uid, cell = '05_m') => `${G}/cessionRequests/2026-10_${cell}_${uid}`;
+
+function cession(uid, toUid, extra = {}) {
+  return {
+    ...vacancyRequest(uid, { cell: '05_m', shiftId: 'm', shiftTitle: 'Manhã', shiftStart: '07:00', shiftEnd: '13:00' }),
+    toUid,
+    toName: 'Convidado Silva',
+    ...extra,
+  };
+}
+
+const withInvited = () => admin([w.update(G, { memberIds: [gestor.uid, coord.uid, medico.uid, invited.uid] })]);
+const cede = (actor, data = cession(actor.uid, invited.uid), path = CQ(actor.uid)) => commit(actor.token, [w.set(path, data)]);
+const seedCession = (extra = {}) => admin([w.set(CQ(medico.uid), cession(medico.uid, invited.uid, { createdAt: new Date(), ...extra }))]);
+
+// Aprovar como o app faz: a lista do plantão troca quem cede pelo colega, no mesmo lote
+function approveCessionWrites(actor, people = [invited.uid]) {
+  return [
+    {
+      update: {
+        name: `projects/${PROJECT}/databases/(default)/documents/${S}`,
+        fields: {
+          updatedBy: { stringValue: actor.uid },
+          assignments: { mapValue: { fields: { '05_m': { arrayValue: { values: people.map((stringValue) => ({ stringValue })) } } } } },
+        },
+      },
+      updateMask: { fieldPaths: ['updatedBy', 'assignments.`05_m`'] },
+      updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }],
+      currentDocument: { exists: true },
+    },
+    w.update(CQ(medico.uid), { status: 'approved', decidedBy: actor.uid, decidedByName: 'Coordenador', decidedAt: NOW }),
+  ];
+}
+
+test('cessão: quem está no plantão cede para um colega do grupo', async () => {
+  await withInvited();
+  await admin([w.set(S, { ...schedule(gestor), createdAt: new Date(), updatedAt: new Date() })]);
+  assert.ok(!(await cede(medico))); // rascunho
+  await publishedSchedule();
+  assert.ok(!(await cede(medico, cession(medico.uid, outsider.uid)))); // colega fora do grupo
+  assert.ok(!(await cede(medico, cession(medico.uid, medico.uid)))); // para si mesmo
+  assert.ok(!(await cede(invited, cession(invited.uid, coord.uid), CQ(invited.uid)))); // não está no plantão
+  assert.ok(!(await cede(medico, cession(medico.uid, invited.uid, { extra: 1 }))));
+  assert.ok(!(await cede(medico, cession(gestor.uid, invited.uid)))); // em nome de outra pessoa
+  assert.ok(await cede(medico));
+  assert.ok(!(await cede(medico))); // pendente: não regrava
+  // O colega lê; outro membro não; a coordenação lê e consulta os pendentes
+  assert.ok(await canRead(invited.token, CQ(medico.uid)));
+  assert.ok(await canRead(coord.token, CQ(medico.uid)));
+  assert.ok(!(await canRead(adm.token, CQ(medico.uid))));
+  assert.ok(await canQueryGroup(invited.token, 'cessionRequests', 'toUid', invited.uid));
+  assert.ok(await canQueryGroup(medico.token, 'cessionRequests', 'uid', medico.uid));
+  assert.ok(!(await canQueryGroup(medico.token, 'cessionRequests', 'toUid', invited.uid)));
+  assert.ok(await canQueryIn(coord.token, G, 'cessionRequests', [['status', 'EQUAL', 'pending']]));
+  assert.ok(!(await canQueryIn(medico.token, G, 'cessionRequests', [['status', 'EQUAL', 'pending']])));
+  // Cancelar: quem cede sim; o colega não
+  assert.ok(!(await commit(invited.token, [w.delete(CQ(medico.uid))])));
+  assert.ok(await commit(medico.token, [w.delete(CQ(medico.uid))]));
+});
+
+test('cessão: só a coordenação aprova, e só trocando as pessoas no plantão', async () => {
+  await withInvited();
+  await publishedSchedule();
+  await seedCession();
+  assert.ok(!(await commit(medico.token, approveCessionWrites(medico))));
+  assert.ok(!(await commit(invited.token, approveCessionWrites(invited))));
+  assert.ok(!(await commit(coord.token, approveCessionWrites(coord, [medico.uid, invited.uid])))); // quem cede ficou
+  assert.ok(!(await commit(coord.token, approveCessionWrites(coord, [])))); // o colega não entrou
+  assert.ok(await commit(coord.token, approveCessionWrites(coord)));
+  assert.ok(!(await commit(coord.token, [w.update(CQ(medico.uid), { status: 'declined', decidedBy: coord.uid, decidedByName: 'C', decidedAt: NOW })])));
+});
+
+test('cessão: recusar; cada um dispensa só para si; depois pode pedir de novo', async () => {
+  await withInvited();
+  await publishedSchedule();
+  await seedCession();
+  const declineCession = (actor) =>
+    commit(actor.token, [w.update(CQ(medico.uid), { status: 'declined', decidedBy: actor.uid, decidedByName: 'Gestor', decidedAt: NOW })]);
+  assert.ok(!(await declineCession(adm)));
+  assert.ok(!(await declineCession(invited)));
+  assert.ok(await declineCession(gestor));
+  // Dispensar: só se acrescentar a si mesmo
+  assert.ok(!(await commit(invited.token, [w.update(CQ(medico.uid), { dismissedBy: [medico.uid] })])));
+  assert.ok(!(await commit(adm.token, [w.update(CQ(medico.uid), { dismissedBy: [adm.uid] })])));
+  assert.ok(await commit(invited.token, [w.update(CQ(medico.uid), { dismissedBy: [invited.uid] })]));
+  assert.ok(await commit(medico.token, [w.update(CQ(medico.uid), { dismissedBy: [invited.uid, medico.uid] })]));
+  // O colega não muda mais nada
+  assert.ok(!(await commit(invited.token, [w.update(CQ(medico.uid), { status: 'approved' })])));
+  // Pedir de novo, para outro colega (o coordenador também é membro)
+  assert.ok(await cede(medico, cession(medico.uid, coord.uid, { toName: 'Coordenador' })));
+});
+
+test('histórico: cessão aprovada registra quem cedeu (fromUid), com até 3 pessoas', async () => {
+  const record = (actor, extra = {}) => ({
+    type: 'cession',
+    groupId: 'g1',
+    actorUid: actor.uid,
+    targetUid: invited.uid,
+    fromUid: medico.uid,
+    memberUids: [actor.uid, invited.uid, medico.uid],
+    public: true,
+    monthKey: '2026-10',
+    createdAt: NOW,
+    ...extra,
+  });
+  assert.ok(await commit(coord.token, [w.set(`${G}/movements/m1`, record(coord))]));
+  assert.ok(!(await commit(coord.token, [w.set(`${G}/movements/m2`, record(coord, { memberUids: [coord.uid, invited.uid, medico.uid, gestor.uid] }))])));
+});
+
 // ---------- Membros e coordenadores ----------
 test('Gestor marca e desmarca coordenadores; coordenador não', async () => {
   assert.ok(!(await commit(coord.token, [w.update(G, { coordinatorIds: [coord.uid, medico.uid], updatedAt: NOW })])));

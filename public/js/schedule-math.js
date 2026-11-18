@@ -177,3 +177,25 @@ export function requestBlock(schedule, shifts, uid, month, key, now = new Date()
   if (findConflict(schedule.assignments, shifts, uid, day, shiftId)) return 'conflict';
   return null;
 }
+
+// ---------- Cessão direcionada ----------
+// Quem está no plantão pode cedê-lo? null = pode; senão: 'closed' (escala não publicada ou
+// turno apagado), 'not-mine' (não está no plantão), 'past' (o plantão já começou)
+export function cessionBlock(schedule, shifts, uid, month, key, now = new Date()) {
+  const { day, shiftId } = parseCellKey(key);
+  const shift = shifts?.[shiftId];
+  if (!schedule || schedule.status !== 'published' || !shift) return 'closed';
+  if (!schedule.assignments?.[key]?.includes(uid)) return 'not-mine';
+  const { year, monthIndex } = monthParts(month);
+  if (new Date(year, monthIndex, day, 0, shift.startMinute) <= now) return 'past';
+  return null;
+}
+
+// O colega pode receber o plantão? null = pode; 'assigned' (já está nele) ou 'conflict'
+// (tem outro plantão no mesmo horário)
+export function receiverBlock(schedule, shifts, toUid, key) {
+  const { day, shiftId } = parseCellKey(key);
+  if (schedule?.assignments?.[key]?.includes(toUid)) return 'assigned';
+  if (findConflict(schedule?.assignments, shifts, toUid, day, shiftId)) return 'conflict';
+  return null;
+}

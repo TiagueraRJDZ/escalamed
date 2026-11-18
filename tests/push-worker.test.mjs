@@ -487,6 +487,54 @@ test('resposta ao pedido: quem pediu recebe (aceito, recusado ou vagas preenchid
   assert.equal(preenchido.corpo, 'As vagas do plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto foram preenchidas.');
 });
 
+// ---------- Cessão direcionada ----------
+function cessaoFirestore({ status = 'pending', decidedBy } = {}) {
+  return {
+    ...pedidoFirestore({ status, decidedBy }),
+    toUid: texto('eva'),
+    toName: texto('Eva Plantonista'),
+  };
+}
+
+test('cessão pedida: o colega e os coordenadores recebem, cada um com a sua mensagem', async () => {
+  const eva = await novoAparelho('eva');
+  const carla = await novoAparelho('carla');
+  await chamar('/push/inscrever', { inscricao: eva.inscricao }, 'eva');
+  await chamar('/push/inscrever', { inscricao: carla.inscricao }, 'carla');
+  convites['g1/c1'] = cessaoFirestore();
+  leitores['g1/c1'] = ['bruno', 'eva', 'carla'];
+  convites['groups/g1'] = { ownerId: texto('ana'), coordinatorIds: lista('carla') };
+  leitores['groups/g1'] = ['bruno', 'eva', 'carla'];
+  const avisar = (uid) => chamar('/push/avisar', { tipo: 'cessao-pedido', grupo: 'g1', chave: 'c1' }, uid);
+  assert.equal((await avisar('eva')).enviados, 0); // só quem cede avisa
+  assert.equal((await avisar('bruno')).enviados, 2);
+  const paraEva = await abrir(eva, entregues.find((e) => e.endpoint === eva.inscricao.endpoint).corpo);
+  const paraCarla = await abrir(carla, entregues.find((e) => e.endpoint === carla.inscricao.endpoint).corpo);
+  assert.equal(paraEva.titulo, 'Cessão de plantão para você');
+  assert.equal(paraEva.corpo, 'Bruno Plantonista quer ceder para você o plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto. A coordenação vai aprovar ou recusar.');
+  assert.equal(paraCarla.titulo, 'Cessão de plantão para aprovar');
+  assert.equal(paraCarla.corpo, 'Bruno Plantonista quer ceder o plantão Noturno de 07/11 (19h00 às 01h00) para Eva Plantonista em UTI Adulto. Toque para aprovar ou recusar.');
+});
+
+test('cessão respondida: aprovada avisa quem cedeu e o colega; recusada, só quem cedeu', async () => {
+  const bruno = await novoAparelho('bruno');
+  const eva = await novoAparelho('eva');
+  await chamar('/push/inscrever', { inscricao: bruno.inscricao }, 'bruno');
+  await chamar('/push/inscrever', { inscricao: eva.inscricao }, 'eva');
+  convites['g1/c1'] = cessaoFirestore({ status: 'approved', decidedBy: 'carla' });
+  convites['g1/c2'] = cessaoFirestore({ status: 'declined', decidedBy: 'carla' });
+  for (const id of ['c1', 'c2']) leitores[`g1/${id}`] = ['bruno', 'eva', 'carla'];
+  const responder = (chave, uid) => chamar('/push/avisar', { tipo: 'cessao-resposta', grupo: 'g1', chave }, uid);
+  assert.equal((await responder('c1', 'bruno')).enviados, 0); // só quem respondeu avisa
+  assert.equal((await responder('c1', 'carla')).enviados, 2);
+  const aprovadaBruno = await abrir(bruno, entregues[0].corpo);
+  const aprovadaEva = await abrir(eva, entregues[1].corpo);
+  assert.equal(aprovadaBruno.corpo, 'Carla Coordenadora aprovou: Eva Plantonista ficou com o seu plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto.');
+  assert.equal(aprovadaEva.titulo, 'Plantão cedido para você');
+  assert.equal((await responder('c2', 'carla')).enviados, 1);
+  assert.equal((await abrir(bruno, entregues[2].corpo)).titulo, 'Cessão recusada');
+});
+
 // ---------- Teste geral (só Dev) ----------
 test('Dev: teste para todos os aparelhos ativos, de todas as contas', async () => {
   const aparelhos = {};

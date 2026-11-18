@@ -3,7 +3,9 @@
 //  - convites que ela mandou e foram aceitos ou recusados (Dispensar);
 //  - avisos dela (users/{uid}/notices), como o cargo alterado por um Gestor (Dispensar);
 //  - pedidos de plantão vago esperando resposta, para o Gestor e o coordenador do grupo
-//    (Aceitar / Recusar), e as respostas aos pedidos da própria pessoa (Dispensar).
+//    (Aceitar / Recusar), e as respostas aos pedidos da própria pessoa (Dispensar);
+//  - cessões direcionadas: para a coordenação aprovar (Aprovar / Recusar), a resposta para quem
+//    cedeu e o aviso para o colega que recebe (Dispensar).
 // O sininho mostra quantas há; o que chega com a página aberta também vira um aviso.
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 // No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
@@ -26,6 +28,7 @@ import {
 import { watchMyGroups } from './my-groups.js';
 import { can } from './permissions.js';
 import { watchMyRequests, watchGroupRequests, removeRequest, answerRequest, requestShiftText, requestDayLink } from './vacancy-requests.js';
+import { watchMyCessions, watchGroupCessions, dismissCession, answerCession } from './cession-requests.js';
 
 let invites = []; // recebidos, pendentes
 let answered = []; // mandados e respondidos (aceitos ou recusados)
@@ -33,6 +36,8 @@ let notices = []; // avisos da própria pessoa (ex.: cargo alterado)
 let vacancyAnswers = []; // respostas aos pedidos de plantão vago da própria pessoa
 let vacancyPending = []; // pedidos esperando resposta nos grupos em que a pessoa altera a escala
 const vacancyGroups = new Map(); // groupId → grupo (para saber se quem pediu ainda está nele)
+let cessionNotes = []; // cessões que eu pedi (já respondidas) e as pedidas para mim
+let cessionPending = []; // cessões esperando a coordenação nos grupos em que a pessoa altera a escala
 // Avisos e respostas já vistos (clicados), guardados em notificationReads/{uid} para valer em
 // todos os aparelhos. Convite recebido não entra: fica destacado até ser respondido.
 let seen = new Set();
@@ -96,6 +101,27 @@ const vacancyPendingText = (r) =>
 
 const stillMember = (r) => vacancyGroups.get(r.groupId)?.memberIds?.includes(r.uid) ?? true;
 
+// Cessões: quem cedeu vê a resposta; o colega vê o pedido e a resposta
+function cessionNoteText(c) {
+  const where = `<strong>${escapeHtml(c.groupName ?? 'o grupo')}</strong>`;
+  const by = `<strong>${escapeHtml(c.decidedByName ?? 'A coordenação')}</strong>`;
+  if (c.mine) {
+    return c.status === 'approved'
+      ? `${by} aprovou: <strong>${escapeHtml(c.toName)}</strong> ficou com o seu plantão ${requestShiftText(c)} em ${where}`
+      : `${by} recusou a cessão do seu plantão ${requestShiftText(c)} para ${escapeHtml(c.toName)} em ${where}. Você continua no plantão`;
+  }
+  const from = `<strong>${escapeHtml(c.name)}</strong>`;
+  if (c.status === 'pending') return `${from} quer ceder para você o plantão ${requestShiftText(c)} em ${where}. A coordenação vai aprovar ou recusar`;
+  if (c.status === 'approved') return `Você ficou com o plantão ${requestShiftText(c)} em ${where}, cedido por ${from} (aprovado por ${by})`;
+  return `${by} recusou a cessão do plantão ${requestShiftText(c)} de ${from} para você em ${where}`;
+}
+
+const cessionPendingText = (c) =>
+  `<strong>${escapeHtml(c.name ?? 'Alguém')}</strong> quer ceder o plantão ${requestShiftText(c)} para <strong>${escapeHtml(c.toName)}</strong> em <strong>${escapeHtml(c.groupName ?? 'um grupo')}</strong>`;
+
+const cessionIcon = (c) => (c.status === 'approved' ? 'check' : c.status === 'declined' ? 'x' : 'arrowRight');
+const cessionTone = (c) => (c.status === 'approved' ? ' is-accepted' : c.status === 'declined' ? ' is-declined' : ' is-notice');
+
 const noticeText = (n) =>
   n.type === 'role'
     ? `<strong>${escapeHtml(n.byName ?? 'Um Gestor')}</strong> alterou seu cargo para <strong>${escapeHtml(n.categoryName ?? 'outro cargo')}</strong>`
@@ -117,6 +143,8 @@ function renderBell() {
   const count =
     invites.length +
     vacancyPending.length +
+    cessionPending.length +
+    cessionNotes.filter(isUnread).length +
     answered.filter(isUnread).length +
     notices.filter(isUnread).length +
     vacancyAnswers.filter(isUnread).length;
@@ -153,6 +181,48 @@ function renderDrawer() {
   const showShifts = !filters.length || filters.includes('shifts');
   const toAnswer = showShifts || filters.includes('management') ? vacancyPending : [];
   const myAnswers = showShifts ? vacancyAnswers : [];
+  const toApprove = showShifts || filters.includes('management') ? cessionPending : [];
+  const myCessionNotes = showShifts ? cessionNotes : [];
+
+  // Gestor e coordenador: "Bruno quer ceder o plantão ... para Ana em UTI"
+  const toApproveHtml = toApprove.length
+    ? `<h3 class="section-title">Cessões para aprovar</h3>
+      <ul class="notification-list">${toApprove
+        .map(
+          (c) => `<li class="notification-item" data-id="${escapeHtml(c.path)}">
+          <span class="notification-icon" aria-hidden="true">${icon('arrowRight')}</span>
+          <div class="notification-text">
+            <span class="notification-sentence">${cessionPendingText(c)}</span>
+            <small>${whenText(c.createdAt)}</small>
+            <div class="notification-actions">
+              <a class="btn btn-ghost" href="${requestDayLink(c)}">Ver o dia</a>
+              <button type="button" class="btn btn-secondary" data-cession-answer="no">Recusar</button>
+              <button type="button" class="btn btn-primary" data-cession-answer="yes">Aprovar</button>
+            </div>
+          </div>
+        </li>`,
+        )
+        .join('')}</ul>`
+    : '';
+
+  const cessionNotesHtml = myCessionNotes.length
+    ? `<h3 class="section-title">Cessões de plantão</h3>
+      <ul class="notification-list">${myCessionNotes
+        .map(
+          (c) => `<li class="notification-item${cessionTone(c)}${readClass(c)}" data-id="${escapeHtml(c.id)}" data-readable>
+          <span class="notification-icon" aria-hidden="true">${icon(cessionIcon(c))}</span>
+          <div class="notification-text">
+            <span class="notification-sentence">${unreadLabel(c)}${cessionNoteText(c)}</span>
+            <small>${whenText(c.decidedAt ?? c.createdAt)}</small>
+            <div class="notification-actions">
+              <a class="btn btn-ghost" href="${requestDayLink(c)}">Ver o dia</a>
+              <button type="button" class="btn btn-ghost" data-dismiss>Dispensar</button>
+            </div>
+          </div>
+        </li>`,
+        )
+        .join('')}</ul>`
+    : '';
 
   // Gestor e coordenador: "Ana pediu o plantão vago Noturno de 07/11 (19h00 às 01h00) em UTI"
   const toAnswerHtml = toAnswer.length
@@ -254,7 +324,7 @@ function renderDrawer() {
 
   // Limpar todas: avisos e respostas aos convites (os do filtro escolhido). Convite recebido
   // só sai respondendo.
-  const clearable = mine.length + replies.length + myAnswers.length;
+  const clearable = mine.length + replies.length + myAnswers.length + myCessionNotes.length;
   const toolsHtml = clearable
     ? `<div class="notification-tools">
         <button type="button" class="btn btn-ghost" data-clear-all>${icon('trash')}Limpar todas</button>
@@ -262,8 +332,8 @@ function renderDrawer() {
     : '';
 
   list.innerHTML =
-    noticesHtml || toAnswerHtml || receivedHtml || myAnswersHtml || repliesHtml
-      ? toolsHtml + noticesHtml + toAnswerHtml + receivedHtml + myAnswersHtml + repliesHtml
+    noticesHtml || toAnswerHtml || toApproveHtml || receivedHtml || myAnswersHtml || cessionNotesHtml || repliesHtml
+      ? toolsHtml + noticesHtml + toAnswerHtml + toApproveHtml + receivedHtml + myAnswersHtml + cessionNotesHtml + repliesHtml
       : `<h3 class="section-title">Não lidas</h3>
       <div class="empty-state">
         ${icon('bell')}
@@ -523,19 +593,46 @@ export function setupNotifications(app, user, profile, access = {}) {
     render();
   });
 
+  // Cessões: as minhas já respondidas e as pedidas para mim (o id leva a situação: a aprovação
+  // de uma cessão já vista volta como nova). Dispensada some só para quem dispensou.
+  const cessionNotesChanged = tracker((c) => {
+    let text;
+    if (c.mine) text = c.status === 'approved' ? `Cessão aprovada: ${c.toName} ficou com o seu plantão.` : 'A coordenação recusou a sua cessão de plantão.';
+    else if (c.status === 'pending') text = `${c.name} quer ceder um plantão para você. Veja no sininho.`;
+    else if (c.status === 'approved') text = `Você ficou com o plantão cedido por ${c.name}.`;
+    else text = `A coordenação recusou a cessão de ${c.name} para você.`;
+    toast(text, c.status === 'approved' ? 'success' : 'info', 8000);
+  });
+  watchMyCessions(user.uid, ({ mine, toMe }, meta) => {
+    const visible = (c) => !c.dismissedBy?.includes(user.uid);
+    const note = (c, isMine) => ({ ...c, mine: isMine, id: `${c.path}@${c.createdAt?.toMillis?.() ?? 0}#${c.status}` });
+    const when = (c) => (c.decidedAt ?? c.createdAt)?.toMillis?.() ?? 0;
+    const next = [
+      ...mine.filter((c) => c.status !== 'pending' && visible(c)).map((c) => note(c, true)),
+      ...toMe.filter(visible).map((c) => note(c, false)),
+    ].sort((a, b) => when(b) - when(a));
+    if (!cessionNotesChanged(next, meta)) return;
+    cessionNotes = next;
+    render();
+  });
+
   // Pedidos esperando resposta: só para quem altera a escala de algum grupo de equipe
   // (Gestor, coordenador marcado no grupo, Dev). Uma escuta por grupo.
   if (['dev', 'gestor', 'coordenador'].includes(access?.role)) {
-    const byGroup = new Map(); // groupId → { stop, list }
-    const synced = new Set(); // grupos que já responderam do servidor
+    const byGroup = new Map(); // groupId → { stop, list, cessions }
+    const synced = new Set(); // "grupo:v" (vagas) e "grupo:c" (cessões) que já responderam do servidor
     const pendingChanged = tracker((r) => toast(`${r.name} pediu um plantão vago em ${r.groupName}. Veja no sininho.`, 'info', 8000));
+    const cessionsChanged = tracker((c) => toast(`${c.name} quer ceder um plantão em ${c.groupName}. Veja no sininho.`, 'info', 8000));
+    const newest = (a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0);
     const emit = () => {
-      const list = [...byGroup.values()]
-        .flatMap((entry) => entry.list)
-        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
-      const changed = pendingChanged(list, { synced: [...byGroup.keys()].every((id) => synced.has(id)) });
+      const allSynced = [...byGroup.keys()].every((id) => synced.has(`${id}:v`) && synced.has(`${id}:c`));
+      const list = [...byGroup.values()].flatMap((entry) => entry.list).sort(newest);
+      const cessions = [...byGroup.values()].flatMap((entry) => entry.cessions).sort(newest);
+      const changed = pendingChanged(list, { synced: allSynced });
+      const changedCessions = cessionsChanged(cessions, { synced: allSynced });
       vacancyPending = list;
-      if (changed) render();
+      cessionPending = cessions;
+      if (changed || changedCessions) render();
     };
     watchMyGroups(user.uid, access.role, (groups) => {
       const editable = groups.filter((g) => g.type === 'team' && can(g.role, 'editSchedule'));
@@ -546,17 +643,26 @@ export function setupNotifications(app, user, profile, access = {}) {
         if (ids.has(id)) continue;
         entry.stop();
         byGroup.delete(id);
-        synced.delete(id);
+        synced.delete(`${id}:v`);
+        synced.delete(`${id}:c`);
       }
       for (const g of editable) {
         if (byGroup.has(g.id)) continue;
-        const entry = { list: [], stop: null };
+        const entry = { list: [], cessions: [], stop: null };
         byGroup.set(g.id, entry);
-        entry.stop = watchGroupRequests(g.id, (list, meta) => {
-          entry.list = list;
-          if (meta.synced) synced.add(g.id);
-          emit();
-        });
+        const stops = [
+          watchGroupRequests(g.id, (list, meta) => {
+            entry.list = list;
+            if (meta.synced) synced.add(`${g.id}:v`);
+            emit();
+          }),
+          watchGroupCessions(g.id, (list, meta) => {
+            entry.cessions = list;
+            if (meta.synced) synced.add(`${g.id}:c`);
+            emit();
+          }),
+        ];
+        entry.stop = () => stops.forEach((stop) => stop());
       }
       emit();
       render(); // quem pediu pode ter saído do grupo
@@ -577,7 +683,7 @@ export function setupNotifications(app, user, profile, access = {}) {
   // Guarda só as que ainda estão na lista (as dispensadas saem), no máximo 300
   const saveSeen = () =>
     setDoc(readsRef, {
-      ids: [...notices, ...answered, ...vacancyAnswers].map((item) => item.id).filter((id) => seen.has(id)).slice(0, 300),
+      ids: [...notices, ...answered, ...vacancyAnswers, ...cessionNotes].map((item) => item.id).filter((id) => seen.has(id)).slice(0, 300),
       updatedAt: serverTimestamp(),
     }).catch(() => {}); // sem conexão: o Firestore grava quando voltar
 
@@ -604,9 +710,11 @@ export function setupNotifications(app, user, profile, access = {}) {
         const notice = notices.find((item) => item.id === id);
         const inv = answered.find((item) => item.id === id);
         const answer = vacancyAnswers.find((item) => item.id === id);
+        const cession = cessionNotes.find((item) => item.id === id);
         if (notice) return deleteDoc(doc(db, notice.id));
         if (inv) return cancelInvite(inv.groupId, inviteKey(inv));
         if (answer) return removeRequest(answer.groupId, answer.docId);
+        if (cession) return dismissCession(cession.groupId, cession.docId);
         return null;
       }),
     );
@@ -639,6 +747,16 @@ export function setupNotifications(app, user, profile, access = {}) {
       if (!ok && vacancyButton.isConnected) setLoading(vacancyButton, false);
       return;
     }
+    // Cessão: Aprovar ou Recusar
+    const cessionButton = event.target.closest('[data-cession-answer]');
+    if (cessionButton) {
+      const cession = cessionPending.find((c) => c.path === cessionButton.closest('[data-id]').dataset.id);
+      if (!cession) return;
+      setLoading(cessionButton, true);
+      const ok = await answerCession(cession, cessionButton.dataset.cessionAnswer === 'yes', { deciderName: session.profile?.name });
+      if (!ok && cessionButton.isConnected) setLoading(cessionButton, false);
+      return;
+    }
     const button = event.target.closest('[data-accept], [data-decline], [data-dismiss]');
     if (!button) return;
     const id = button.closest('[data-id]').dataset.id;
@@ -649,10 +767,12 @@ export function setupNotifications(app, user, profile, access = {}) {
       const notice = notices.find((item) => item.id === id);
       const inv = answered.find((item) => item.id === id);
       const answer = vacancyAnswers.find((item) => item.id === id);
+      const cession = cessionNotes.find((item) => item.id === id);
       try {
         if (notice) await deleteDoc(doc(db, notice.id));
         else if (inv) await cancelInvite(inv.groupId, inviteKey(inv));
         else if (answer) await removeRequest(answer.groupId, answer.docId);
+        else if (cession) await dismissCession(cession.groupId, cession.docId);
       } catch (error) {
         ok = false;
         toast(firebaseErrorMessage(error), 'error');

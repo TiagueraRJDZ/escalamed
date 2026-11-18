@@ -41,6 +41,7 @@ escalamed/
 │  │  ├─ schedule-math.js escala: horas, conflitos de horário, replicação (sem Firebase, com testes)
 │  │  ├─ schedule-data.js escala no Firestore: ler, alocar, vagas, publicar, replicar
 │  │  ├─ vacancy-requests.js pedidos de plantão vago: pedir, cancelar, aceitar e recusar
+│  │  ├─ cession-requests.js cessão direcionada: pedir, cancelar, aprovar e recusar
 │  │  ├─ movements.js   histórico (groups/{g}/movements): gravar no mesmo lote da ação e consultar
 │  │  ├─ shift-report.js relatório de plantões: junta e agrupa por membro (sem Firebase, com testes)
 │  │  ├─ report-export.js exportar o relatório: Excel (SheetJS do CDN) e PDF (impressão)
@@ -191,9 +192,18 @@ Plantão vago não é assumido direto: o membro pede e a coordenação da escala
 - **Resposta:** quem pediu vê no sininho (e no celular, com o push ativo) e dispensa; depois de recusado, pode pedir de novo.
 - **Dados:** `groups/{g}/vacancyRequests/{mês}_{célula}_{uid}` (um pedido por pessoa e plantão). As regras (`firestore.rules`) conferem que a vaga está aberta numa escala publicada, que só a coordenação responde e que aceitar acontece no mesmo lote em que a pessoa entra no plantão.
 
+## Cessão direcionada
+
+Quem está num plantão pode cedê-lo para um colega escolhido; a cessão só vale com a aprovação da coordenação.
+
+- **Quem cede:** membro do grupo que não altera a escala. Nos detalhes do próprio plantão (gaveta do dia → tocar no seu nome), **Ceder plantão** abre a lista de colegas do grupo; quem já está no plantão ou tem outro no mesmo horário aparece bloqueado. Só vale para plantão de escala **publicada** que ainda não começou. Enquanto espera, o plantão mostra "Cedendo" (gaveta do dia e Seus plantões) e dá para cancelar.
+- **Quem aprova:** Gestor e o coordenador do grupo (e o Dev), pelo sininho ("Cessões para aprovar"), pelo cartão "Solicitações para a coordenação" no Calendário do grupo e pela gaveta do dia. Aprovar troca as pessoas no plantão (escala dinâmica) numa transação e registra no Histórico ("Bruno cedeu o plantão ... para Eva (aprovado por Ana)"). Se o colega já tem plantão no horário, o app pergunta antes.
+- **Avisos:** o colega é avisado do pedido e da aprovação; quem cedeu, da resposta (sininho e push). Dispensar tira a notificação só de quem dispensou (`dismissedBy`).
+- **Dados:** `groups/{g}/cessionRequests/{mês}_{célula}_{uid de quem cede}`, com `toUid`. As regras conferem que quem cede está no plantão, que o colega é do grupo e que aprovar acontece no mesmo lote da troca.
+
 ## Notificações push no celular
 
-Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado), **convite aceito** ou **recusado** (para quem convidou), **pedido de plantão vago** (para os coordenadores do grupo; sem coordenador, para o Gestor que criou o grupo) e a **resposta ao pedido** (para quem pediu). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
+Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado), **convite aceito** ou **recusado** (para quem convidou), **pedido de plantão vago** e **cessão** (para os coordenadores do grupo; sem coordenador, para o Gestor que criou o grupo; a cessão também avisa o colega) e as **respostas** (para quem pediu e, na cessão aprovada, para o colega). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
 
 - **Onde ativar:** no topo da gaveta do sininho (`notifications.js`), por aparelho e por conta. Ali também ficam Testar (os aparelhos da própria conta) e Desativar. O Dev tem ainda **Testar em todos os aparelhos**: manda "Teste de notificações" para todas as contas com push ativo, celular e computador (`/push/teste-geral`, em lotes de 40 por causa do limite de requisições do plano gratuito do Cloudflare). Quem sai da conta deixa de receber naquele aparelho (e volta a receber sozinho se entrar de novo).
 - **iPhone/iPad:** só no EscalaMed adicionado à Tela de Início (iOS 16.4 ou mais novo); no Safari comum, a gaveta mostra o passo a passo. O app da Tela de Início tem login próprio (entra uma vez nele). Android, computador (Chrome, Edge, Firefox) e Safari do Mac funcionam direto no navegador.

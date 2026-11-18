@@ -35,6 +35,8 @@ import {
   parseCellKey,
   requestId,
   requestBlock,
+  cessionBlock,
+  receiverBlock,
 } from '../schedule-math.js';
 import {
   watchMyRequests,
@@ -45,6 +47,15 @@ import {
   requestShiftText,
   BLOCK_TEXT,
 } from '../vacancy-requests.js';
+import {
+  watchMyCessions,
+  watchGroupCessions,
+  requestCession,
+  cancelCession,
+  answerCession,
+  CESSION_BLOCK_TEXT,
+  RECEIVER_BLOCK_TEXT,
+} from '../cession-requests.js';
 import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
 import { listenWithRetry, batched } from '../live.js';
 import {
@@ -762,13 +773,20 @@ async function renderDay() {
           (m) => `<li><button type="button" class="day-person${m.id === user.uid ? ' is-me' : ''}" data-person="${escapeHtml(m.id)}" data-shift="${escapeHtml(shiftId)}">
             ${avatarHtml(m, 'avatar day-avatar')}
             <span class="day-person-name">${escapeHtml(m.name)}${m.id === user.uid ? ' <span class="muted">(você)</span>' : ''}</span>
+            ${dayState.mode === 'dynamic' && pendingCessionOf(m.id, month, cellKey(day, shiftId)) ? '<span class="badge badge-warning">Cedendo</span>' : ''}
             ${icon('chevronRight')}</button></li>`,
         )
         .join('');
       const open = vacancies ? `<span class="badge badge-warning">${vacancies} ${vacancies === 1 ? 'vaga' : 'vagas'}</span>` : '';
       const request = dayState.mode === 'dynamic' ? requestHtml(schedule, shifts, month, cellKey(day, shiftId), vacancies) : '';
+      // Coordenação: quantos pedidos esperam resposta neste turno (vaga e cessão)
+      const waiting =
+        dayState.mode === 'dynamic' && stopGroupRequests
+          ? [...groupRequests, ...groupCessions].filter((r) => r.month === month && r.cell === cellKey(day, shiftId)).length
+          : 0;
+      const waitingBadge = waiting ? `<span class="badge badge-primary">${waiting} ${waiting === 1 ? 'pedido' : 'pedidos'}</span>` : '';
       return `<article class="day-shift">
-        <header><strong>${escapeHtml(shift.title)} - ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>${open}</header>
+        <header><strong>${escapeHtml(shift.title)} - ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong><span class="day-shift-badges">${open}${waitingBadge}</span></header>
         ${people ? `<ul>${people}</ul>` : '<p class="muted text-sm">Ninguém escalado.</p>'}
         ${request}
       </article>`;
@@ -851,38 +869,58 @@ function listenRequests() {
   }
 }
 
-const stillMember = (r) => Boolean(group?.memberIds?.includes(r.uid));
+// Quem entra no plantão: quem pediu a vaga ou o colega que recebe a cessão
+const enteringUid = (r, kind) => (kind === 'cession' ? r.toUid : r.uid);
+const stillMember = (r, kind = 'vacancy') => Boolean(group?.memberIds?.includes(enteringUid(r, kind)));
 
 // Quem saiu do grupo não pode mais entrar na escala: o pedido só pode ser recusado
-const answerButtons = (r) => `<button type="button" class="btn btn-secondary" data-request-answer="no">Recusar</button>
-  ${stillMember(r) ? '<button type="button" class="btn btn-primary" data-request-answer="yes">Aceitar</button>' : ''}`;
+const answerButtons = (r, kind = 'vacancy') => `<button type="button" class="btn btn-secondary" data-request-answer="no">Recusar</button>
+  ${stillMember(r, kind) ? `<button type="button" class="btn btn-primary" data-request-answer="yes">${kind === 'cession' ? 'Aprovar' : 'Aceitar'}</button>` : ''}`;
 
-// Cartão "Solicitações de plantão vago" (só aparece com pedido esperando)
+const memberName = (uid, fallback) => members.find((m) => m.id === uid)?.name ?? fallback;
+
+// Pedidos pendentes de vaga e de cessão, por data do plantão
+function pendingItems() {
+  return [
+    ...groupRequests.map((r) => ({ kind: 'vacancy', r })),
+    ...groupCessions.map((r) => ({ kind: 'cession', r })),
+  ].sort(
+    (a, b) =>
+      String(a.r.shiftDate).localeCompare(String(b.r.shiftDate)) || String(a.r.shiftStart).localeCompare(String(b.r.shiftStart)),
+  );
+}
+
+// "pediu o plantão vago Diurno de 02/12 ..." ou "quer ceder o plantão ... para Ana"
+const pendingText = ({ kind, r }) =>
+  kind === 'cession'
+    ? `quer ceder o plantão ${requestShiftText(r)} para <strong>${escapeHtml(memberName(r.toUid, r.toName))}</strong>${stillMember(r, kind) ? '' : ' (saiu do grupo)'}`
+    : `pediu o plantão vago ${requestShiftText(r)}${stillMember(r, kind) ? '' : ' · saiu do grupo'}`;
+
+// Cartão "Solicitações para a coordenação" (só aparece com pedido esperando)
 function renderRequests() {
   const box = $('vacancy-requests');
-  box.hidden = !groupRequests.length;
-  if (!groupRequests.length) {
+  const items = pendingItems();
+  box.hidden = !items.length;
+  if (!items.length) {
     box.innerHTML = '';
     return;
   }
   const byId = new Map(members.map((m) => [m.id, m]));
-  const list = [...groupRequests].sort(
-    (a, b) => String(a.shiftDate).localeCompare(String(b.shiftDate)) || String(a.shiftStart).localeCompare(String(b.shiftStart)),
-  );
-  box.innerHTML = `<h2 class="requests-title">${icon('hourglass')}Solicitações de plantão vago (${list.length})</h2>
-    <p class="muted text-sm">Aceite para escalar a pessoa na vaga. Quem pediu recebe a resposta no sininho.</p>
-    <ul class="request-list">${list
-      .map((r) => {
+  box.innerHTML = `<h2 class="requests-title">${icon('hourglass')}Solicitações para a coordenação (${items.length})</h2>
+    <p class="muted text-sm">Pedidos de plantão vago e de cessão. Quem pediu recebe a resposta no sininho.</p>
+    <ul class="request-list">${items
+      .map((item) => {
+        const { kind, r } = item;
         const person = byId.get(r.uid) ?? { id: r.uid, name: r.name };
-        return `<li class="request-item" data-request="${escapeHtml(r.docId)}">
+        return `<li class="request-item" data-request="${escapeHtml(r.docId)}" data-kind="${kind}">
           ${avatarHtml(person, 'avatar day-avatar')}
           <div class="request-info">
             <strong>${escapeHtml(person.name ?? r.name)}</strong>
-            <span class="muted">${requestShiftText(r)}${stillMember(r) ? '' : ' · saiu do grupo'}</span>
+            <span class="muted">${pendingText(item)}</span>
           </div>
           <div class="request-actions">
             <button type="button" class="btn btn-ghost" data-request-day="${escapeHtml(r.shiftDate)}">Ver o dia</button>
-            ${answerButtons(r)}
+            ${answerButtons(r, kind)}
           </div>
         </li>`;
       })
@@ -898,18 +936,22 @@ $('vacancy-requests').addEventListener('click', (event) => {
   answerFromClick(event);
 });
 
-// Aceitar ou Recusar (no cartão ou na gaveta do dia). true se o clique foi num desses botões.
+// Aceitar/Aprovar ou Recusar (no cartão ou na gaveta do dia). true se o clique foi num desses botões.
 function answerFromClick(event) {
   const button = event.target.closest('[data-request-answer]');
   if (!button) return false;
-  const request = groupRequests.find((r) => r.docId === button.closest('[data-request]')?.dataset.request);
+  const holder = button.closest('[data-request]');
+  const kind = holder?.dataset.kind ?? 'vacancy';
+  const list = kind === 'cession' ? groupCessions : groupRequests;
+  const request = list.find((r) => r.docId === holder?.dataset.request);
   if (!request) return true;
+  const yes = button.dataset.requestAnswer === 'yes';
   (async () => {
     setLoading(button, true);
-    const ok = await answerRequest(request, button.dataset.requestAnswer === 'yes', {
-      deciderName: profile?.name,
-      pending: groupRequests,
-    });
+    const ok =
+      kind === 'cession'
+        ? await answerCession(request, yes, { deciderName: profile?.name })
+        : await answerRequest(request, yes, { deciderName: profile?.name, pending: groupRequests });
     if (!ok && button.isConnected) setLoading(button, false);
   })();
   return true;
@@ -919,19 +961,41 @@ function answerFromClick(event) {
 function requestHtml(schedule, shifts, month, key, vacancies) {
   if (schedule?.status !== 'published') return '';
   if (stopGroupRequests) {
-    const list = groupRequests.filter((r) => r.month === month && r.cell === key);
-    if (!list.length) return '';
-    return `<div class="day-request">
-      <span class="day-request-title">Pedidos desta vaga (${list.length})</span>
-      ${list
-        .map(
-          (r) => `<div class="day-request-status" data-request="${escapeHtml(r.docId)}">
-            <span>${escapeHtml(members.find((m) => m.id === r.uid)?.name ?? r.name)}${stillMember(r) ? '' : ' <span class="muted">(saiu do grupo)</span>'}</span>
-            <span class="request-actions">${answerButtons(r)}</span>
-          </div>`,
-        )
-        .join('')}
-    </div>`;
+    const asked = groupRequests.filter((r) => r.month === month && r.cell === key);
+    const ceded = groupCessions.filter((r) => r.month === month && r.cell === key);
+    // Cada pedido como o médico vê o dele: foto, nome, selo e os botões de resposta
+    const row = (r, kind, label, badge) => `<li class="day-request-person" data-request="${escapeHtml(r.docId)}" data-kind="${kind}">
+        ${avatarHtml(members.find((m) => m.id === r.uid) ?? { id: r.uid, name: r.name }, 'avatar day-avatar')}
+        <div class="day-request-who">
+          <strong>${label}</strong>
+          <span>${badge}${stillMember(r, kind) ? '' : ' <span class="muted text-sm">saiu do grupo</span>'}</span>
+        </div>
+        <span class="request-actions">${answerButtons(r, kind)}</span>
+      </li>`;
+    const vacancyHtml = asked.length
+      ? `<span class="day-request-title">Pedidos desta vaga (${asked.length})</span>
+        <ul class="day-request-list">${asked
+          .map((r) => row(r, 'vacancy', escapeHtml(memberName(r.uid, r.name)), '<span class="badge badge-warning">Pedido enviado</span>'))
+          .join('')}</ul>`
+      : '';
+    const cessionHtmlBlock = ceded.length
+      ? `<span class="day-request-title">Cessões pedidas (${ceded.length})</span>
+        <ul class="day-request-list">${ceded
+          .map((r) =>
+            row(
+              r,
+              'cession',
+              `${escapeHtml(memberName(r.uid, r.name))} → ${escapeHtml(memberName(r.toUid, r.toName))}`,
+              '<span class="badge badge-warning">Cessão pedida</span>',
+            ),
+          )
+          .join('')}</ul>`
+      : '';
+    return vacancyHtml || cessionHtmlBlock
+      ? `<div class="day-request">${vacancyHtml}${cessionHtmlBlock}
+          <p class="muted text-sm">Aguardando a sua resposta. Quem pediu recebe o aviso no sininho.</p>
+        </div>`
+      : '';
   }
   if (!stopMyRequests) return '';
   const mine = myRequests.get(requestId(month, key, user.uid));
@@ -1027,8 +1091,10 @@ async function openShiftDetail(uid, shiftId) {
               <span class="muted">${escapeHtml(professionLabel(m) || '')}</span></div></li>`)
             .join('')}</ul>`
         : '<p class="muted">Não há outro profissional neste plantão.</p>'
-    }`;
-  $('drawer-shift').showModal();
+    }
+    ${uid === user.uid && mode === 'dynamic' ? cessionHtml(schedule, scheduleShifts(schedule, liveShifts), month, cellKey(day, shiftId)) : ''}`;
+  detailState = { uid, shiftId, month, day };
+  if (!$('drawer-shift').open) $('drawer-shift').showModal();
 }
 
 // Fechar (X) fecha as duas gavetas; a seta só volta para os plantões do dia
@@ -1037,8 +1103,174 @@ $('close-shift-drawers').addEventListener('click', () => {
   $('drawer-day').close();
 });
 $('drawer-shift').addEventListener('click', (event) => {
-  if (event.target === $('drawer-shift')) $('drawer-shift').close();
+  if (event.target === $('drawer-shift')) {
+    $('drawer-shift').close();
+    return;
+  }
+  if (event.target.closest('[data-cession-open]')) {
+    openCessionModal();
+    return;
+  }
+  const cancel = event.target.closest('[data-cession-cancel]');
+  if (cancel) cancelMyCession(cancel, cancel.dataset.cessionCancel);
 });
+
+// ---------- Cessão direcionada ----------
+// Quem está no plantão (membro sem poder alterar a escala) escolhe um colega do grupo nos
+// detalhes do plantão; a coordenação aprova ou recusa (cession-requests.js). Gestor e
+// coordenador alteram a escala direto, então não pedem cessão.
+let detailState = null; // plantão aberto nos detalhes: { uid, shiftId, month, day }
+let myCessions = new Map(); // docId → cessão que eu pedi neste grupo
+let groupCessions = []; // cessões pendentes do grupo (coordenação)
+let stopMyCessions = null;
+let stopGroupCessions = null;
+
+// Redesenha o que mostra cessões (detalhes do plantão aberto e a gaveta do dia)
+function refreshCessionViews() {
+  if ($('drawer-day').open) renderDay();
+  if ($('drawer-shift').open && detailState?.month === dayState.month && detailState?.day === dayState.day) {
+    openShiftDetail(detailState.uid, detailState.shiftId);
+  }
+}
+
+function listenCessions() {
+  if (asksVacancies() && !stopMyCessions) {
+    stopMyCessions = watchMyCessions(user.uid, ({ mine }) => {
+      myCessions = new Map(mine.filter((c) => c.groupId === groupId).map((c) => [c.docId, c]));
+      refreshCessionViews();
+    });
+  } else if (!asksVacancies() && stopMyCessions) {
+    stopMyCessions();
+    stopMyCessions = null;
+    myCessions = new Map();
+  }
+  if (answersRequests() && !stopGroupCessions) {
+    stopGroupCessions = watchGroupCessions(groupId, (list) => {
+      groupCessions = list;
+      renderRequests();
+      refreshCessionViews();
+    });
+  } else if (!answersRequests() && stopGroupCessions) {
+    stopGroupCessions();
+    stopGroupCessions = null;
+    groupCessions = [];
+  }
+}
+
+// Cessão pendente de alguém num plantão (para o selo "Cedendo" na gaveta do dia)
+const pendingCessionOf = (uid, month, key) =>
+  [...myCessions.values(), ...groupCessions].find((c) => c.status === 'pending' && c.uid === uid && c.month === month && c.cell === key);
+
+// Seção "Ceder este plantão" nos detalhes do meu plantão
+function cessionHtml(schedule, shifts, month, key) {
+  if (!stopMyCessions) return '';
+  const mine = myCessions.get(requestId(month, key, user.uid));
+  if (mine?.status === 'pending') {
+    return `<h3 class="section-title">Cessão</h3>
+      <div class="detail-cession">
+        <div class="day-request-status">
+          <span class="badge badge-warning">Aguardando a coordenação</span>
+          <button type="button" class="btn btn-ghost" data-cession-cancel="${escapeHtml(mine.docId)}">Cancelar cessão</button>
+        </div>
+        <p class="muted text-sm">Você pediu para ceder este plantão para <strong>${escapeHtml(mine.toName)}</strong>.</p>
+      </div>`;
+  }
+  const block = cessionBlock(schedule, shifts, user.uid, month, key);
+  if (block) return '';
+  const declined =
+    mine?.status === 'declined'
+      ? `<p class="muted text-sm">A coordenação recusou a cessão anterior (para ${escapeHtml(mine.toName)}).</p>`
+      : '';
+  return `<h3 class="section-title">Cessão</h3>
+    <div class="detail-cession">
+      ${declined}
+      <button type="button" class="btn btn-secondary" data-cession-open>${icon('arrowRight')}Ceder plantão</button>
+      <p class="muted text-sm">Escolha um colega do grupo. A cessão vale depois que a coordenação da escala aprovar.</p>
+    </div>`;
+}
+
+// Janela "Ceder plantão": colegas do grupo; quem já está no plantão ou tem outro no horário fica bloqueado
+let cessionTarget = null; // { month, key, shift, schedule, shifts }
+
+async function openCessionModal() {
+  if (!detailState) return;
+  const { month, day, shiftId } = detailState;
+  const schedule = await monthData(month).catch(() => null);
+  const shifts = scheduleShifts(schedule, liveShifts);
+  const key = cellKey(day, shiftId);
+  const block = cessionBlock(schedule, shifts, user.uid, month, key);
+  if (block) {
+    toast(CESSION_BLOCK_TEXT[block], 'error');
+    return;
+  }
+  const shift = shifts[shiftId];
+  cessionTarget = { month, key, shift, schedule, shifts };
+  $('cession-shift').textContent = `${capitalizeFirst(detailDate.format(dateOf(month, day)))} · ${shift.title} (${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)})`;
+  $('cession-search').value = '';
+  renderCessionPeople();
+  setLoading($('cession-submit'), false);
+  $('modal-cession').showModal();
+  $('cession-search').focus();
+}
+
+function renderCessionPeople() {
+  if (!cessionTarget) return;
+  const { schedule, shifts, key } = cessionTarget;
+  const chosen = $('cession-people').querySelector('input:checked')?.value;
+  const term = normalize($('cession-search').value);
+  const people = members
+    .filter((m) => m.id !== user.uid && group.memberIds.includes(m.id))
+    .filter((m) => !term || normalize(m.name ?? '').includes(term))
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+  $('cession-people').innerHTML = people.length
+    ? people
+        .map((m) => {
+          const block = receiverBlock(schedule, shifts, m.id, key);
+          return `<li><label class="cession-person${block ? ' is-blocked' : ''}">
+            <input type="radio" name="cession-to" value="${escapeHtml(m.id)}"${block ? ' disabled' : ''}${chosen === m.id && !block ? ' checked' : ''} />
+            ${avatarHtml(m, 'avatar day-avatar')}
+            <span class="cession-person-name">${escapeHtml(m.name)}${
+              block ? `<small>${RECEIVER_BLOCK_TEXT[block]}</small>` : professionLabel(m) ? `<small>${escapeHtml(professionLabel(m))}</small>` : ''
+            }</span>
+          </label></li>`;
+        })
+        .join('')
+    : `<li class="muted text-sm">${term ? 'Nenhum colega com esse nome.' : 'Não há outros colegas no grupo.'}</li>`;
+}
+
+$('cession-search').addEventListener('input', renderCessionPeople);
+
+$('cession-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const toUid = $('cession-people').querySelector('input:checked')?.value;
+  if (!toUid) {
+    toast('Escolha para quem você quer ceder o plantão.', 'error');
+    return;
+  }
+  const to = members.find((m) => m.id === toUid);
+  const { month, key, shift } = cessionTarget;
+  const button = $('cession-submit');
+  setLoading(button, true);
+  try {
+    await requestCession(group, month, key, shift, profile?.name, to);
+    $('modal-cession').close();
+    toast(`Pedido de cessão para ${to.name} enviado. A coordenação da escala vai aprovar ou recusar.`, 'success', 6000);
+  } catch (error) {
+    toast(firebaseErrorMessage(error), 'error');
+  }
+  setLoading(button, false);
+});
+
+async function cancelMyCession(button, docId) {
+  setLoading(button, true);
+  try {
+    await cancelCession(groupId, docId);
+    toast('Cessão cancelada. Você continua no plantão.');
+  } catch (error) {
+    toast(firebaseErrorMessage(error), 'error');
+    if (button.isConnected) setLoading(button, false);
+  }
+}
 
 // ---------- Editar escala: meses do ano ----------
 let listYear = new Date().getFullYear();
@@ -1101,6 +1333,7 @@ onSnapshot(
     listenInvites();
     listenCalendar();
     listenRequests();
+    listenCessions();
     renderRequests();
     renderMembers();
     renderInvites();
