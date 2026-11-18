@@ -414,7 +414,19 @@ body.is-booting.has-shell .page-skeleton {
 .notification-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .notification-text strong { font-weight: 500; }
 .notification-text span { color: var(--cor-texto-2); font-size: var(--texto-sm); }
-.notification-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-2); margin-top: var(--esp-2); }
+/* Botões numa linha só, na largura toda do cartão (também embaixo do ícone): "Ver o dia" à
+   esquerda, as respostas (Recusar, Aceitar, Dispensar) à direita */
+.notification-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--esp-1);
+  margin-top: var(--esp-2);
+  margin-left: calc(-40px - var(--esp-3));
+}
+.notification-actions .btn { min-height: 36px; padding: 0 var(--esp-3); }
+.notification-actions a.btn-ghost { margin-right: auto; }
 .notification-text small { color: var(--cor-texto-3); font-size: var(--texto-xs); }
 .notification-sentence strong { font-weight: 500; }
 /* Convite aceito (ícone verde) ou recusado (ícone vermelho) */
