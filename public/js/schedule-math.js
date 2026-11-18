@@ -155,3 +155,25 @@ export function replicate(source, fromMonth, toMonth, mode, shiftIds) {
   }
   return { assignments, vacancies };
 }
+
+// ---------- Pedidos de plantão vago ----------
+// Um pedido por pessoa e plantão: "2026-11_07_<turno>_<uid>" (o mesmo id do firestore.rules)
+export const requestId = (month, key, uid) => `${month}_${key}_${uid}`;
+
+// A pessoa pode pedir a vaga deste plantão? null = pode; senão o motivo:
+//   'closed'   escala não publicada ou turno que não existe mais
+//   'full'     nenhuma vaga aberta
+//   'assigned' já está no plantão
+//   'past'     o plantão já começou
+//   'conflict' tem outro plantão no mesmo horário
+export function requestBlock(schedule, shifts, uid, month, key, now = new Date()) {
+  const { day, shiftId } = parseCellKey(key);
+  const shift = shifts?.[shiftId];
+  if (!schedule || schedule.status !== 'published' || !shift) return 'closed';
+  if (!((schedule.vacancies?.[key] ?? 0) > 0)) return 'full';
+  if (schedule.assignments?.[key]?.includes(uid)) return 'assigned';
+  const { year, monthIndex } = monthParts(month);
+  if (new Date(year, monthIndex, day, 0, shift.startMinute) <= now) return 'past';
+  if (findConflict(schedule.assignments, shifts, uid, day, shiftId)) return 'conflict';
+  return null;
+}

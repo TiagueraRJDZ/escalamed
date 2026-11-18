@@ -695,6 +695,74 @@ service cloud.firestore {
           && incoming().createdAt == resource.data.createdAt;
         allow delete: if isGestorOf(groupData()) || isOwnerOf(groupData());
       }
+
+      // ----- Solicitações de plantão vago (id = "<mês>_<célula>_<uid>": uma por pessoa e plantão) -----
+      // O membro pede uma vaga aberta de escala publicada; quem altera a escala (Gestor,
+      // coordenador do grupo) aceita ou recusa. Aceitar é no mesmo lote em que a pessoa entra
+      // na escala (assignments) e a vaga diminui. Quem pediu lê, cancela o pedido pendente e
+      // dispensa a resposta (apaga); pedir de novo depois de recusado regrava o documento.
+      match /vacancyRequests/{requestId} {
+        function schedulePath(m) {
+          return /databases/$(database)/documents/groups/$(groupId)/schedules/$(m);
+        }
+
+        function validRequest(d) {
+          return d.keys().hasOnly(['uid', 'name', 'groupName', 'month', 'cell', 'shiftId', 'shiftTitle',
+                                   'shiftDate', 'shiftStart', 'shiftEnd', 'status', 'createdAt'])
+            && d.uid == me()
+            && str(d.name, 1, 80)
+            && str(d.groupName, 1, 60)
+            && d.month is string && d.month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+            && str(d.shiftId, 1, 128) && d.shiftId.matches('^[A-Za-z0-9]+$')
+            && d.shiftDate is string && d.shiftDate.matches('^' + d.month + '-(0[1-9]|[12][0-9]|3[01])$')
+            && d.cell == d.shiftDate.split('-')[2] + '_' + d.shiftId
+            && requestId == d.month + '_' + d.cell + '_' + me()
+            && str(d.shiftTitle, 1, 40)
+            && d.shiftStart is string && d.shiftStart.matches('^[0-2][0-9]:[0-5][0-9]$')
+            && d.shiftEnd is string && d.shiftEnd.matches('^[0-2][0-9]:[0-5][0-9]$')
+            && d.status == 'pending'
+            && d.createdAt == request.time;
+        }
+
+        // A vaga está aberta numa escala publicada e a pessoa ainda não está no plantão
+        function vacantFor(d) {
+          return exists(schedulePath(d.month))
+            && get(schedulePath(d.month)).data.status == 'published'
+            && get(schedulePath(d.month)).data.vacancies.get(d.cell, 0) > 0
+            && !(me() in get(schedulePath(d.month)).data.assignments.get(d.cell, []));
+        }
+
+        function canAsk() {
+          return groupData().type == 'team' && isMemberOf(groupData())
+            && validRequest(incoming()) && vacantFor(incoming());
+        }
+
+        allow read: if signedIn() && (resource.data.uid == me() || editorOf(groupData()));
+        allow create: if canAsk();
+        // Pedir de novo (o pedido anterior já foi respondido)
+        allow update: if resource.data.uid == me() && resource.data.status != 'pending' && canAsk();
+
+        // Responder: aceitar só junto com a entrada da pessoa no plantão (e ela ainda no grupo);
+        // recusar, a qualquer momento ("filled": as vagas acabaram)
+        allow update: if editorOf(groupData())
+          && resource.data.status == 'pending'
+          && changedOnly(['status', 'decidedBy', 'decidedByName', 'decidedAt', 'reason'])
+          && incoming().decidedBy == me()
+          && str(incoming().decidedByName, 1, 80)
+          && incoming().decidedAt == request.time
+          && ((incoming().status == 'declined' && incoming().get('reason', null) in [null, 'filled'])
+              || (incoming().status == 'approved'
+                  && !('reason' in incoming())
+                  && resource.data.uid in groupData().memberIds
+                  && resource.data.uid in getAfter(schedulePath(resource.data.month)).data.assignments.get(resource.data.cell, [])));
+
+        allow delete: if signedIn() && (resource.data.uid == me() || editorOf(groupData()));
+      }
+    }
+
+    // "Minhas solicitações": os pedidos de plantão vago da própria pessoa, em todos os grupos
+    match /{path=**}/vacancyRequests/{requestId} {
+      allow read: if signedIn() && resource.data.uid == me();
     }
 
     // Administradores da plataforma: qualquer usuário logado lê (o app decide se mostra

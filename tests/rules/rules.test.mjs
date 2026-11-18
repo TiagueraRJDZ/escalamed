@@ -4,7 +4,7 @@
 //   firebase emulators:exec --config firebase.test.json --project demo-escalamed-test "node --test tests/rules/rules.test.mjs"
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { w, NOW, commit, admin, canRead, canQuery, canQueryGroup, clearFirestore, clearAuth, createUser, PROJECT } from './emulator.mjs';
+import { w, NOW, commit, admin, canRead, canQuery, canQueryGroup, canQueryIn, clearFirestore, clearAuth, createUser, PROJECT } from './emulator.mjs';
 
 // Cargos: plataforma (config/admins), gestor, coordenador (marcado no g1), coordenador de outro
 // grupo, administrativo, médico membro, pendente (pediu Gestor, sem aprovação), de fora.
@@ -364,6 +364,128 @@ test('escala: rascunho só Gestor e coordenador; publicada também membros e Adm
   assert.ok(!(await canRead(pending.token, S)));
   // Mês sem escala: membro consegue perguntar (e recebe "não existe")
   assert.ok(await canRead(medico.token, `${G}/schedules/2026-11`));
+});
+
+// ---------- Pedidos de plantão vago ----------
+// Escala de outubro publicada com 2 vagas no 05_n; o médico está no 05_m
+const RQ = (uid, cell = '05_n') => `${G}/vacancyRequests/2026-10_${cell}_${uid}`;
+
+function vacancyRequest(uid, extra = {}) {
+  return {
+    uid,
+    name: 'Médico',
+    groupName: 'TELEAUDITORIA HAPVIDA',
+    month: '2026-10',
+    cell: '05_n',
+    shiftId: 'n',
+    shiftTitle: 'Noturno',
+    shiftDate: '2026-10-05',
+    shiftStart: '19:00',
+    shiftEnd: '01:00',
+    status: 'pending',
+    createdAt: NOW,
+    ...extra,
+  };
+}
+
+const publishedSchedule = (extra = {}) =>
+  admin([w.set(S, { ...schedule(gestor), status: 'published', createdAt: new Date(), updatedAt: new Date(), ...extra })]);
+// Pedido já gravado (pelo emulador, sem regras)
+const seedRequest = (uid, extra = {}) => admin([w.set(RQ(uid), vacancyRequest(uid, { createdAt: new Date(), ...extra }))]);
+const ask = (actor, data = vacancyRequest(actor.uid), path = RQ(actor.uid)) => commit(actor.token, [w.set(path, data)]);
+
+// Aceitar como o app faz: a pessoa entra no plantão, a vaga diminui e o pedido fica aceito
+function approveWrites(actor, uid, { assign = true, left = 1 } = {}) {
+  const scheduleWrite = {
+    update: {
+      name: `projects/${PROJECT}/databases/(default)/documents/${S}`,
+      fields: { updatedBy: { stringValue: actor.uid }, vacancies: { mapValue: { fields: { '05_n': { integerValue: String(left) } } } } },
+    },
+    updateMask: { fieldPaths: ['updatedBy', 'vacancies.`05_n`'] },
+    updateTransforms: [
+      { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+      ...(assign ? [{ fieldPath: 'assignments.`05_n`', appendMissingElements: { values: [{ stringValue: uid }] } }] : []),
+    ],
+    currentDocument: { exists: true },
+  };
+  return [scheduleWrite, w.update(RQ(uid), { status: 'approved', decidedBy: actor.uid, decidedByName: 'Coordenador', decidedAt: NOW })];
+}
+
+const decline = (actor, uid, extra = {}) =>
+  commit(actor.token, [w.update(RQ(uid), { status: 'declined', decidedBy: actor.uid, decidedByName: 'Coordenador', decidedAt: NOW, ...extra })]);
+
+test('pedido de vaga: membro pede vaga aberta de escala publicada', async () => {
+  await admin([w.set(S, { ...schedule(gestor), createdAt: new Date(), updatedAt: new Date() })]);
+  assert.ok(!(await ask(medico))); // rascunho
+  await publishedSchedule();
+  assert.ok(!(await ask(outsider))); // não é do grupo
+  assert.ok(!(await ask(adm))); // Administrativo vê, mas não está na escala
+  assert.ok(!(await ask(medico, vacancyRequest(gestor.uid)))); // em nome de outra pessoa
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid), `${G}/vacancyRequests/qualquer`))); // id fora do padrão
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid, { status: 'approved' }))));
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid, { extra: 1 }))));
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid, { shiftDate: '2026-10-06' })))); // dia diferente da célula
+  // Sem vaga ou já no plantão
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid, { cell: '06_n', shiftDate: '2026-10-06' }), RQ(medico.uid, '06_n'))));
+  assert.ok(!(await ask(medico, vacancyRequest(medico.uid, { cell: '05_m', shiftId: 'm' }), RQ(medico.uid, '05_m'))));
+  assert.ok(await ask(medico));
+  // Pendente: não regrava (cancela e pede de novo)
+  assert.ok(!(await ask(medico)));
+  assert.ok(await commit(medico.token, [w.delete(RQ(medico.uid))]));
+  assert.ok(await ask(medico));
+});
+
+test('pedido de vaga: quem pediu e a coordenação leem; os outros não', async () => {
+  await publishedSchedule();
+  await admin([w.update(G, { memberIds: [gestor.uid, coord.uid, medico.uid, invited.uid] })]);
+  await seedRequest(medico.uid);
+  assert.ok(await canRead(medico.token, RQ(medico.uid)));
+  assert.ok(await canRead(coord.token, RQ(medico.uid)));
+  assert.ok(await canRead(gestor.token, RQ(medico.uid)));
+  assert.ok(!(await canRead(invited.token, RQ(medico.uid)))); // outro membro
+  assert.ok(!(await canRead(adm.token, RQ(medico.uid))));
+  assert.ok(!(await canRead(coordOther.token, RQ(medico.uid))));
+  // Consultas do app: os meus em todos os grupos; os pendentes do grupo (coordenação)
+  assert.ok(await canQueryGroup(medico.token, 'vacancyRequests', 'uid', medico.uid));
+  assert.ok(!(await canQueryGroup(medico.token, 'vacancyRequests', 'uid', invited.uid)));
+  assert.ok(await canQueryIn(coord.token, G, 'vacancyRequests', [['status', 'EQUAL', 'pending']]));
+  assert.ok(await canQueryIn(gestor.token, G, 'vacancyRequests', [['status', 'EQUAL', 'pending']]));
+  assert.ok(!(await canQueryIn(medico.token, G, 'vacancyRequests', [['status', 'EQUAL', 'pending']])));
+  // Cancelar: só quem pediu (ou a coordenação)
+  assert.ok(!(await commit(invited.token, [w.delete(RQ(medico.uid))])));
+  assert.ok(await commit(medico.token, [w.delete(RQ(medico.uid))]));
+});
+
+test('pedido de vaga: aceitar só junto com a entrada no plantão, e só a coordenação', async () => {
+  await publishedSchedule();
+  await seedRequest(medico.uid);
+  assert.ok(!(await commit(medico.token, approveWrites(medico, medico.uid)))); // a própria pessoa
+  assert.ok(!(await commit(coordOther.token, approveWrites(coordOther, medico.uid))));
+  assert.ok(!(await commit(coord.token, approveWrites(coord, medico.uid, { assign: false })))); // sem escalar
+  assert.ok(!(await commit(coord.token, [w.update(RQ(medico.uid), { status: 'approved', decidedBy: coord.uid, decidedByName: 'Coordenador', decidedAt: NOW })])));
+  assert.ok(await commit(coord.token, approveWrites(coord, medico.uid)));
+  // Já respondido: não responde de novo
+  assert.ok(!(await decline(coord, medico.uid)));
+});
+
+test('pedido de vaga: quem saiu do grupo não é aceito, mas pode ser recusado', async () => {
+  await publishedSchedule();
+  await seedRequest(medico.uid);
+  await admin([w.update(G, { memberIds: [gestor.uid, coord.uid] })]);
+  assert.ok(!(await commit(gestor.token, approveWrites(gestor, medico.uid))));
+  assert.ok(await decline(gestor, medico.uid));
+});
+
+test('pedido de vaga: recusar (também "vagas preenchidas"); depois a pessoa pode pedir de novo', async () => {
+  await publishedSchedule();
+  await seedRequest(medico.uid);
+  assert.ok(!(await decline(adm, medico.uid)));
+  assert.ok(!(await decline(medico, medico.uid)));
+  assert.ok(!(await decline(coord, medico.uid, { reason: 'outro' })));
+  assert.ok(!(await decline(coord, medico.uid, { decidedBy: gestor.uid })));
+  assert.ok(await decline(coord, medico.uid, { reason: 'filled' }));
+  assert.ok(await canRead(medico.token, RQ(medico.uid)));
+  assert.ok(await ask(medico)); // regrava como pedido novo
 });
 
 // ---------- Membros e coordenadores ----------

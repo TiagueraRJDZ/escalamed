@@ -118,7 +118,10 @@ function sentence(m, members) {
     case 'vacant_closed':
       return `${actor} fechou as vagas do plantão de ${shiftText(m)}`;
     case 'vacant_taken':
-      return `${actor} assumiu o plantão vago de ${shiftText(m)}`;
+      // Pedido aceito pelo Gestor ou coordenador: quem entrou é o target
+      return m.targetUid && !self
+        ? `${target} assumiu o plantão vago de ${shiftText(m)} (pedido aceito por ${actor})`
+        : `${actor} assumiu o plantão vago de ${shiftText(m)}`;
     case 'assigned':
       return self ? `${actor} se escalou no plantão de ${shiftText(m)}` : `${actor} escalou ${target} no plantão de ${shiftText(m)}`;
     case 'unassigned':
@@ -203,6 +206,7 @@ function groupSentence(items, members) {
     if (m.type === 'assigned') return `${actor} fez ${count} escalações`;
     if (m.type === 'unassigned') return `${actor} tirou ${count} pessoas de plantões`;
     if (m.type === 'cession') return `${actor} cedeu ${n}`;
+    if (m.type === 'vacant_taken') return `${actor} aceitou ${count} pedidos de plantão vago`;
   }
   switch (m.type) {
     case 'assigned':
@@ -214,7 +218,7 @@ function groupSentence(items, members) {
     case 'vacant_closed':
       return `${actor} fechou as vagas de ${n}`;
     case 'vacant_taken':
-      return `${actor} assumiu ${count} plantões vagos`;
+      return m.targetUid && !self ? `${target} assumiu ${count} plantões vagos (pedidos aceitos por ${actor})` : `${actor} assumiu ${count} plantões vagos`;
     case 'cession':
       return `${actor} cedeu ${n} para ${target}`;
     default:

@@ -15,6 +15,8 @@ import {
   dayShifts,
   replicationMap,
   replicate,
+  requestId,
+  requestBlock,
 } from '../public/js/schedule-math.js';
 
 // Turnos do grupo de referência
@@ -121,4 +123,28 @@ test('replicar copia alocações e vagas, só dos turnos que existem', () => {
   const result = replicate(source, '2026-10', '2026-11', 'weekday', ['m', 'n']);
   assert.deepEqual(result.assignments, { [cellKey(1, 'm')]: ['ana'] });
   assert.deepEqual(result.vacancies, { [cellKey(1, 'n')]: 1 });
+});
+
+test('pedido de plantão vago: id e quando dá para pedir', () => {
+  assert.equal(requestId('2026-11', '07_m', 'u1'), '2026-11_07_m_u1');
+  const now = new Date(2026, 10, 7, 6, 0); // 07/11/2026, 06h00
+  const schedule = {
+    status: 'published',
+    assignments: { '07_m': ['u2'], '07_t': ['u1'], '08_mad': ['u3'] },
+    vacancies: { '07_m': 1, '07_n': 2, '06_m': 1, '08_mad': 1, '07_ref': 1 },
+  };
+  const block = (uid, key, extra = {}) => requestBlock({ ...schedule, ...extra }, SHIFTS, uid, '2026-11', key, now);
+  assert.equal(block('u1', '07_m'), null);
+  assert.equal(block('u1', '07_m', { status: 'draft' }), 'closed');
+  assert.equal(block('u1', '07_x'), 'closed'); // turno apagado
+  assert.equal(requestBlock(null, SHIFTS, 'u1', '2026-11', '07_m', now), 'closed');
+  assert.equal(block('u1', '08_m'), 'full'); // sem vaga
+  assert.equal(block('u1', '07_m', { vacancies: { '07_m': 0 } }), 'full');
+  assert.equal(block('u2', '07_m'), 'assigned');
+  assert.equal(block('u1', '06_m'), 'past'); // ontem
+  assert.equal(requestBlock(schedule, SHIFTS, 'u1', '2026-11', '07_m', new Date(2026, 10, 7, 7, 0)), 'past'); // já começou
+  assert.equal(block('u1', '07_ref'), 'conflict'); // u1 está no T (13h-19h), REF é 16h-19h
+  assert.equal(block('u4', '07_n'), null);
+  // N do dia 7 (19h-01h) bate com o MAD do dia 8 (00h-06h)
+  assert.equal(block('u3', '07_n'), 'conflict');
 });

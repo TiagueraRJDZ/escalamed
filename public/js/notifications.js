@@ -1,7 +1,9 @@
 // Notificações (sininho do topo), em tempo real em todas as páginas:
 //  - convites para grupos que a pessoa recebeu (Aceitar / Recusar);
 //  - convites que ela mandou e foram aceitos ou recusados (Dispensar);
-//  - avisos dela (users/{uid}/notices), como o cargo alterado por um Gestor (Dispensar).
+//  - avisos dela (users/{uid}/notices), como o cargo alterado por um Gestor (Dispensar);
+//  - pedidos de plantão vago esperando resposta, para o Gestor e o coordenador do grupo
+//    (Aceitar / Recusar), e as respostas aos pedidos da própria pessoa (Dispensar).
 // O sininho mostra quantas há; o que chega com a página aberta também vira um aviso.
 // A tela de Escalas usa a mesma lista de convites (onInvitesChange) para os cartões.
 // No topo da gaveta: as notificações push neste aparelho (push.js), para os mesmos avisos
@@ -21,10 +23,16 @@ import {
   inviteKey,
   isAccepted,
 } from './members.js';
+import { watchMyGroups } from './my-groups.js';
+import { can } from './permissions.js';
+import { watchMyRequests, watchGroupRequests, removeRequest, answerRequest, requestShiftText, requestDayLink } from './vacancy-requests.js';
 
 let invites = []; // recebidos, pendentes
 let answered = []; // mandados e respondidos (aceitos ou recusados)
 let notices = []; // avisos da própria pessoa (ex.: cargo alterado)
+let vacancyAnswers = []; // respostas aos pedidos de plantão vago da própria pessoa
+let vacancyPending = []; // pedidos esperando resposta nos grupos em que a pessoa altera a escala
+const vacancyGroups = new Map(); // groupId → grupo (para saber se quem pediu ainda está nele)
 // Avisos e respostas já vistos (clicados), guardados em notificationReads/{uid} para valer em
 // todos os aparelhos. Convite recebido não entra: fica destacado até ser respondido.
 let seen = new Set();
@@ -73,6 +81,21 @@ const answeredText = (inv) =>
   `<strong>${escapeHtml(answerer(inv))}</strong> ${answerVerb(inv)} o convite para
   <strong>${escapeHtml(inv.groupName)}</strong>`;
 
+// Respostas aos pedidos de plantão vago
+const vacancyAnswerText = (r) => {
+  const where = `<strong>${escapeHtml(r.groupName ?? 'o grupo')}</strong>`;
+  if (r.status === 'approved') {
+    return `<strong>${escapeHtml(r.decidedByName ?? 'A coordenação')}</strong> aceitou seu pedido: você está no plantão ${requestShiftText(r)} em ${where}`;
+  }
+  if (r.reason === 'filled') return `As vagas do plantão ${requestShiftText(r)} em ${where} foram preenchidas`;
+  return `<strong>${escapeHtml(r.decidedByName ?? 'A coordenação')}</strong> recusou seu pedido para o plantão ${requestShiftText(r)} em ${where}`;
+};
+
+const vacancyPendingText = (r) =>
+  `<strong>${escapeHtml(r.name ?? 'Alguém')}</strong> pediu o plantão vago ${requestShiftText(r)} em <strong>${escapeHtml(r.groupName ?? 'um grupo')}</strong>`;
+
+const stillMember = (r) => vacancyGroups.get(r.groupId)?.memberIds?.includes(r.uid) ?? true;
+
 const noticeText = (n) =>
   n.type === 'role'
     ? `<strong>${escapeHtml(n.byName ?? 'Um Gestor')}</strong> alterou seu cargo para <strong>${escapeHtml(n.categoryName ?? 'outro cargo')}</strong>`
@@ -91,7 +114,12 @@ const unreadLabel = (item) => (isUnread(item) ? '<span class="sr-only">Não lida
 
 function renderBell() {
   const bell = session.app.querySelector('#notifications-button');
-  const count = invites.length + answered.filter(isUnread).length + notices.filter(isUnread).length;
+  const count =
+    invites.length +
+    vacancyPending.length +
+    answered.filter(isUnread).length +
+    notices.filter(isUnread).length +
+    vacancyAnswers.filter(isUnread).length;
   let badge = bell.querySelector('.bell-count');
   if (!badge) {
     badge = document.createElement('span');
@@ -122,6 +150,50 @@ function renderDrawer() {
   const received = showInvites ? invites : [];
   const replies = showAnswered ? answered : [];
   const mine = !filters.length || filters.includes('management') ? notices : [];
+  const showShifts = !filters.length || filters.includes('shifts');
+  const toAnswer = showShifts || filters.includes('management') ? vacancyPending : [];
+  const myAnswers = showShifts ? vacancyAnswers : [];
+
+  // Gestor e coordenador: "Ana pediu o plantão vago Noturno de 07/11 (19h00 às 01h00) em UTI"
+  const toAnswerHtml = toAnswer.length
+    ? `<h3 class="section-title">Pedidos de plantão vago</h3>
+      <ul class="notification-list">${toAnswer
+        .map(
+          (r) => `<li class="notification-item" data-id="${escapeHtml(r.path)}">
+          <span class="notification-icon" aria-hidden="true">${icon('hourglass')}</span>
+          <div class="notification-text">
+            <span class="notification-sentence">${vacancyPendingText(r)}${stillMember(r) ? '' : ' <span class="muted">(saiu do grupo)</span>'}</span>
+            <small>${whenText(r.createdAt)}</small>
+            <div class="notification-actions">
+              <a class="btn btn-ghost" href="${requestDayLink(r)}">Ver o dia</a>
+              <button type="button" class="btn btn-secondary" data-vacancy-answer="no">Recusar</button>
+              ${stillMember(r) ? '<button type="button" class="btn btn-primary" data-vacancy-answer="yes">Aceitar</button>' : ''}
+            </div>
+          </div>
+        </li>`,
+        )
+        .join('')}</ul>`
+    : '';
+
+  // Quem pediu: "Bruno aceitou seu pedido: você está no plantão ..."
+  const myAnswersHtml = myAnswers.length
+    ? `<h3 class="section-title">Respostas aos seus pedidos de plantão</h3>
+      <ul class="notification-list">${myAnswers
+        .map(
+          (r) => `<li class="notification-item ${r.status === 'approved' ? 'is-accepted' : 'is-declined'}${readClass(r)}" data-id="${escapeHtml(r.id)}" data-readable>
+          <span class="notification-icon" aria-hidden="true">${icon(r.status === 'approved' ? 'check' : 'x')}</span>
+          <div class="notification-text">
+            <span class="notification-sentence">${unreadLabel(r)}${vacancyAnswerText(r)}</span>
+            <small>${whenText(r.decidedAt)}</small>
+            <div class="notification-actions">
+              <a class="btn btn-ghost" href="${requestDayLink(r)}">Ver o dia</a>
+              <button type="button" class="btn btn-ghost" data-dismiss>Dispensar</button>
+            </div>
+          </div>
+        </li>`,
+        )
+        .join('')}</ul>`
+    : '';
 
   // "Ana Gestora alterou seu cargo para Médico"
   const noticesHtml = mine.length
@@ -182,7 +254,7 @@ function renderDrawer() {
 
   // Limpar todas: avisos e respostas aos convites (os do filtro escolhido). Convite recebido
   // só sai respondendo.
-  const clearable = mine.length + replies.length;
+  const clearable = mine.length + replies.length + myAnswers.length;
   const toolsHtml = clearable
     ? `<div class="notification-tools">
         <button type="button" class="btn btn-ghost" data-clear-all>${icon('trash')}Limpar todas</button>
@@ -190,8 +262,8 @@ function renderDrawer() {
     : '';
 
   list.innerHTML =
-    noticesHtml || receivedHtml || repliesHtml
-      ? toolsHtml + noticesHtml + receivedHtml + repliesHtml
+    noticesHtml || toAnswerHtml || receivedHtml || myAnswersHtml || repliesHtml
+      ? toolsHtml + noticesHtml + toAnswerHtml + receivedHtml + myAnswersHtml + repliesHtml
       : `<h3 class="section-title">Não lidas</h3>
       <div class="empty-state">
         ${icon('bell')}
@@ -431,6 +503,66 @@ export function setupNotifications(app, user, profile, access = {}) {
     { metadata: true },
   );
 
+  // Respostas aos meus pedidos de plantão vago. O id leva a hora do pedido: pedir de novo
+  // depois de uma recusa gera uma resposta nova (não lida).
+  const vacancyAnswersChanged = tracker((r) =>
+    toast(
+      r.status === 'approved'
+        ? `Pedido aceito: você está no plantão de ${r.shiftDate.slice(8)}/${r.shiftDate.slice(5, 7)} em ${r.groupName}.`
+        : `Seu pedido de plantão vago em ${r.groupName} foi recusado.`,
+      r.status === 'approved' ? 'success' : 'info',
+      8000,
+    ),
+  );
+  watchMyRequests(user.uid, (list, meta) => {
+    const next = list
+      .filter((r) => r.status === 'approved' || r.status === 'declined')
+      .map((r) => ({ ...r, id: `${r.path}@${r.createdAt?.toMillis?.() ?? 0}` }));
+    if (!vacancyAnswersChanged(next, meta)) return;
+    vacancyAnswers = next;
+    render();
+  });
+
+  // Pedidos esperando resposta: só para quem altera a escala de algum grupo de equipe
+  // (Gestor, coordenador marcado no grupo, Dev). Uma escuta por grupo.
+  if (['dev', 'gestor', 'coordenador'].includes(access?.role)) {
+    const byGroup = new Map(); // groupId → { stop, list }
+    const synced = new Set(); // grupos que já responderam do servidor
+    const pendingChanged = tracker((r) => toast(`${r.name} pediu um plantão vago em ${r.groupName}. Veja no sininho.`, 'info', 8000));
+    const emit = () => {
+      const list = [...byGroup.values()]
+        .flatMap((entry) => entry.list)
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      const changed = pendingChanged(list, { synced: [...byGroup.keys()].every((id) => synced.has(id)) });
+      vacancyPending = list;
+      if (changed) render();
+    };
+    watchMyGroups(user.uid, access.role, (groups) => {
+      const editable = groups.filter((g) => g.type === 'team' && can(g.role, 'editSchedule'));
+      const ids = new Set(editable.map((g) => g.id));
+      vacancyGroups.clear();
+      editable.forEach((g) => vacancyGroups.set(g.id, g));
+      for (const [id, entry] of byGroup) {
+        if (ids.has(id)) continue;
+        entry.stop();
+        byGroup.delete(id);
+        synced.delete(id);
+      }
+      for (const g of editable) {
+        if (byGroup.has(g.id)) continue;
+        const entry = { list: [], stop: null };
+        byGroup.set(g.id, entry);
+        entry.stop = watchGroupRequests(g.id, (list, meta) => {
+          entry.list = list;
+          if (meta.synced) synced.add(g.id);
+          emit();
+        });
+      }
+      emit();
+      render(); // quem pediu pode ter saído do grupo
+    });
+  }
+
   // Já vistas, em tempo real (vistas em outro aparelho também deixam de contar aqui)
   const readsRef = doc(db, 'notificationReads', user.uid);
   listenWithRetry(
@@ -445,7 +577,7 @@ export function setupNotifications(app, user, profile, access = {}) {
   // Guarda só as que ainda estão na lista (as dispensadas saem), no máximo 300
   const saveSeen = () =>
     setDoc(readsRef, {
-      ids: [...notices, ...answered].map((item) => item.id).filter((id) => seen.has(id)).slice(0, 300),
+      ids: [...notices, ...answered, ...vacancyAnswers].map((item) => item.id).filter((id) => seen.has(id)).slice(0, 300),
       updatedAt: serverTimestamp(),
     }).catch(() => {}); // sem conexão: o Firestore grava quando voltar
 
@@ -461,7 +593,7 @@ export function setupNotifications(app, user, profile, access = {}) {
     const list = [...document.querySelectorAll('#notifications-list [data-readable]')].map((li) => li.dataset.id);
     const ok = await confirmDialog({
       title: 'Limpar todas as notificações?',
-      message: 'Os avisos e as respostas aos seus convites saem da lista. Convites que você recebeu continuam até você responder.',
+      message: 'Os avisos e as respostas aos seus convites e pedidos saem da lista. Convites e pedidos que esperam a sua resposta continuam até você responder.',
       confirmText: 'Limpar todas',
       danger: true,
     });
@@ -471,8 +603,10 @@ export function setupNotifications(app, user, profile, access = {}) {
       list.map((id) => {
         const notice = notices.find((item) => item.id === id);
         const inv = answered.find((item) => item.id === id);
+        const answer = vacancyAnswers.find((item) => item.id === id);
         if (notice) return deleteDoc(doc(db, notice.id));
         if (inv) return cancelInvite(inv.groupId, inviteKey(inv));
+        if (answer) return removeRequest(answer.groupId, answer.docId);
         return null;
       }),
     );
@@ -492,6 +626,19 @@ export function setupNotifications(app, user, profile, access = {}) {
     // Clicar no aviso (ou em "Ver meu cargo") marca como visto; Dispensar apaga
     const item = event.target.closest('[data-readable]');
     if (item && !event.target.closest('[data-dismiss]')) markSeen(item.dataset.id);
+    // Pedido de plantão vago: Aceitar ou Recusar
+    const vacancyButton = event.target.closest('[data-vacancy-answer]');
+    if (vacancyButton) {
+      const request = vacancyPending.find((r) => r.path === vacancyButton.closest('[data-id]').dataset.id);
+      if (!request) return;
+      setLoading(vacancyButton, true);
+      const ok = await answerRequest(request, vacancyButton.dataset.vacancyAnswer === 'yes', {
+        deciderName: session.profile?.name,
+        pending: vacancyPending,
+      });
+      if (!ok && vacancyButton.isConnected) setLoading(vacancyButton, false);
+      return;
+    }
     const button = event.target.closest('[data-accept], [data-decline], [data-dismiss]');
     if (!button) return;
     const id = button.closest('[data-id]').dataset.id;
@@ -501,9 +648,11 @@ export function setupNotifications(app, user, profile, access = {}) {
       // Dispensar: apaga o aviso, ou o convite aceito ou recusado
       const notice = notices.find((item) => item.id === id);
       const inv = answered.find((item) => item.id === id);
+      const answer = vacancyAnswers.find((item) => item.id === id);
       try {
         if (notice) await deleteDoc(doc(db, notice.id));
         else if (inv) await cancelInvite(inv.groupId, inviteKey(inv));
+        else if (answer) await removeRequest(answer.groupId, answer.docId);
       } catch (error) {
         ok = false;
         toast(firebaseErrorMessage(error), 'error');

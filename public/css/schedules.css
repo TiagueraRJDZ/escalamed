@@ -246,6 +246,7 @@
 .day-card { padding: var(--esp-4); }
 .day-card-title { font-size: var(--texto-md); margin-bottom: var(--esp-2); color: var(--cor-primaria); }
 .day-empty { color: var(--cor-texto-3); font-size: var(--texto-sm); }
+.day-hint { margin: 0 var(--esp-1); }
 .home-shifts { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
 .home-shift {
   display: grid;

@@ -360,3 +360,30 @@
 .detail-others { display: grid; gap: var(--esp-2); margin: 0; padding: 0; list-style: none; }
 .detail-others li { display: flex; align-items: center; gap: var(--esp-2); }
 .detail-others li > div { display: flex; flex-direction: column; font-size: var(--texto-sm); }
+
+/* ---------- Pedidos de plantão vago ---------- */
+/* Gestor e coordenador: cartão no topo do Calendário, com os pedidos esperando resposta */
+.requests-card { grid-column: 1 / -1; padding: var(--esp-5); }
+.requests-card[hidden] { display: none; }
+.requests-title { display: flex; align-items: center; gap: var(--esp-2); font-size: var(--texto-lg); }
+.requests-title svg { width: 20px; height: 20px; color: var(--cor-primaria); }
+.request-list { display: grid; gap: var(--esp-2); margin: var(--esp-3) 0 0; padding: 0; list-style: none; }
+.request-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2) var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio) var(--raio) var(--folha-sm) var(--raio);
+  background: var(--cor-superficie);
+}
+.request-info { display: grid; flex: 1 1 220px; min-width: 0; font-size: var(--texto-sm); }
+.request-info strong { font-weight: 600; }
+.request-actions { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin-left: auto; }
+
+/* Gaveta do dia: pedir a vaga (membro) ou responder os pedidos (coordenação) */
+.day-request { display: grid; gap: var(--esp-2); margin-top: var(--esp-3); padding-top: var(--esp-3); border-top: 1px dashed var(--cor-borda); }
+.day-request-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2); font-size: var(--texto-sm); }
+.day-request .btn { justify-self: start; }
+.day-request-title { font-size: var(--texto-sm); font-weight: 600; color: var(--cor-texto-2); }

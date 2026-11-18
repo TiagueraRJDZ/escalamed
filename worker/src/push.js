@@ -13,6 +13,9 @@
  *   recusa   o convidado recusou                    → para quem convidou
  *   cargo    um Gestor ou administrador alterou o cargo de alguém → para essa pessoa
  *            (grupo = uid dela, chave = id do aviso em users/{uid}/notices)
+ *   vaga-pedido    um membro pediu um plantão vago → para os coordenadores do grupo (sem
+ *                  coordenador, para o Gestor que criou o grupo); chave = id do pedido
+ *   vaga-resposta  a coordenação aceitou ou recusou o pedido → para quem pediu
  *
  * Rotas (POST, com "Authorization: Bearer <token do Firebase>"):
  *   /push/inscrever  { inscricao: { endpoint, keys: { p256dh, auth } }, aparelho }
@@ -33,6 +36,9 @@
  * ===================================================================== */
 
 const MAX_APARELHOS = 10; // por conta: os mais antigos saem
+// Pessoas por aviso (pedido de plantão vago → coordenadores): 4 x 10 aparelhos cabem no limite
+// de 50 requisições por chamada do plano gratuito do Cloudflare
+const MAX_DESTINOS = 4;
 const AVISO_RECENTE_MS = 10 * 60 * 1000; // só avisa o que aconteceu nos últimos 10 minutos
 const GUARDA_AVISOS_MS = 30 * 24 * 60 * 60 * 1000; // lembra os avisos enviados por 30 dias
 const VALIDADE_MENSAGEM_S = 7 * 24 * 60 * 60; // celular desligado: o serviço guarda por até 7 dias
@@ -173,8 +179,12 @@ async function avisar(contexto) {
   const novo = await env.DB.prepare('INSERT INTO push_avisos (chave, em) VALUES (?1, ?2) ON CONFLICT (chave) DO NOTHING RETURNING chave')
     .bind(`${tipo}:${grupo}:${chave}:${aviso.momento}`, Date.now())
     .first();
-  if (!novo || !aviso.destino || aviso.destino === quem.uid) return { enviados: 0 };
-  return { enviados: await enviarParaConta(env, aviso.destino, aviso.mensagem) };
+  // Para uma pessoa (destino) ou algumas (destinos); quem pediu nunca recebe o próprio aviso
+  const destinos = [...new Set(aviso.destinos ?? [aviso.destino])].filter((uid) => uid && uid !== quem.uid).slice(0, MAX_DESTINOS);
+  if (!novo || !destinos.length) return { enviados: 0 };
+  let enviados = 0;
+  for (const uid of destinos) enviados += await enviarParaConta(env, uid, aviso.mensagem);
+  return { enviados };
 }
 
 // Documento conferido de cada tipo de aviso ("grupo" e "chave" vêm do app)
@@ -182,7 +192,19 @@ const CAMINHOS = {
   convite: (grupo, chave) => `groups/${grupo}/invites/${chave}`,
   // cargo: grupo = uid de quem teve o cargo alterado; chave = id do aviso
   cargo: (uid, aviso) => `users/${uid}/notices/${aviso}`,
+  'vaga-pedido': (grupo, pedido) => `groups/${grupo}/vacancyRequests/${pedido}`,
+  'vaga-resposta': (grupo, pedido) => `groups/${grupo}/vacancyRequests/${pedido}`,
 };
+
+// "Noturno de 07/11 (19h00 às 01h00)"
+function plantaoDe(pedido) {
+  const data = String(pedido.shiftDate || '');
+  const hora = (t) => String(t || '').replace(':', 'h');
+  const horario = pedido.shiftStart ? ` (${hora(pedido.shiftStart)} às ${hora(pedido.shiftEnd)})` : '';
+  return `${pedido.shiftTitle || 'Plantão'} de ${data.slice(8, 10)}/${data.slice(5, 7)}${horario}`;
+}
+
+const textos = (campo) => (campo?.arrayValue?.values || []).map((v) => v.stringValue).filter(Boolean);
 
 // Cada tipo de aviso: confere o documento e monta a notificação (null = nada a avisar)
 const AVISOS = {
@@ -215,6 +237,46 @@ const AVISOS = {
         corpo: `${convite.invitedByName || 'Alguém'} convidou você para o grupo${unidade}. Toque para aceitar ou recusar.`,
         url: `/invite.html?g=${encodeURIComponent(grupo)}`,
         tag: `convite:${grupo}`,
+      },
+    };
+  },
+  // Pedido de plantão vago: quem pediu precisa ser quem avisa. Vai para os coordenadores do
+  // grupo (lidos com o token de quem pediu, que é membro e lê o grupo); sem coordenador, para
+  // o Gestor que criou o grupo.
+  async 'vaga-pedido'({ env, local, quem, grupo, chave, convite: pedido }) {
+    if (pedido.uid !== quem.uid || pedido.status !== 'pending') return null;
+    const campos = await apoio.lerDocumento(env, quem.token, `groups/${encodeURIComponent(grupo)}`, local);
+    const coordenadores = textos(campos?.coordinatorIds);
+    return {
+      momento: Date.parse(pedido.createdAt || ''),
+      destinos: coordenadores.length ? coordenadores : [campos?.ownerId?.stringValue],
+      mensagem: {
+        titulo: 'Pedido de plantão vago',
+        corpo: `${pedido.name || 'Um membro'} pediu o plantão ${plantaoDe(pedido)} em ${pedido.groupName || 'um grupo'}. Toque para aceitar ou recusar.`,
+        url: `/group.html?id=${encodeURIComponent(grupo)}&dia=${encodeURIComponent(pedido.shiftDate || '')}`,
+        tag: `vaga-pedido:${grupo}:${chave}`,
+      },
+    };
+  },
+  // Resposta ao pedido: quem pediu o aviso precisa ser quem respondeu; vai para quem pediu
+  async 'vaga-resposta'({ quem, grupo, chave, convite: pedido }) {
+    if (pedido.decidedBy !== quem.uid || !['approved', 'declined'].includes(pedido.status)) return null;
+    const plantao = plantaoDe(pedido);
+    const onde = pedido.groupName || 'o grupo';
+    const quemRespondeu = pedido.decidedByName || 'A coordenação';
+    const mensagem =
+      pedido.status === 'approved'
+        ? { titulo: 'Pedido de plantão aceito', corpo: `${quemRespondeu} aceitou: você está no plantão ${plantao} em ${onde}.` }
+        : pedido.reason === 'filled'
+          ? { titulo: 'Vagas preenchidas', corpo: `As vagas do plantão ${plantao} em ${onde} foram preenchidas.` }
+          : { titulo: 'Pedido de plantão recusado', corpo: `${quemRespondeu} recusou seu pedido para o plantão ${plantao} em ${onde}.` };
+    return {
+      momento: Date.parse(pedido.decidedAt || ''),
+      destino: pedido.uid,
+      mensagem: {
+        ...mensagem,
+        url: `/group.html?id=${encodeURIComponent(grupo)}&dia=${encodeURIComponent(pedido.shiftDate || '')}`,
+        tag: `vaga-resposta:${grupo}:${chave}`,
       },
     };
   },

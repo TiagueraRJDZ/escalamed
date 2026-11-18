@@ -128,7 +128,8 @@ globalThis.fetch = async (url, opcoes = {}) => {
     // Dev: as regras só deixam o Dev ler config/dev (404 = Dev, 403 = não é)
     if (caminho === 'config/dev') return new Response('{}', { status: uid === 'dev' ? 404 : 403 });
     const [, grupo, , chave] = caminho.split('/');
-    const id = `${grupo}/${chave}`;
+    // Documento do grupo ("groups/g1") fica no mapa pelo caminho inteiro
+    const id = chave === undefined ? caminho : `${grupo}/${chave}`;
     if (!convites[id]) return new Response('{}', { status: 404 });
     if (!leitores[id]?.includes(uid)) return new Response('{}', { status: 403 });
     return new Response(JSON.stringify({ fields: convites[id] }), { status: 200 });
@@ -404,6 +405,86 @@ test('cargo alterado: a pessoa recebe; só quem alterou consegue pedir', async (
   assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a1' }, 'gestora')).enviados, 0);
   assert.equal((await chamar('/push/avisar', { tipo: 'cargo', grupo: 'bruno', chave: 'a2' }, 'gestora')).status, 404);
   assert.equal(entregues.length, 1);
+});
+
+// ---------- Pedidos de plantão vago ----------
+function pedidoFirestore({ status = 'pending', criadoHa = 0, decidedBy, reason } = {}) {
+  return {
+    uid: texto('bruno'),
+    name: texto('Bruno Plantonista'),
+    groupName: texto('UTI Adulto'),
+    month: texto('2026-11'),
+    cell: texto('07_n'),
+    shiftId: texto('n'),
+    shiftTitle: texto('Noturno'),
+    shiftDate: texto('2026-11-07'),
+    shiftStart: texto('19:00'),
+    shiftEnd: texto('01:00'),
+    status: texto(status),
+    createdAt: momento(criadoHa),
+    ...(decidedBy ? { decidedBy: texto(decidedBy), decidedByName: texto('Carla Coordenadora'), decidedAt: momento() } : {}),
+    ...(reason ? { reason: texto(reason) } : {}),
+  };
+}
+
+const lista = (...uids) => ({ arrayValue: { values: uids.map(texto) } });
+
+test('pedido de plantão vago: os coordenadores do grupo recebem; só quem pediu consegue avisar', async () => {
+  const carla = await novoAparelho('carla');
+  const davi = await novoAparelho('davi');
+  const ana = await novoAparelho('ana');
+  await chamar('/push/inscrever', { inscricao: carla.inscricao }, 'carla');
+  await chamar('/push/inscrever', { inscricao: davi.inscricao }, 'davi');
+  await chamar('/push/inscrever', { inscricao: ana.inscricao }, 'ana');
+  convites['g1/2026-11_07_n_bruno'] = pedidoFirestore();
+  leitores['g1/2026-11_07_n_bruno'] = ['bruno', 'carla', 'intruso'];
+  convites['groups/g1'] = { ownerId: texto('ana'), coordinatorIds: lista('carla', 'davi') };
+  leitores['groups/g1'] = ['bruno', 'carla', 'intruso'];
+  const avisar = (uid) => chamar('/push/avisar', { tipo: 'vaga-pedido', grupo: 'g1', chave: '2026-11_07_n_bruno' }, uid);
+  assert.equal((await avisar('intruso')).enviados, 0); // não foi quem pediu
+  assert.equal((await avisar('bruno')).enviados, 2); // os dois coordenadores (a Gestora, não)
+  const mensagem = await abrir(carla, entregues[0].corpo);
+  assert.equal(mensagem.titulo, 'Pedido de plantão vago');
+  assert.equal(mensagem.corpo, 'Bruno Plantonista pediu o plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto. Toque para aceitar ou recusar.');
+  assert.equal(mensagem.url, '/group.html?id=g1&dia=2026-11-07');
+  assert.equal((await avisar('bruno')).enviados, 0); // uma vez só
+  assert.equal(entregues.length, 2);
+});
+
+test('pedido de plantão vago: grupo sem coordenador avisa o Gestor que criou; pedido antigo não', async () => {
+  const ana = await novoAparelho('ana');
+  await chamar('/push/inscrever', { inscricao: ana.inscricao }, 'ana');
+  convites['g1/2026-11_07_n_bruno'] = pedidoFirestore();
+  leitores['g1/2026-11_07_n_bruno'] = ['bruno'];
+  convites['groups/g1'] = { ownerId: texto('ana'), coordinatorIds: lista() };
+  leitores['groups/g1'] = ['bruno'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'vaga-pedido', grupo: 'g1', chave: '2026-11_07_n_bruno' }, 'bruno')).enviados, 1);
+  convites['g1/2026-11_08_n_bruno'] = pedidoFirestore({ criadoHa: 11 * 60 * 1000 });
+  leitores['g1/2026-11_08_n_bruno'] = ['bruno'];
+  assert.equal((await chamar('/push/avisar', { tipo: 'vaga-pedido', grupo: 'g1', chave: '2026-11_08_n_bruno' }, 'bruno')).status, 400);
+});
+
+test('resposta ao pedido: quem pediu recebe (aceito, recusado ou vagas preenchidas)', async () => {
+  const bruno = await novoAparelho('bruno');
+  await chamar('/push/inscrever', { inscricao: bruno.inscricao }, 'bruno');
+  const responder = (chave, uid) => chamar('/push/avisar', { tipo: 'vaga-resposta', grupo: 'g1', chave }, uid);
+  // Pendente ainda não é resposta
+  convites['g1/p0'] = pedidoFirestore();
+  leitores['g1/p0'] = ['bruno', 'carla'];
+  assert.equal((await responder('p0', 'carla')).enviados, 0);
+  convites['g1/p1'] = pedidoFirestore({ status: 'approved', decidedBy: 'carla' });
+  convites['g1/p2'] = pedidoFirestore({ status: 'declined', decidedBy: 'carla' });
+  convites['g1/p3'] = pedidoFirestore({ status: 'declined', decidedBy: 'carla', reason: 'filled' });
+  for (const id of ['p1', 'p2', 'p3']) leitores[`g1/${id}`] = ['bruno', 'carla', 'intruso'];
+  assert.equal((await responder('p1', 'intruso')).enviados, 0); // não foi quem respondeu
+  assert.equal((await responder('p1', 'carla')).enviados, 1);
+  assert.equal((await responder('p2', 'carla')).enviados, 1);
+  assert.equal((await responder('p3', 'carla')).enviados, 1);
+  const [aceito, recusado, preenchido] = await Promise.all(entregues.map((e) => abrir(bruno, e.corpo)));
+  assert.equal(aceito.titulo, 'Pedido de plantão aceito');
+  assert.equal(aceito.corpo, 'Carla Coordenadora aceitou: você está no plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto.');
+  assert.equal(recusado.titulo, 'Pedido de plantão recusado');
+  assert.equal(preenchido.corpo, 'As vagas do plantão Noturno de 07/11 (19h00 às 01h00) em UTI Adulto foram preenchidas.');
 });
 
 // ---------- Teste geral (só Dev) ----------

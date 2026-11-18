@@ -10,7 +10,8 @@ import { groupColor } from '/data/colors.js';
 import { isMember, canCreateTeam, canEditSettings } from '../permissions.js';
 import { groupQueries, mergeGroups, seesDrafts, groupSubtitle } from '../my-groups.js';
 import { onInvitesChange, respondInvite, inviteText } from '../notifications.js';
-import { monthKey, userDays, dayShifts } from '../schedule-math.js';
+import { monthKey, userDays, dayShifts, requestId } from '../schedule-math.js';
+import { watchMyRequests } from '../vacancy-requests.js';
 import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
 import { listenWithRetry, batched } from '../live.js';
 import { formatClock } from '../shifts.js';
@@ -37,6 +38,7 @@ const today = new Date();
 today.setHours(0, 0, 0, 0);
 let selectedDate = today;
 let calendarMonth = null;
+let askedVacancies = new Set(); // pedidos de plantão vago pendentes: "<grupo>/<id do pedido>"
 
 // Calendário: só os grupos em que a pessoa está na escala (Gestor e Administrativo veem
 // todos os grupos na lista, mas os plantões e vagas do calendário são os da pessoa)
@@ -186,9 +188,13 @@ function renderDay() {
         mine.push({ start: shift.startMinute, html: shiftItem({ group, shift, date, badge }) });
         continue;
       }
-      const slots = openSlots(schedule, `${String(day).padStart(2, '0')}_${shiftId}`);
+      const key = `${String(day).padStart(2, '0')}_${shiftId}`;
+      const slots = openSlots(schedule, key);
       if (slots > 0) {
-        const badge = `<span class="badge badge-warning">${slots} ${slots === 1 ? 'vaga' : 'vagas'}</span>`;
+        const month = monthKey(date.getFullYear(), date.getMonth());
+        const badge = askedVacancies.has(`${group.id}/${requestId(month, key, user.uid)}`)
+          ? '<span class="badge badge-primary">Pedido enviado</span>'
+          : `<span class="badge badge-warning">${slots} ${slots === 1 ? 'vaga' : 'vagas'}</span>`;
         open.push({ start: shift.startMinute, html: shiftItem({ group, shift, date, badge }) });
       }
     }
@@ -197,8 +203,15 @@ function renderDay() {
   dayPanel.setAttribute('aria-busy', 'false');
   dayPanel.innerHTML =
     sectionHtml('Seus plantões', sorted(mine), isToday ? 'Você não tem plantão hoje.' : 'Você não tem plantão neste dia.') +
-    sectionHtml('Disponíveis', sorted(open), 'Nenhuma vaga aberta neste dia. Plantões vagos nos seus grupos aparecem aqui.');
+    sectionHtml('Disponíveis', sorted(open), 'Nenhuma vaga aberta neste dia. Plantões vagos nos seus grupos aparecem aqui.') +
+    (open.length ? '<p class="muted text-sm day-hint">Toque numa vaga para pedir o plantão. A coordenação da escala aceita ou recusa.</p>' : '');
 }
+
+// Vagas que a pessoa já pediu e esperam resposta: selo "Pedido enviado"
+watchMyRequests(user.uid, (list) => {
+  askedVacancies = new Set(list.filter((r) => r.status === 'pending').map((r) => `${r.groupId}/${r.docId}`));
+  redraw();
+});
 
 renderDay();
 

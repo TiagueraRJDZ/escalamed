@@ -40,6 +40,7 @@ escalamed/
 │  │  ├─ members.js     mudar cargo, remover, convites
 │  │  ├─ schedule-math.js escala: horas, conflitos de horário, replicação (sem Firebase, com testes)
 │  │  ├─ schedule-data.js escala no Firestore: ler, alocar, vagas, publicar, replicar
+│  │  ├─ vacancy-requests.js pedidos de plantão vago: pedir, cancelar, aceitar e recusar
 │  │  ├─ movements.js   histórico (groups/{g}/movements): gravar no mesmo lote da ação e consultar
 │  │  ├─ shift-report.js relatório de plantões: junta e agrupa por membro (sem Firebase, com testes)
 │  │  ├─ report-export.js exportar o relatório: Excel (SheetJS do CDN) e PDF (impressão)
@@ -181,9 +182,18 @@ O ícone de calendário na barra do topo conecta a conta Google da pessoa. O Esc
 
 Sem o `googleClientId`, o botão Conectar avisa que a integração ainda não foi configurada. Trocar o `GOOGLE_SEGREDO` desconecta todo mundo (os tokens guardados deixam de abrir).
 
+## Pedidos de plantão vago
+
+Plantão vago não é assumido direto: o membro pede e a coordenação da escala responde.
+
+- **Quem pede:** membro do grupo que não altera a escala (Médico e demais profissões). Na gaveta do dia (Calendário do grupo), cada turno com vaga aberta numa escala **publicada** tem **Solicitar plantão**. Não dá para pedir plantão que já começou, em que já está ou que bate no horário com outro plantão seu. Enquanto espera, aparece "Pedido enviado" (com Cancelar pedido) na gaveta e na tela de Escalas (Disponíveis).
+- **Quem responde:** Gestor e o coordenador do grupo (e o Dev). Os pedidos aparecem no sininho, num cartão no topo do Calendário do grupo e na gaveta do dia, com **Aceitar** e **Recusar**. Aceitar escala a pessoa na escala dinâmica, diminui a vaga e registra no Histórico ("Bruno assumiu o plantão vago ... (pedido aceito por Ana)"), tudo numa transação: dois coordenadores aceitando ao mesmo tempo não preenchem a mesma vaga duas vezes. Quando a última vaga acaba, os outros pedidos daquele plantão ficam recusados ("vagas preenchidas"). Se a pessoa já tem plantão no mesmo horário, o app pergunta antes de aceitar.
+- **Resposta:** quem pediu vê no sininho (e no celular, com o push ativo) e dispensa; depois de recusado, pode pedir de novo.
+- **Dados:** `groups/{g}/vacancyRequests/{mês}_{célula}_{uid}` (um pedido por pessoa e plantão). As regras (`firestore.rules`) conferem que a vaga está aberta numa escala publicada, que só a coordenação responde e que aceitar acontece no mesmo lote em que a pessoa entra no plantão.
+
 ## Notificações push no celular
 
-Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado) e **convite aceito** ou **recusado** (para quem convidou). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
+Os avisos do sininho também chegam no aparelho, mesmo com o EscalaMed fechado: **convite para um grupo** (para quem foi convidado), **convite aceito** ou **recusado** (para quem convidou), **pedido de plantão vago** (para os coordenadores do grupo; sem coordenador, para o Gestor que criou o grupo) e a **resposta ao pedido** (para quem pediu). É Web Push padrão, sem Firebase Cloud Messaging: o serviço de contas (`worker/src/push.js`) cifra a mensagem (RFC 8291) e se identifica com uma chave VAPID (RFC 8292), sem bibliotecas.
 
 - **Onde ativar:** no topo da gaveta do sininho (`notifications.js`), por aparelho e por conta. Ali também ficam Testar (os aparelhos da própria conta) e Desativar. O Dev tem ainda **Testar em todos os aparelhos**: manda "Teste de notificações" para todas as contas com push ativo, celular e computador (`/push/teste-geral`, em lotes de 40 por causa do limite de requisições do plano gratuito do Cloudflare). Quem sai da conta deixa de receber naquele aparelho (e volta a receber sozinho se entrar de novo).
 - **iPhone/iPad:** só no EscalaMed adicionado à Tela de Início (iOS 16.4 ou mais novo); no Safari comum, a gaveta mostra o passo a passo. O app da Tela de Início tem login próprio (entra uma vez nele). Android, computador (Chrome, Edge, Firefox) e Safari do Mac funcionam direto no navegador.

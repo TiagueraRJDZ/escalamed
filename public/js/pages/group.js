@@ -15,6 +15,7 @@ import {
   canEditSettings,
   canLeave,
   canRemoveMember,
+  canTakeShifts,
   isMarkedCoordinator,
   platformRoleOf,
 } from '../permissions.js';
@@ -31,7 +32,19 @@ import {
   dayShifts,
   memberMinutes,
   formatHours,
+  parseCellKey,
+  requestId,
+  requestBlock,
 } from '../schedule-math.js';
+import {
+  watchMyRequests,
+  watchGroupRequests,
+  requestVacancy,
+  removeRequest,
+  answerRequest,
+  requestShiftText,
+  BLOCK_TEXT,
+} from '../vacancy-requests.js';
 import { scheduleShifts, schedulesQuery, schedulesFrom, shiftsRef, shiftsFrom } from '../schedule-data.js';
 import { listenWithRetry, batched } from '../live.js';
 import {
@@ -753,9 +766,11 @@ async function renderDay() {
         )
         .join('');
       const open = vacancies ? `<span class="badge badge-warning">${vacancies} ${vacancies === 1 ? 'vaga' : 'vagas'}</span>` : '';
+      const request = dayState.mode === 'dynamic' ? requestHtml(schedule, shifts, month, cellKey(day, shiftId), vacancies) : '';
       return `<article class="day-shift">
         <header><strong>${escapeHtml(shift.title)} - ${formatClock(shift.startMinute)} às ${formatClock(shift.endMinute)}</strong>${open}</header>
         ${people ? `<ul>${people}</ul>` : '<p class="muted text-sm">Ninguém escalado.</p>'}
+        ${request}
       </article>`;
     })
     .join('');
@@ -784,9 +799,190 @@ $('drawer-day').addEventListener('click', (event) => {
     renderDay();
     return;
   }
+  const ask = event.target.closest('[data-request-ask]');
+  if (ask) {
+    askVacancy(ask, ask.dataset.requestAsk);
+    return;
+  }
+  const cancel = event.target.closest('[data-request-cancel]');
+  if (cancel) {
+    cancelVacancyRequest(cancel, cancel.dataset.requestCancel);
+    return;
+  }
+  if (answerFromClick(event)) return;
   const person = event.target.closest('[data-person]');
   if (person) openShiftDetail(person.dataset.person, person.dataset.shift);
 });
+
+// ---------- Pedidos de plantão vago ----------
+// Membro (sem poder alterar a escala): pede a vaga na gaveta do dia e acompanha o pedido.
+// Gestor e coordenador do grupo: cartão no topo do Calendário e os pedidos de cada vaga na
+// gaveta do dia, com Aceitar e Recusar (vacancy-requests.js).
+let myRequests = new Map(); // docId → pedido meu neste grupo
+let groupRequests = []; // pedidos pendentes do grupo (coordenação)
+let stopMyRequests = null;
+let stopGroupRequests = null;
+
+const answersRequests = () => group.type === 'team' && can(myRole, 'editSchedule');
+const asksVacancies = () => group.type === 'team' && canTakeShifts(group, user.uid) && !can(myRole, 'editSchedule');
+
+// Liga ou desliga as escutas conforme o papel (o papel pode mudar com a página aberta)
+function listenRequests() {
+  if (asksVacancies() && !stopMyRequests) {
+    stopMyRequests = watchMyRequests(user.uid, (list) => {
+      myRequests = new Map(list.filter((r) => r.groupId === groupId).map((r) => [r.docId, r]));
+      if ($('drawer-day').open) renderDay();
+    });
+  } else if (!asksVacancies() && stopMyRequests) {
+    stopMyRequests();
+    stopMyRequests = null;
+    myRequests = new Map();
+  }
+  if (answersRequests() && !stopGroupRequests) {
+    stopGroupRequests = watchGroupRequests(groupId, (list) => {
+      groupRequests = list;
+      renderRequests();
+      if ($('drawer-day').open) renderDay();
+    });
+  } else if (!answersRequests() && stopGroupRequests) {
+    stopGroupRequests();
+    stopGroupRequests = null;
+    groupRequests = [];
+  }
+}
+
+const stillMember = (r) => Boolean(group?.memberIds?.includes(r.uid));
+
+// Quem saiu do grupo não pode mais entrar na escala: o pedido só pode ser recusado
+const answerButtons = (r) => `<button type="button" class="btn btn-secondary" data-request-answer="no">Recusar</button>
+  ${stillMember(r) ? '<button type="button" class="btn btn-primary" data-request-answer="yes">Aceitar</button>' : ''}`;
+
+// Cartão "Solicitações de plantão vago" (só aparece com pedido esperando)
+function renderRequests() {
+  const box = $('vacancy-requests');
+  box.hidden = !groupRequests.length;
+  if (!groupRequests.length) {
+    box.innerHTML = '';
+    return;
+  }
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const list = [...groupRequests].sort(
+    (a, b) => String(a.shiftDate).localeCompare(String(b.shiftDate)) || String(a.shiftStart).localeCompare(String(b.shiftStart)),
+  );
+  box.innerHTML = `<h2 class="requests-title">${icon('hourglass')}Solicitações de plantão vago (${list.length})</h2>
+    <p class="muted text-sm">Aceite para escalar a pessoa na vaga. Quem pediu recebe a resposta no sininho.</p>
+    <ul class="request-list">${list
+      .map((r) => {
+        const person = byId.get(r.uid) ?? { id: r.uid, name: r.name };
+        return `<li class="request-item" data-request="${escapeHtml(r.docId)}">
+          ${avatarHtml(person, 'avatar day-avatar')}
+          <div class="request-info">
+            <strong>${escapeHtml(person.name ?? r.name)}</strong>
+            <span class="muted">${requestShiftText(r)}${stillMember(r) ? '' : ' · saiu do grupo'}</span>
+          </div>
+          <div class="request-actions">
+            <button type="button" class="btn btn-ghost" data-request-day="${escapeHtml(r.shiftDate)}">Ver o dia</button>
+            ${answerButtons(r)}
+          </div>
+        </li>`;
+      })
+      .join('')}</ul>`;
+}
+
+$('vacancy-requests').addEventListener('click', (event) => {
+  const day = event.target.closest('[data-request-day]');
+  if (day) {
+    openDay(day.dataset.requestDay.slice(0, 7), Number(day.dataset.requestDay.slice(8)));
+    return;
+  }
+  answerFromClick(event);
+});
+
+// Aceitar ou Recusar (no cartão ou na gaveta do dia). true se o clique foi num desses botões.
+function answerFromClick(event) {
+  const button = event.target.closest('[data-request-answer]');
+  if (!button) return false;
+  const request = groupRequests.find((r) => r.docId === button.closest('[data-request]')?.dataset.request);
+  if (!request) return true;
+  (async () => {
+    setLoading(button, true);
+    const ok = await answerRequest(request, button.dataset.requestAnswer === 'yes', {
+      deciderName: profile?.name,
+      pending: groupRequests,
+    });
+    if (!ok && button.isConnected) setLoading(button, false);
+  })();
+  return true;
+}
+
+// Bloco embaixo de cada turno na gaveta do dia (só na escala dinâmica publicada)
+function requestHtml(schedule, shifts, month, key, vacancies) {
+  if (schedule?.status !== 'published') return '';
+  if (stopGroupRequests) {
+    const list = groupRequests.filter((r) => r.month === month && r.cell === key);
+    if (!list.length) return '';
+    return `<div class="day-request">
+      <span class="day-request-title">Pedidos desta vaga (${list.length})</span>
+      ${list
+        .map(
+          (r) => `<div class="day-request-status" data-request="${escapeHtml(r.docId)}">
+            <span>${escapeHtml(members.find((m) => m.id === r.uid)?.name ?? r.name)}${stillMember(r) ? '' : ' <span class="muted">(saiu do grupo)</span>'}</span>
+            <span class="request-actions">${answerButtons(r)}</span>
+          </div>`,
+        )
+        .join('')}
+    </div>`;
+  }
+  if (!stopMyRequests) return '';
+  const mine = myRequests.get(requestId(month, key, user.uid));
+  if (mine?.status === 'pending') {
+    return `<div class="day-request">
+      <div class="day-request-status">
+        <span class="badge badge-warning">Pedido enviado</span>
+        <button type="button" class="btn btn-ghost" data-request-cancel="${escapeHtml(mine.docId)}">Cancelar pedido</button>
+      </div>
+      <p class="muted text-sm">A coordenação da escala vai aceitar ou recusar. A resposta chega no sininho.</p>
+    </div>`;
+  }
+  if (!vacancies) return '';
+  const block = requestBlock(schedule, shifts, user.uid, month, key);
+  if (block === 'assigned') return '';
+  const declined = mine?.status === 'declined' ? '<p class="muted text-sm">Seu pedido anterior para esta vaga foi recusado.</p>' : '';
+  if (block) return `<div class="day-request">${declined}<p class="muted text-sm">${BLOCK_TEXT[block]}</p></div>`;
+  return `<div class="day-request">${declined}
+    <button type="button" class="btn btn-primary" data-request-ask="${escapeHtml(key)}">${icon('userPlus')}${mine ? 'Pedir de novo' : 'Solicitar plantão'}</button>
+  </div>`;
+}
+
+async function askVacancy(button, key) {
+  const { month } = dayState;
+  const schedule = await monthData(month).catch(() => null);
+  const shifts = scheduleShifts(schedule, liveShifts);
+  const block = requestBlock(schedule, shifts, user.uid, month, key);
+  if (block) {
+    toast(BLOCK_TEXT[block], 'error');
+    return;
+  }
+  setLoading(button, true);
+  try {
+    await requestVacancy(group, month, key, shifts[parseCellKey(key).shiftId], profile?.name);
+    toast('Pedido enviado. A coordenação da escala vai aceitar ou recusar.', 'success');
+  } catch (error) {
+    toast(firebaseErrorMessage(error), 'error');
+    if (button.isConnected) setLoading(button, false);
+  }
+}
+
+async function cancelVacancyRequest(button, docId) {
+  setLoading(button, true);
+  try {
+    await removeRequest(groupId, docId);
+    toast('Pedido cancelado.');
+  } catch (error) {
+    toast(firebaseErrorMessage(error), 'error');
+    if (button.isConnected) setLoading(button, false);
+  }
+}
 
 // ---------- Detalhes do plantão ----------
 const detailDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -904,6 +1100,8 @@ onSnapshot(
     $('invite-button').hidden = !can(myRole, 'manageMembers');
     listenInvites();
     listenCalendar();
+    listenRequests();
+    renderRequests();
     renderMembers();
     renderInvites();
 
@@ -930,7 +1128,10 @@ onSnapshot(
   collection(db, 'groups', groupId, 'members'),
   (snapshot) => {
     members = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (group) renderMembers();
+    if (group) {
+      renderMembers();
+      renderRequests();
+    }
     if ($('drawer-day').open) renderDay();
   },
   () => {}, // sem acesso: o listener do grupo já cuida de sair da página
